@@ -1,0 +1,217 @@
+/* soloyolo hero. Corner bleed: the window sits one gutter from the top and runs off the right
+   and bottom; the source card straddles its left edge over the sidebar, half outside. */
+.sy {
+  & .ss-stage {
+    --gutter: 32px;
+    /* soloyolo's tokens (spike/viewer.html) mapped onto the kit's */
+    --ss-accent: #e8590c;
+    --ss-accent-soft: #fdeee4;
+    --ss-success: #2f7d4f;
+    --ss-text-strong: #161616;
+    overflow: hidden;
+    border-radius: 14px;
+    background: var(--ss-well);
+  }
+
+  .sy-window {
+    position: absolute;
+    top: var(--gutter);
+    left: 132px;
+    width: 700px;
+    height: 360px;
+    box-shadow: var(--ss-shadow-hero);
+  }
+
+  /* ---- Sidebar: people, ranked ---- */
+  .sy-people {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 2px 8px;
+  }
+
+  .sy-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ss-text-strong);
+  }
+
+  /* ---- Content ---- */
+  .sy-main {
+    display: flex;
+    flex-direction: column;
+    padding: 0 16px 16px;
+  }
+
+  .sy-meta {
+    display: flex;
+    gap: 8px;
+    margin-top: 2px;
+  }
+
+  .sy-label {
+    margin: 18px 0 8px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ss-text-faint);
+  }
+
+  .sy-promise {
+    width: 344px; /* ends one gutter from the stage's right edge */
+    padding: 12px;
+    border: 1px solid var(--ss-line-strong, rgba(0, 0, 0, 0.09));
+    border-radius: 10px;
+    background: var(--ss-surface);
+    transition: box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+
+  /* Lifted the way the product would, when its source is open: no ring */
+  .sy-promise[data-open] {
+    border-color: transparent;
+    box-shadow: var(--ss-shadow-card);
+  }
+
+  .sy-promise-line {
+    display: grid;
+    grid-template-columns: 16px 1fr auto;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .sy-what {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--ss-text-strong);
+    text-decoration: line-through;
+    text-decoration-color: transparent;
+    transition: color 0.3s ease, text-decoration-color 0.3s ease;
+  }
+
+  .sy-promise[data-done] .sy-what {
+    color: var(--ss-text-faint);
+    text-decoration-color: var(--ss-text-faint);
+  }
+
+  .sy-due {
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ss-accent);
+    transition: color 0.2s ease;
+  }
+
+  .sy-due[data-done] {
+    color: var(--ss-success);
+  }
+
+  .sy-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 10px;
+  }
+
+  .sy-btn {
+    padding: 5px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 7px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--ss-text-strong);
+    background: var(--ss-surface);
+    transition: background 0.12s ease, transform 0.12s ease;
+    will-change: transform; /* its label never hops when a press settles */
+  }
+
+  .sy-btn[data-hover] { background: #f4f4f2; }
+  .sy-btn[data-pressed] { transform: scale(0.97); }
+
+  .sy-btn--send {
+    min-width: 64px;
+    text-align: center;
+    border-color: transparent;
+    background: #161616;
+    color: #fff;
+  }
+
+  .sy-btn--send[data-hover] { background: #2a2a2a; }
+  .sy-btn--send[data-sent] { background: var(--ss-success); }
+
+  .sy-compose {
+    padding-top: 10px;
+  }
+
+  .sy-field {
+    min-height: 52px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--ss-canvas);
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--ss-text-strong);
+  }
+
+  .sy-filler {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 344px;
+    padding: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 10px;
+    background: var(--ss-surface);
+  }
+
+  /* ---- The source: a message from Messages, so Messages' own blue ---- */
+  .sy-source {
+    --ss-accent: #0a84ff;
+    position: absolute;
+    left: var(--gutter);
+    bottom: var(--gutter);
+    z-index: 5;
+    width: max-content;
+    max-width: 230px;
+    padding: 12px 12px 16px;
+    border-radius: 12px;
+    background: var(--ss-surface);
+    box-shadow: var(--ss-shadow-satellite);
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+    transition: opacity 0.18s ease, transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+    will-change: transform;
+  }
+
+  .sy-source[data-show] {
+    opacity: 1;
+    transform: none;
+  }
+
+  .sy-source-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .sy-source-when {
+    font-size: 11px;
+    color: var(--ss-text-faint);
+  }
+
+  .sy-thread {
+    margin: 0 -6px; /* the thread's own side inset, so the card pads evenly */
+    font-size: 12px;
+  }
+
+  /* ---- Compact: no sidebar, the card full width, the source over the filler ---- */
+  & .ss-stage[data-layout='compact'] { --gutter: 16px; }
+  & .ss-stage[data-layout='compact'] .sy-window { left: var(--gutter); width: 420px; height: 380px; }
+  & .ss-stage[data-layout='compact'] .sy-promise,
+  & .ss-stage[data-layout='compact'] .sy-filler { width: 294px; }
+  /* The source covers only the filler row here, so it drops its header to stay clear of the card */
+  & .ss-stage[data-layout='compact'] .sy-source-head { display: none; }
+  & .ss-stage[data-layout='compact'] .sy-source { left: auto; right: var(--gutter); max-width: 280px; }
+}
