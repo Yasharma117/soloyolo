@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>soloyolo</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --surface: #ffffff; --ink: #161616; --ink-2: #5c5c58; --ink-3: #9a9a95;
+    --line: #e4e4e0; --accent: #e8590c; --accent-soft: #fdeee4; --ok: #2f7d4f; --ok-soft: #e7f3ec;
+    --me: #161616; --me-ink: #ffffff; --them: #ecece8;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111110; --surface: #1a1a19; --ink: #ededea; --ink-2: #a3a39e; --ink-3: #6b6b67;
+      --line: #2a2a28; --accent: #ff7a2f; --accent-soft: #2e1c11; --ok: #5cbf86; --ok-soft: #13261b;
+      --me: #ededea; --me-ink: #111110; --them: #262624;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
+  .app { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; height: 100vh; }
+  header { padding: 20px 20px 12px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  header p { margin: 2px 0 0; color: var(--ink-3); font-size: 12px; }
+  aside { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--surface); }
+  .list { overflow-y: auto; flex: 1; }
+  .person { display: block; width: 100%; text-align: left; border: 0; background: none; color: inherit; font: inherit;
+            padding: 14px 20px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .person:hover { background: var(--bg); }
+  .person[aria-current="true"] { background: var(--bg); box-shadow: inset 2px 0 0 var(--ink); }
+  .row1 { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .name { font-weight: 600; }
+  .when { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .hint { margin-top: 3px; font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hint.owe { color: var(--accent); }
+  main { overflow-y: auto; min-height: 0; }
+  .detail { max-width: 720px; margin: 0 auto; padding: 32px 32px 64px; }
+  .detail h2 { margin: 0; font-size: 22px; letter-spacing: -0.02em; }
+  .meta { color: var(--ink-3); font-size: 12px; margin-top: 4px; }
+  .topics { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .topic { font-size: 12px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-2); }
+  section { margin-top: 28px; }
+  section h3 { margin: 0 0 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+  .c { display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; align-items: baseline; padding: 10px 12px;
+       border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin-bottom: 6px; cursor: pointer; }
+  .c:hover { border-color: var(--ink-3); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ink-3); transform: translateY(1px); }
+  .c.open.mine .dot { border-color: var(--accent); }
+  .c.done { color: var(--ink-3); }
+  .c.done .dot { background: var(--ok); border-color: var(--ok); }
+  .c.done .what { text-decoration: line-through; text-decoration-color: var(--ink-3); }
+  .due { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .due.late { color: var(--accent); font-weight: 600; }
+  .empty { color: var(--ink-3); font-size: 13px; }
+  .thread { display: flex; flex-direction: column; gap: 4px; }
+  .day { align-self: center; font-size: 11px; color: var(--ink-3); margin: 14px 0 6px; }
+  .b { max-width: 78%; padding: 7px 12px; border-radius: 16px; font-size: 14px; scroll-margin: 120px; }
+  .b.me { align-self: flex-end; background: var(--me); color: var(--me-ink); }
+  .b.them { align-self: flex-start; background: var(--them); }
+  .b.src { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .b.fin { outline: 2px solid var(--ok); outline-offset: 2px; }
+  .b.flash { animation: flash 1.2s ease-out; }
+  @keyframes flash { from { box-shadow: 0 0 0 8px var(--accent-soft); } to { box-shadow: 0 0 0 0 transparent; } }
+  .foot { padding: 10px 20px; border-top: 1px solid var(--line); font-size: 11px; color: var(--ink-3); }
+  @media (max-width: 760px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; }
+    aside { border-right: 0; border-bottom: 1px solid var(--line); }
+    .list { max-height: 40vh; }
+    .detail { padding: 24px 16px 48px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .b.flash { animation: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <header><h1>soloyolo</h1><p id="summary">Loading…</p></header>
+    <div class="list" id="list" role="list"></div>
+    <div class="foot" id="foot">Local only · 127.0.0.1</div>
+  </aside>
+  <main><div class="detail" id="detail"></div></main>
+</div>
+<script>
+const DAY = 86400000;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ago = (ts) => {
+  const d = Math.floor((Date.now() - ts * 1000) / DAY);
+  return d <= 0 ? "today" : d === 1 ? "yesterday" : d < 30 ? `${d}d ago` : new Date(ts * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+};
+const dueLabel = (iso) => {
+  if (!iso) return { text: "", late: false };
+  const d = Math.round((new Date(iso + "T23:59:59") - Date.now()) / DAY);
+  if (d < 0) return { text: `${-d}d overdue`, late: true };
+  return { text: d === 0 ? "due today" : `due in ${d}d`, late: false };
+};
+const openMine = (p) => p.commitments.filter((c) => c.owner === "me" && c.status === "open");
+
+let people = [], current = null;
+
+function renderList() {
+  const owed = people.reduce((n, p) => n + openMine(p).length, 0);
+  $("#summary").textContent = `${people.length} people · you owe ${owed} follow-up${owed === 1 ? "" : "s"}`;
+  $("#list").innerHTML = people.map((p) => {
+    const mine = openMine(p)[0];
+    const theirs = p.commitments.find((c) => c.owner === "them" && c.status === "open");
+    const hint = mine ? `<div class="hint owe">You owe: ${esc(mine.action)}</div>`
+      : theirs ? `<div class="hint">Owes you: ${esc(theirs.action)}</div>`
+      : `<div class="hint">${p.count} messages</div>`;
+    return `<button class="person" role="listitem" data-id="${p.id}" aria-current="${p.id === current}">
+      <div class="row1"><span class="name">${esc(p.name)}</span><span class="when">${ago(p.last)}</span></div>${hint}</button>`;
+  }).join("");
+}
+
+function commitmentRow(c) {
+  const due = c.status === "open" ? dueLabel(c.due) : { text: "done", late: false };
+  return `<div class="c ${c.status} ${c.owner === "me" ? "mine" : ""}" data-src="${c.source_message_id}" data-fin="${c.done_message_id ?? ""}">
+    <span class="dot"></span><span class="what">${esc(c.action)}</span><span class="due ${due.late ? "late" : ""}">${due.text}</span></div>`;
+}
+
+async function select(id) {
+  current = id;
+  renderList();
+  const p = people.find((x) => x.id === id);
+  const thread = await (await fetch(`/api/thread/${id}`)).json();
+  const src = new Set(p.commitments.map((c) => c.source_message_id));
+  const fin = new Set(p.commitments.map((c) => c.done_message_id).filter(Boolean));
+  const mine = p.commitments.filter((c) => c.owner === "me"), theirs = p.commitments.filter((c) => c.owner === "them");
+  let lastDay = "";
+  const bubbles = thread.map((m) => {
+    const day = new Date(m.ts * 1000).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    const sep = day !== lastDay ? `<div class="day">${day}</div>` : "";
+    lastDay = day;
+    const cls = [m.from_me ? "me" : "them", src.has(m.id) ? "src" : "", fin.has(m.id) ? "fin" : ""].join(" ");
+    return `${sep}<div class="b ${cls}" id="m${m.id}">${esc(m.text)}</div>`;
+  }).join("");
+  $("#detail").innerHTML = `
+    <h2>${esc(p.name)}</h2>
+    <div class="meta">${p.count} messages · last ${ago(p.last)} · extracted by ${esc(p.commitments[0]?.extractor ?? "—")}</div>
+    ${p.topics.length ? `<div class="topics">${p.topics.map((t) => `<span class="topic">${esc(t)}</span>`).join("")}</div>` : ""}
+    <section><h3>You owe</h3>${mine.map(commitmentRow).join("") || `<div class="empty">Nothing.</div>`}</section>
+    <section><h3>Owes you</h3>${theirs.map(commitmentRow).join("") || `<div class="empty">Nothing.</div>`}</section>
+    <section><h3>Thread</h3><div class="thread">${bubbles}</div></section>`;
+  $("main").scrollTop = 0;
+}
+
+$("#list").addEventListener("click", (e) => { const b = e.target.closest(".person"); if (b) select(Number(b.dataset.id)); });
+$("#detail").addEventListener("click", (e) => {
+  const c = e.target.closest(".c"); if (!c) return;
+  const el = document.getElementById("m" + (c.dataset.fin || c.dataset.src));
+  if (!el) return;
+  el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+  el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+});
+
+fetch("/api/people").then((r) => r.json()).then((data) => {
+  people = data;
+  const models = [...new Set(people.flatMap((p) => p.commitments.map((c) => c.extractor)))].filter((m) => m !== "heuristic");
+  $("#foot").textContent = models.length
+    ? `Served from 127.0.0.1 · thread text was sent to ${models.join(", ")} for extraction`
+    : "Local only · 127.0.0.1 · no message text has left this machine";
+  renderList();
+  if (people.length) select(people[0].id); else $("#detail").innerHTML = `<p class="empty">No messages yet. Run <code>python -m spike ingest</code>.</p>`;
+});
+</script>
+</body>
+</html>

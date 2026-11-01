@@ -1,0 +1,79 @@
+# Content spike
+
+**The question:** does reading what you said beat counting how often you said it? Mesh knows you texted Sam
+40 times. This spike tries to find that you *promised Sam an intro nine days ago and haven't sent it*.
+
+If that works on real threads, it's soloyolo's wedge. If it doesn't, the Go daemon is plumbing for a product
+nobody needs. So this comes first.
+
+```
+chat.db (read-only) ──► store (SQLite: person, handle, message, commitment, topic) ──► viewer (127.0.0.1)
+                                         ▲
+                       extractor: heuristic (offline) │ Claude (--cloud, opt-in)
+```
+
+## Run it
+
+```bash
+pip install -r spike/requirements.txt
+```
+
+Demo on synthetic data (works anywhere):
+
+```bash
+python -m spike demo
+```
+
+On your own Messages history (macOS; give your terminal Full Disk Access first):
+
+```bash
+python -m spike ingest --days 90
+```
+
+```bash
+python -m spike extract            # offline regexes: a floor, misses most phrasing
+```
+
+```bash
+python -m spike extract --cloud    # Claude; see the privacy note below
+```
+
+```bash
+python -m spike serve              # http://127.0.0.1:8765
+```
+
+Tests (offline, never call the API):
+
+```bash
+python -m unittest spike.test_spike
+```
+
+## Privacy, stated plainly
+
+- `ingest` reads `chat.db` read-only and copies 1:1 thread text into `soloyolo.db` in the current folder.
+  That file is your message history: it's git-ignored, and you should treat it like `chat.db`.
+- `extract --cloud` **sends each thread's text to the Anthropic API.** That breaks the local-first promise,
+  which is why it needs a flag and the viewer's footer says so. It's fine for testing whether the idea works on
+  your own data. A shipping product needs on-device extraction, or explicit per-person consent.
+- The viewer binds to `127.0.0.1` only and never logs message text.
+
+## How to judge the result (the actual experiment)
+
+Run `ingest --days 90`, then `extract --cloud`, then go through the "You owe" lists and score each item:
+
+| Score | Meaning |
+|---|---|
+| ✅ useful | A real promise you'd forgotten or were about to drop |
+| ➖ true but known | A real promise you already had in mind |
+| ❌ wrong | Not a promise, wrong person, or already done |
+
+**Kill or continue:** continue if the last 90 days surface **at least 5 ✅** and **❌ stays under a third** of
+items. Below that, the thesis is weak: ranking by message counts (what Mesh does) would be nearly as good.
+
+## Known limits (deliberate, for a spike)
+
+- **1:1 threads only.** Group chats need per-speaker attribution and a different prompt.
+- **iMessage/SMS only.** WhatsApp arrives through `connectord` (the Go daemon), which writes to the same model.
+- **No contact names** from Apple Contacts yet; people show as phone numbers or emails outside the demo.
+- **Reads the last 300 messages per person.** Older promises are out of scope.
+- **Re-extraction replaces the person's commitments**, so manual edits wouldn't survive it. There are no manual edits yet.
