@@ -1,3 +1,6 @@
-refs/
-rea-out/
 .DS_Store
+# >100MB, GitHub rejects
+rea-out/mesh-desktop.json
+refs/mesh-desktop/Mesh-3.0.9-universal.dmg
+refs/mesh-desktop/x/node_modules/@mesh/sync-engine-sdk-darwin-universal/native/mesh-integrations
+refs/mesh-desktop/app.asar.unpacked/node_modules/@mesh/sync-engine-sdk-darwin-universal/native/mesh-integrations

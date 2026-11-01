@@ -1,0 +1,33 @@
+[submodule "refs/platform-imessage"]
+	path = refs/platform-imessage
+	url = https://github.com/beeper/platform-imessage
+[submodule "refs/desktop-api-mcp"]
+	path = refs/desktop-api-mcp
+	url = https://github.com/beeper/desktop-api-mcp
+[submodule "refs/mautrix-go"]
+	path = refs/mautrix-go
+	url = https://github.com/mautrix/go
+[submodule "refs/ai-bridge"]
+	path = refs/ai-bridge
+	url = https://github.com/beeper/ai-bridge
+[submodule "refs/cli"]
+	path = refs/cli
+	url = https://github.com/beeper/cli
+[submodule "refs/babbleserv"]
+	path = refs/babbleserv
+	url = https://github.com/beeper/babbleserv
+[submodule "refs/desktop-api-js"]
+	path = refs/desktop-api-js
+	url = https://github.com/beeper/desktop-api-js
+[submodule "refs/beeper-ingestor"]
+	path = refs/beeper-ingestor
+	url = https://github.com/beeper/beeper-ingestor
+[submodule "refs/bridge-manager"]
+	path = refs/bridge-manager
+	url = https://github.com/beeper/bridge-manager
+[submodule "refs/dummybridge"]
+	path = refs/dummybridge
+	url = https://github.com/beeper/dummybridge
+[submodule "refs/_skills/rea"]
+	path = refs/_skills/rea
+	url = https://github.com/morluto/rea
