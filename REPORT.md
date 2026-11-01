@@ -215,7 +215,9 @@ through Beeper Desktop's API, with no need to embed the bridges.
 
 ## 3. Build it: soloyolo = local-first Mesh on Beeper's pipes
 
-> Not depending on Beeper or Matrix, plus where Beeper and Mesh fail: see `BUILD-WITHOUT-BEEPER.md`.
+> **Superseded.** This was the first plan (build on Beeper Desktop's API). The current plan is in
+> `BUILD-WITHOUT-BEEPER.md`: own the data model, use the protocol libraries directly, and treat Beeper/Matrix
+> as optional transports. Kept here because the Beeper Desktop API is still a valid fallback adapter.
 
 The cheap version that beats both on privacy:
 1. **Ingest**: Beeper Desktop API `GET /v1/accounts/*/contacts` + `GET /v1/chats` + `/v1/ws` events → every network, already logged in,
