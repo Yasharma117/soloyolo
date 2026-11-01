@@ -2,6 +2,7 @@
 
 This is the "own your data model" rule from BUILD-WITHOUT-BEEPER.md. chat.db, WhatsApp or
 Beeper are just sources that write into it. One SQLite file, on the user's machine.
+The schema lives in connectord/internal/store/core.sql so the Go daemon and this spike share it.
 """
 from __future__ import annotations
 
@@ -11,45 +12,7 @@ import time
 from pathlib import Path
 from typing import Iterable
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS person (
-  id INTEGER PRIMARY KEY,
-  display_name TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS handle (
-  network TEXT NOT NULL,           -- imessage | whatsapp | telegram ...
-  address TEXT NOT NULL,           -- phone, email, or network user id
-  person_id INTEGER NOT NULL REFERENCES person(id),
-  PRIMARY KEY (network, address)
-);
-CREATE TABLE IF NOT EXISTS message (
-  id INTEGER PRIMARY KEY,
-  network TEXT NOT NULL,
-  remote_id TEXT NOT NULL,         -- the network's own id; dedupes live vs backfill
-  person_id INTEGER NOT NULL REFERENCES person(id),
-  ts REAL NOT NULL,
-  from_me INTEGER NOT NULL,
-  text TEXT NOT NULL,
-  UNIQUE (network, remote_id)
-);
-CREATE INDEX IF NOT EXISTS message_person_ts ON message(person_id, ts);
-CREATE TABLE IF NOT EXISTS commitment (
-  id INTEGER PRIMARY KEY,
-  person_id INTEGER NOT NULL REFERENCES person(id),
-  owner TEXT NOT NULL CHECK (owner IN ('me', 'them')),
-  action TEXT NOT NULL,
-  due TEXT,                        -- ISO date, when one was stated or implied
-  status TEXT NOT NULL CHECK (status IN ('open', 'done')),
-  source_message_id INTEGER NOT NULL REFERENCES message(id),
-  done_message_id INTEGER REFERENCES message(id),
-  extractor TEXT NOT NULL          -- 'heuristic' | model id
-);
-CREATE TABLE IF NOT EXISTS topic (
-  person_id INTEGER NOT NULL REFERENCES person(id),
-  label TEXT NOT NULL,
-  PRIMARY KEY (person_id, label)
-);
-"""
+SCHEMA = (Path(__file__).resolve().parents[1] / "connectord/internal/store/core.sql").read_text()
 
 HALF_LIFE_DAYS = 30  # same decay as mini_mesh.py
 
