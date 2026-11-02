@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    name: spike (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false # nothing after checkout needs the token
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r spike/requirements.txt
+      # Offline: the Claude extractors are tested with a fake CLI and a mock client.
+      - run: python -m unittest spike.test_spike -v
+      - run: python mini_mesh.py --demo
+
+  connectord:
+    name: connectord (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: connectord
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false # nothing after checkout needs the token
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: connectord/go.mod
+          cache-dependency-path: connectord/go.sum
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  site:
+    name: site (build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false # nothing after checkout needs the token
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: npm ci
+      - run: npm run build

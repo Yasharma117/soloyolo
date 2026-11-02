@@ -1,6 +1,19 @@
 .DS_Store
-# >100MB, GitHub rejects
-rea-out/mesh-desktop.json
-refs/mesh-desktop/Mesh-3.0.9-universal.dmg
-refs/mesh-desktop/x/node_modules/@mesh/sync-engine-sdk-darwin-universal/native/mesh-integrations
-refs/mesh-desktop/app.asar.unpacked/node_modules/@mesh/sync-engine-sdk-darwin-universal/native/mesh-integrations
+node_modules/
+dist/
+*.tsbuildinfo
+__pycache__/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+
+# Proprietary third-party material: keep local, never commit (see refs/README.md)
+refs/mesh-desktop/
+refs/mesh-wasm/
+refs/mesh-web/
+rea-out/
+
+# Go build output
+connectord/bin/
