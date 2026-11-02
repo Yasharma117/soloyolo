@@ -24,7 +24,19 @@ Demo on synthetic data (works anywhere):
 python -m spike demo
 ```
 
-On your own Messages history (macOS; give your terminal Full Disk Access first):
+From WhatsApp exports (any phone; you pick the chats). On the phone, open a 1:1 chat → the contact's
+name (iPhone) or ⋮ → More (Android) → **Export chat** → **Without media**. Do this for 5–10 people you talk
+to often, then:
+
+```bash
+python -m spike import-whatsapp ~/Downloads/WhatsApp*.zip --tz Asia/Kolkata
+```
+
+It reads iPhone and Android layouts, any date order and 12/24-hour clocks, drops media placeholders and
+system notices, and skips group chats. With 2+ chats it works out which sender is you; with one, add
+`--me "Your Name"`. Re-importing a newer export of the same chat only adds new messages.
+
+Or from your own Messages history (macOS; give your terminal Full Disk Access first):
 
 ```bash
 python -m spike ingest --days 90

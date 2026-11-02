@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import chatdb, fixture
+from . import chatdb, fixture, whatsapp_export
 from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor
 from .store import Store
 
@@ -83,6 +83,12 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("--chatdb", type=Path, default=chatdb.DEFAULT_PATH)
     i.add_argument("--days", type=int, default=180, help="how far back to read (0 = everything)")
 
+    w = sub.add_parser("import-whatsapp", help="import WhatsApp 'Export chat' files (.txt or .zip)")
+    w.add_argument("files", nargs="+", type=Path)
+    w.add_argument("--me", help="your name exactly as the export shows it (inferred when 2+ chats are given)")
+    w.add_argument("--tz", help="the phone's time zone, e.g. Asia/Kolkata (default: this machine's)")
+    w.add_argument("--date-order", choices=["dmy", "mdy", "ymd"], help="override date order detection")
+
     e = sub.add_parser("extract", help="find commitments in each thread")
     e.add_argument("--extractor", choices=EXTRACTORS, default="heuristic",
                    help="heuristic: offline regexes. claude-code: Claude via your Claude Code login (no API key). "
@@ -116,6 +122,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if a.cmd == "ingest":
             ingest(store, a.chatdb, a.days)
+        elif a.cmd == "import-whatsapp":
+            try:
+                rows, names, notes = whatsapp_export.load(a.files, a.me, a.tz, a.date_order)
+            except ValueError as err:
+                ap.error(str(err))
+            print("\n".join(notes))
+            print(f"{store.add_messages('whatsapp', rows, names)} new messages from {len(names)} chats")
         elif a.cmd == "extract":
             return 1 if extract(store, a.extractor, a.window, a.person, a.top) else 0
         elif a.cmd == "show":

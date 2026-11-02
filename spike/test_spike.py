@@ -274,5 +274,81 @@ class ReviewFixesTest(unittest.TestCase):
             httpd.server_close()
 
 
+IOS_EXPORT = (
+    "\u200e[28/10/2026, 19:02:11] Sam Okafor: \u200eMessages and calls are end-to-end encrypted.\n"
+    "[28/10/2026, 19:02:11] Sam Okafor: Good seeing you at the dinner\n"
+    "[28/10/2026, 19:05:40] Yash Sharma: You're hiring a design lead?\n"
+    "[28/10/2026, 19:06:02] Sam Okafor: Yes, the hardest role right now\n"
+    "[28/10/2026, 19:07:30] Yash Sharma: I'll intro you to Priya\n"
+    "she built the design team at her last startup\n"
+    "[28/10/2026, 19:08:00] Sam Okafor: \u200eimage omitted\n"
+    "[31/10/2026, 09:15:00] Sam Okafor: Any luck reaching Priya? <This message was edited>\n"
+)
+ANDROID_EXPORT = (
+    "11/2/26, 9:10\u202fPM - Messages and calls are end-to-end encrypted. No one outside of this chat can read them.\n"
+    "11/2/26, 9:10\u202fPM - Ana Torres: Thanks for covering lunch, I'll pay you back on Friday\n"
+    "11/2/26, 9:12\u202fPM - Yash Sharma: No rush\n"
+    "11/2/26, 9:13\u202fPM - Yash Sharma: <Media omitted>\n"
+    "11/13/26, 12:05\u202fAM - Ana Torres: Sent!\n"
+)
+GROUP_EXPORT = (
+    "[01/11/2026, 10:00:00] Yash Sharma: Dinner Friday?\n"
+    "[01/11/2026, 10:01:00] Sam Okafor: In\n"
+    "[01/11/2026, 10:02:00] Priya Nair: In too\n"
+)
+
+
+class WhatsAppExportTest(unittest.TestCase):
+    def setUp(self):
+        import zipfile
+        self.tmp = tempfile.TemporaryDirectory()
+        d = Path(self.tmp.name)
+        (d / "WhatsApp Chat - Sam Okafor.txt").write_text(IOS_EXPORT)
+        with zipfile.ZipFile(d / "ana.zip", "w") as z:
+            z.writestr("WhatsApp Chat with Ana Torres.txt", ANDROID_EXPORT)
+        (d / "group.txt").write_text(GROUP_EXPORT)
+        self.files = [d / "WhatsApp Chat - Sam Okafor.txt", d / "ana.zip", d / "group.txt"]
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_parses_both_layouts_and_infers_me(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from spike import whatsapp_export as wa
+        rows, names, notes = wa.load(self.files, tz="Asia/Kolkata")
+        self.assertEqual(sorted(names.values()), ["Ana Torres", "Sam Okafor"])
+        self.assertTrue(any("groups aren't supported" in n for n in notes))
+        sam = [r for r in rows if r.handle == "export:Sam Okafor"]
+        self.assertEqual([r.from_me for r in sam], [False, True, False, True, False])  # system line + image dropped
+        self.assertEqual(sam[3].text, "I'll intro you to Priya\nshe built the design team at her last startup")
+        self.assertEqual(sam[-1].text, "Any luck reaching Priya?")  # edit marker stripped
+        ana = [r for r in rows if r.handle == "export:Ana Torres"]
+        self.assertEqual([r.text for r in ana], ["Thanks for covering lunch, I'll pay you back on Friday", "No rush", "Sent!"])
+        # month-first detected from "11/13/26"; 12:05 AM is just after midnight
+        when = datetime.fromtimestamp(ana[-1].ts, ZoneInfo("Asia/Kolkata"))
+        self.assertEqual((when.month, when.day, when.hour, when.minute), (11, 13, 0, 5))
+        first = datetime.fromtimestamp(ana[0].ts, ZoneInfo("Asia/Kolkata"))
+        self.assertEqual((first.month, first.day, first.hour), (11, 2, 21))
+
+    def test_single_chat_needs_me(self):
+        from spike import whatsapp_export as wa
+        with self.assertRaisesRegex(ValueError, "--me"):
+            wa.load(self.files[:1])
+        rows, _, _ = wa.load(self.files[:1], me="Yash Sharma")
+        self.assertEqual(sum(r.from_me for r in rows), 2)
+
+    def test_import_is_idempotent_and_extractable(self):
+        from spike import whatsapp_export as wa
+        st = Store(Path(self.tmp.name) / "s.db")
+        rows, names, _ = wa.load(self.files, tz="Asia/Kolkata")
+        self.assertEqual(st.add_messages("whatsapp", rows, names), len(rows))
+        self.assertEqual(st.add_messages("whatsapp", *wa.load(self.files, tz="Asia/Kolkata")[:2]), 0)
+        sam = next(p for p in st.people() if p["name"] == "Sam Okafor")
+        found = HeuristicExtractor().extract([dict(m) for m in st.thread(sam["id"])]).commitments
+        self.assertEqual([(c.owner, c.status) for c in found], [("me", "open")])
+        st.close()
+
+
 if __name__ == "__main__":
     unittest.main()
