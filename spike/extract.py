@@ -27,11 +27,14 @@ from pydantic import BaseModel, Field
 
 
 class Commitment(BaseModel):
-    owner: Literal["me", "them"] = Field(description="'me' if the user made the promise, 'them' if the other person did")
-    action: str = Field(description="What was promised, as a short imperative, e.g. 'Intro Sam to Priya'")
+    kind: Literal["promise", "ask"] = Field(
+        description="'promise' if one side said they would do it, 'ask' if one side asked the other and got no yes or no")
+    owner: Literal["me", "them"] = Field(
+        description="Who has to act: for a promise, who made it; for an ask, who was asked. 'me' is the thread owner")
+    action: str = Field(description="What has to be done, as a short imperative, e.g. 'Intro Sam to Priya'")
     due: Optional[str] = Field(description="ISO date (YYYY-MM-DD) if a deadline was stated or clearly implied, else null")
     status: Literal["open", "done"]
-    source_message_id: int = Field(description="id of the message where the promise was made")
+    source_message_id: int = Field(description="id of the message where it was promised or asked")
     done_message_id: Optional[int] = Field(description="id of the message showing it was done, else null")
 
 
@@ -57,6 +60,14 @@ _PROMISE = re.compile(
 )
 _DONE = re.compile(r"\b(sent|done|here you go|here it is|just (?:intro'?d|introduced|sent|booked|emailed)|"
                    r"introduced you|booked|attached|forwarded)\b", re.I)
+_ASK = re.compile(
+    r"\b(?:could you|can you|would you|could u|can u|kindly|please|pls|plz)\s+(?:please\s+)?"
+    r"(?P<what>(?:send|share|review|check|upload|book|give|forward|confirm|sign|fill|submit|update|add|"
+    r"intro|introduce|call|email|look at|let me know)\b[^.!?\n]{0,80})",
+    re.I,
+)
+_STATUS_ASK = re.compile(r"\b(any update|following up|follow(?:ing)? up on|gentle reminder|just checking in)\b", re.I)
+_ACCEPT = re.compile(r"^\W*(on it|will do|sure|ok(?:ay)?|yes|lemme|let me|i'?ll|will share|will send)\b", re.I)
 _WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
 
@@ -84,15 +95,16 @@ class HeuristicExtractor:
     remote = False  # never sends text anywhere
 
     def extract(self, thread: Sequence) -> Extraction:
-        out: list[Commitment] = []
+        out, accepted = self._asks(thread)
         for i, m in enumerate(thread):
             hit = _PROMISE.search(m["text"])
-            if not hit:
+            if not hit or m["id"] in accepted:
                 continue
             owner = "me" if m["from_me"] else "them"
             done = next((n for n in thread[i + 1:]
                          if bool(n["from_me"]) == bool(m["from_me"]) and _DONE.search(n["text"])), None)
             out.append(Commitment(
+                kind="promise",
                 owner=owner,
                 action=_sentence(re.split(r",|;| - ", hit.group("what"))[0]),
                 due=_due(m["text"], m["ts"]),
@@ -102,18 +114,63 @@ class HeuristicExtractor:
             ))
         return Extraction(commitments=out, topics=[])
 
+    @staticmethod
+    def _asks(thread: Sequence) -> tuple[list[Commitment], set[int]]:
+        """Requests from one side. The other side's next message decides what it became: a yes makes it
+        their promise, a delivery closes it, silence leaves it open on them."""
+        out: list[Commitment] = []
+        accepted: set[int] = set()
+        for i, m in enumerate(thread):
+            hit = _ASK.search(m["text"])
+            if not hit and not _STATUS_ASK.search(m["text"]):
+                continue
+            asker = bool(m["from_me"])
+            if not hit and any((bool(n["from_me"]) == asker and _ASK.search(n["text"]))
+                               or (bool(n["from_me"]) != asker and _PROMISE.search(n["text"]))
+                               for n in thread[:i]):
+                continue  # chasing something already on the list, not a new item
+            replies = [n for n in thread[i + 1:] if bool(n["from_me"]) != asker]
+            reply = replies[0] if replies else None
+            action = _sentence(re.split(r",|;| - ", hit.group("what"))[0]) if hit else "Reply with an update"
+            if reply and _ACCEPT.search(reply["text"]):
+                accepted.add(reply["id"])
+                done = next((n for n in replies[1:] if _DONE.search(n["text"])), None)
+                kind, src = "promise", reply
+            else:
+                done = reply if reply and (_DONE.search(reply["text"]) or not hit) else None
+                kind, src = "ask", m
+            out.append(Commitment(
+                kind=kind, owner="them" if asker else "me", action=action, due=_due(m["text"], m["ts"]),
+                status="done" if done else "open", source_message_id=src["id"],
+                done_message_id=done["id"] if done else None,
+            ))
+        return out, accepted
+
 
 # --- Claude ----------------------------------------------------------------------------
-SYSTEM = """You read one person's private 1:1 text thread with someone and list the commitments in it.
+SYSTEM = """You read one person's private 1:1 text thread with someone and list what each side owes the other.
 
-A commitment is a concrete thing one side said they would do: send, introduce, call, review, book, pay back,
-find out. Include offers that were accepted. Skip pleasantries with no concrete action ("we should catch up
-sometime", "let me know"), questions, and plans both sides simply attended.
+There are two kinds of item.
+- promise: one side said they would do something concrete: send, introduce, call, review, book, pay back,
+  find out. Offers that were accepted count. A request the other side agreed to ("On it", "Will do", "Sure,
+  sending tonight") is a promise by whoever agreed: list it once, as a promise.
+- ask: one side asked the other for something concrete (a document, a decision, access, a review, an update
+  on where things stand) and the other side has neither agreed nor said no. A follow-up asking where things
+  stand ("any update on next steps?") is an ask while nobody has answered it.
 
-For each one: who owes it ('me' is the thread owner, 'them' the other person), a short imperative action that
-names the people or things involved, a due date only if stated or clearly implied (resolve relative dates against
-the message timestamp), and whether a later message shows it was done. Cite message ids from the [id] prefixes.
-Also give up to 4 recurring topics. Return an empty list when there are no commitments."""
+owner is who has to act next: for a promise, whoever made it; for an ask, whoever was asked. 'me' is the
+thread owner, 'them' the other person.
+
+Skip: pleasantries and open-ended offers ("we should catch up sometime", "let me know if you need anything"),
+questions that are just conversation, rhetorical questions, asks that were turned down, plans both sides simply
+attend, reports of things already done, and anything promised by or asked of someone outside the thread. A
+message chasing something already on the list ("any luck with that intro?") is not a new item.
+
+For each item: a short imperative action that names the people or things involved, a due date only if stated or
+clearly implied (resolve relative dates against the message timestamp), and whether a later message shows it was
+done. A promise is done when a later message shows it was delivered. An ask is done when it was fulfilled or, if
+it asked for information or an update, answered. Cite message ids from the [id] prefixes. Also give up to 4
+recurring topics. Return an empty list when there is nothing."""
 
 
 def _today() -> str:
@@ -154,7 +211,7 @@ class ClaudeCodeExtractor:
         self.schema = json.dumps(Extraction.model_json_schema())
 
     def extract(self, thread: Sequence) -> Extraction:
-        prompt = f"Today is {_today()}. List the commitments in the thread on stdin."
+        prompt = f"Today is {_today()}. List the promises and asks in the thread on stdin."
         args = self.cmd + [
             "-p", prompt,
             "--system-prompt", SYSTEM,

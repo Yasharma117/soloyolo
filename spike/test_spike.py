@@ -83,9 +83,9 @@ class PipelineTest(unittest.TestCase):
         thread = [dict(r) for r in self.store.thread(self.pid("Sam Okafor"))]
         real = thread[3]["id"]
         fake = Extraction(topics=["hiring", "design", "intros", "dinner", "extra"], commitments=[
-            Commitment(owner="me", action="Intro Sam to Priya", due=None, status="open",
+            Commitment(kind="promise", owner="me", action="Intro Sam to Priya", due=None, status="open",
                        source_message_id=real, done_message_id=99999),
-            Commitment(owner="them", action="Invented", due=None, status="open",
+            Commitment(kind="promise", owner="them", action="Invented", due=None, status="open",
                        source_message_id=99999, done_message_id=None),
         ])
         ex = ClaudeExtractor.__new__(ClaudeExtractor)  # skip client construction
@@ -116,9 +116,9 @@ if os.environ.get("FAKE_CLAUDE_MODE") == "error":
 print(json.dumps({"type": "result", "is_error": False, "subtype": "success", "structured_output": {
     "topics": ["hiring"],
     "commitments": [
-        {"owner": "me", "action": "Intro Sam to Priya", "due": None, "status": "done",
+        {"kind": "promise", "owner": "me", "action": "Intro Sam to Priya", "due": None, "status": "done",
          "source_message_id": int(os.environ["FAKE_SRC"]), "done_message_id": 424242},
-        {"owner": "them", "action": "Invented", "due": None, "status": "open",
+        {"kind": "ask", "owner": "them", "action": "Invented", "due": None, "status": "open",
          "source_message_id": 99999, "done_message_id": None}]}}))
 """
 
@@ -169,9 +169,9 @@ class EvalTest(unittest.TestCase):
         from spike.eval.__main__ import score
         case = {"id": "x", "expected": [{"owner": "me", "sources": [2], "done": [3]},
                                         {"owner": "them", "sources": [4], "done": []}]}
-        pred = [Commitment(owner="me", action="a", due=None, status="done", source_message_id=2, done_message_id=3),
-                Commitment(owner="me", action="b", due=None, status="open", source_message_id=2, done_message_id=None),
-                Commitment(owner="me", action="c", due=None, status="open", source_message_id=4, done_message_id=None)]
+        pred = [Commitment(kind="promise", owner="me", action="a", due=None, status="done", source_message_id=2, done_message_id=3),
+                Commitment(kind="promise", owner="me", action="b", due=None, status="open", source_message_id=2, done_message_id=None),
+                Commitment(kind="promise", owner="me", action="c", due=None, status="open", source_message_id=4, done_message_id=None)]
         r = score(case, pred)
         self.assertEqual((r["tp"], r["fp"], r["fn"], r["status_ok"]), (1, 2, 1, 1))
 
@@ -182,7 +182,65 @@ class EvalTest(unittest.TestCase):
         ex, now = HeuristicExtractor(), time.time()
         rows = [score(c, ex.extract(thread_of(c, now)).commitments) for c in CASES]
         tp, fn = sum(r["tp"] for r in rows), sum(r["fn"] for r in rows)
-        self.assertGreaterEqual(tp / (tp + fn), 0.4)
+        self.assertGreaterEqual(tp / (tp + fn), 0.7)
+
+    def test_scorer_counts_kind_separately(self):
+        from spike.eval.__main__ import score
+        case = {"id": "x", "expected": [{"owner": "me", "kind": "ask", "sources": [1], "done": []}]}
+        wrong_kind = [Commitment(kind="promise", owner="me", action="a", due=None, status="open",
+                                 source_message_id=1, done_message_id=None)]
+        r = score(case, wrong_kind)
+        self.assertEqual((r["tp"], r["kind_ok"]), (1, 0))
+
+
+class AskTest(unittest.TestCase):
+    """Asks: concrete requests nobody has said yes or no to. Owner is whoever was asked."""
+
+    def thread(self, *msgs):
+        return [{"id": i, "ts": 1_700_000_000 + i * 3600, "from_me": me, "text": t}
+                for i, (me, t) in enumerate(msgs, start=1)]
+
+    def found(self, *msgs):
+        return [(c.kind, c.owner, c.status, c.source_message_id, c.done_message_id)
+                for c in HeuristicExtractor().extract(self.thread(*msgs)).commitments]
+
+    def test_unanswered_request_is_an_ask_on_whoever_was_asked(self):
+        self.assertEqual(self.found((0, "Please upload your ID proof on the portal")),
+                         [("ask", "me", "open", 1, None)])
+        self.assertEqual(self.found((1, "Could you share an update on the review?")),
+                         [("ask", "them", "open", 1, None)])
+
+    def test_accepted_request_becomes_one_promise(self):
+        self.assertEqual(self.found((0, "Please book the room for Friday"), (1, "Will do"), (1, "Booked, 4B")),
+                         [("promise", "me", "done", 2, 3)])
+
+    def test_fulfilled_request_is_a_done_ask(self):
+        self.assertEqual(self.found((1, "Can you give me edit access to the sheet?"), (0, "Done, added you")),
+                         [("ask", "them", "done", 1, 2)])
+
+    def test_chasing_is_not_a_new_item(self):
+        self.assertEqual(self.found((1, "Could you share an update on the review?"), (1, "Following up on this")),
+                         [("ask", "them", "open", 1, None)])
+
+    def test_kind_round_trips_and_old_stores_migrate(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "old.db"
+            old = sqlite3.connect(path)  # a store from before `kind` existed
+            old.executescript("""CREATE TABLE commitment (id INTEGER PRIMARY KEY, person_id INTEGER NOT NULL,
+                owner TEXT NOT NULL, action TEXT NOT NULL, due TEXT, status TEXT NOT NULL,
+                source_message_id INTEGER NOT NULL, done_message_id INTEGER, extractor TEXT NOT NULL);
+                INSERT INTO commitment VALUES (1, 1, 'me', 'old', NULL, 'open', 1, NULL, 'heuristic');""")
+            old.commit(); old.close()
+            st = Store(path)
+            self.assertEqual(st.conn.execute("SELECT kind FROM commitment").fetchone()[0], "promise")
+            st.add_messages("x", [type("M", (), dict(guid="g", handle="h", ts=1.0, from_me=False, text="hi"))()])
+            pid = st.person_ids()[0]
+            mid = st.thread(pid)[0]["id"]
+            st.replace_extraction(pid, [dict(kind="ask", owner="me", action="Upload ID", due=None, status="open",
+                                             source_message_id=mid, done_message_id=None)], [], "heuristic")
+            self.assertEqual([(c["kind"], c["action"]) for c in st.people()[0]["commitments"]], [("ask", "Upload ID")])
+            st.close()
 
 
 class ReviewFixesTest(unittest.TestCase):

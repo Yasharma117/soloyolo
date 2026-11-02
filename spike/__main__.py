@@ -62,10 +62,11 @@ def show(store: Store) -> None:
         last = datetime.fromtimestamp(p["last"]).strftime("%b %d")
         print(f"\n{p['name']}  ·  score {p['score']}  ·  last {last}")
         for c in p["commitments"]:
-            who = "you owe" if c["owner"] == "me" else "owes you"
+            who = "you owe" if c["owner"] == "me" else "waiting on"
+            asked = " (asked)" if c.get("kind") == "ask" else ""
             mark = "✓" if c["status"] == "done" else "○"
             due = f"  due {c['due']}" if c["due"] else ""
-            print(f"  {mark} {who}: {c['action']}{due}")
+            print(f"  {mark} {who}{asked}: {c['action']}{due}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -94,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
     j = sub.add_parser("import-json", help="import conversations from a JSON file (format in spike/json_import.py)")
     j.add_argument("file", type=Path)
 
-    e = sub.add_parser("extract", help="find commitments in each thread")
+    e = sub.add_parser("extract", help="find promises and asks in each thread")
     e.add_argument("--extractor", choices=EXTRACTORS, default="heuristic",
                    help="heuristic: offline regexes. claude-code: Claude via your Claude Code login (no API key). "
                         "api: Anthropic API key. Both Claude options send each thread's text off this machine")
@@ -102,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--person", type=int, help="only this person id")
     e.add_argument("--top", type=int, help="only the N most active people (start here: --top 25)")
 
-    sub.add_parser("show", help="print people and commitments")
+    sub.add_parser("show", help="print people and what each side owes")
     s = sub.add_parser("serve", help="open the local viewer")
     s.add_argument("--port", type=int, default=8765)
 

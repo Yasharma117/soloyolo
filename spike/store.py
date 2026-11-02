@@ -22,6 +22,15 @@ class Store:
         self.conn = sqlite3.connect(str(path))
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Bring stores made by older versions up to the schema. CREATE IF NOT EXISTS won't add columns."""
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(commitment)")}
+        if "kind" not in cols:
+            with self.conn:
+                self.conn.execute("ALTER TABLE commitment ADD COLUMN kind TEXT NOT NULL DEFAULT 'promise'"
+                                  " CHECK (kind IN ('promise', 'ask'))")
 
     def close(self) -> None:
         self.conn.close()
@@ -65,9 +74,9 @@ class Store:
             self.conn.execute("DELETE FROM topic WHERE person_id = ?", (person_id,))
             for c in commitments:
                 self.conn.execute(
-                    "INSERT INTO commitment(person_id, owner, action, due, status, source_message_id,"
-                    " done_message_id, extractor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (person_id, c["owner"], c["action"], c.get("due"), c["status"],
+                    "INSERT INTO commitment(person_id, kind, owner, action, due, status, source_message_id,"
+                    " done_message_id, extractor) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (person_id, c.get("kind", "promise"), c["owner"], c["action"], c.get("due"), c["status"],
                      c["source_message_id"], c.get("done_message_id"), extractor),
                 )
             self.conn.executemany(
@@ -101,7 +110,7 @@ class Store:
         return [r[0] for r in self.conn.execute("SELECT id FROM person ORDER BY id")]
 
     def people(self, now: float | None = None) -> list[dict]:
-        """Everyone, ranked: open promises you made first, then the mini_mesh decay score.
+        """Everyone, ranked: most open items on you (promises and asks) first, then the mini_mesh decay score.
 
         Three queries in total, not one per person: the viewer calls this on every load.
         """
@@ -116,7 +125,7 @@ class Store:
             s["last"] = max(s["last"], ts)
         commitments: dict[int, list[dict]] = {}
         for c in self.conn.execute(
-                "SELECT c.person_id, c.id, c.owner, c.action, c.due, c.status, c.source_message_id,"
+                "SELECT c.person_id, c.id, c.kind, c.owner, c.action, c.due, c.status, c.source_message_id,"
                 " c.done_message_id, c.extractor, m.ts AS source_ts"
                 " FROM commitment c JOIN message m ON m.id = c.source_message_id"
                 " ORDER BY c.status DESC, m.ts DESC"):

@@ -53,6 +53,8 @@
   .c.done { color: var(--ink-3); }
   .c.done .dot { background: var(--ok); border-color: var(--ok); }
   .c.done .what { text-decoration: line-through; text-decoration-color: var(--ink-3); }
+  .kind { display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3);
+          border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 6px; vertical-align: 1px; }
   .due { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .due.late { color: var(--accent-text); font-weight: 600; }
   .empty { color: var(--ink-3); font-size: 13px; }
@@ -107,12 +109,13 @@ let people = [], current = null;
 
 function renderList() {
   const owed = people.reduce((n, p) => n + openMine(p).length, 0);
-  $("#summary").textContent = `${people.length} people · you owe ${owed} follow-up${owed === 1 ? "" : "s"}`;
+  const waiting = people.reduce((n, p) => n + p.commitments.filter((c) => c.owner === "them" && c.status === "open").length, 0);
+  $("#summary").textContent = `${people.length} people · you owe ${owed} · waiting on ${waiting}`;
   $("#list").innerHTML = people.map((p) => {
     const mine = openMine(p)[0];
     const theirs = p.commitments.find((c) => c.owner === "them" && c.status === "open");
     const hint = mine ? `<div class="hint owe">You owe: ${esc(mine.action)}</div>`
-      : theirs ? `<div class="hint">Owes you: ${esc(theirs.action)}</div>`
+      : theirs ? `<div class="hint">Waiting on: ${esc(theirs.action)}</div>`
       : `<div class="hint">${p.count} messages</div>`;
     return `<button class="person" role="listitem" data-id="${p.id}" aria-current="${p.id === current}">
       <div class="row1"><span class="name">${esc(p.name)}</span><span class="when">${ago(p.last)}</span></div>${hint}</button>`;
@@ -122,7 +125,7 @@ function renderList() {
 function commitmentRow(c) {
   const due = c.status === "open" ? dueLabel(c.due) : { text: "done", late: false };
   return `<div class="c ${c.status} ${c.owner === "me" ? "mine" : ""}" data-src="${c.source_message_id}" data-fin="${c.done_message_id ?? ""}">
-    <span class="dot"></span><span class="what">${esc(c.action)}</span><span class="due ${due.late ? "late" : ""}">${due.text}</span></div>`;
+    <span class="dot"></span><span class="what">${esc(c.action)}${c.kind === "ask" ? `<span class="kind" title="Asked, no yes or no yet">asked</span>` : ""}</span><span class="due ${due.late ? "late" : ""}">${due.text}</span></div>`;
 }
 
 async function select(id) {
@@ -147,7 +150,7 @@ async function select(id) {
     <div class="meta">${p.count} messages · last ${ago(p.last)} · ${p.extractor ? `extracted by ${esc(p.extractor)}` : "not extracted yet"}</div>
     ${p.topics.length ? `<div class="topics">${p.topics.map((t) => `<span class="topic">${esc(t)}</span>`).join("")}</div>` : ""}
     <section><h3>You owe</h3>${mine.map(commitmentRow).join("") || `<div class="empty">Nothing.</div>`}</section>
-    <section><h3>Owes you</h3>${theirs.map(commitmentRow).join("") || `<div class="empty">Nothing.</div>`}</section>
+    <section><h3>Waiting on them</h3>${theirs.map(commitmentRow).join("") || `<div class="empty">Nothing.</div>`}</section>
     <section><h3>Thread</h3><div class="thread">${bubbles}</div></section>`;
   $("main").scrollTop = 0;
 }

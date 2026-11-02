@@ -3,6 +3,10 @@
 **The question:** does reading what you said beat counting how often you said it? Mesh knows you texted Sam
 40 times. This spike tries to find that you *promised Sam an intro nine days ago and haven't sent it*.
 
+It lists two kinds of item per person. **Promises**: something one side said they'd do. **Asks**: a concrete
+request the other side hasn't said yes or no to. Each is owned by whoever has to act next, which gives two lists:
+**You owe** (your promises, requests to you) and **Waiting on them** (their promises, your unanswered requests).
+
 If that works on real threads, it's soloyolo's wedge. If it doesn't, the Go daemon is plumbing for a product
 nobody needs. So this comes first.
 
@@ -66,8 +70,8 @@ Accuracy on 25 labeled threads (`eval/`):
 python -m spike.eval --extractor claude-code
 ```
 
-Last run: Claude found 16/16 commitments at 0.89–0.94 precision; the regexes found 7/16. Details and caveats
-in `eval/RESULTS.md`.
+Last run (30 cases, promises and asks): Claude scored F1 0.95–1.00 over three runs; the regexes scored 0.83.
+Details, the Gmail before/after and the caveats are in `eval/RESULTS.md`.
 
 ## Privacy, stated plainly
 
@@ -81,13 +85,14 @@ in `eval/RESULTS.md`.
 
 ## How to judge the result (the actual experiment)
 
-Run `ingest --days 90`, then `extract --extractor claude-code`, then go through the "You owe" lists and score each item:
+Run `ingest --days 90`, then `extract --extractor claude-code`, then go through the "You owe" and "Waiting on them"
+lists and score each open item:
 
 | Score | Meaning |
 |---|---|
-| ✅ useful | A real promise you'd forgotten or were about to drop |
-| ➖ true but known | A real promise you already had in mind |
-| ❌ wrong | Not a promise, wrong person, or already done |
+| ✅ useful | Something you'd forgotten or were about to drop: a promise, a request to you, or someone to chase |
+| ➖ true but known | Real, but already on your mind |
+| ❌ wrong | Not owed by anyone, wrong person, or already done |
 
 **Kill or continue:** continue if the last 90 days surface **at least 5 ✅** and **❌ stays under a third** of
 items. Below that, the thesis is weak: ranking by message counts (what Mesh does) would be nearly as good.
@@ -99,4 +104,5 @@ items. Below that, the thesis is weak: ranking by message counts (what Mesh does
   WhatsApp sync goes through `connectord` (the Go daemon), which writes to the same model.
 - **No contact names** from Apple Contacts yet; people show as phone numbers or emails outside the demo.
 - **Reads the last 300 messages per person.** Older promises are out of scope.
+- **Asks are judged on text alone.** A reply in another app, or on a call, won't close one.
 - **Re-extraction replaces the person's commitments**, so manual edits wouldn't survive it. There are no manual edits yet.
