@@ -37,14 +37,51 @@ type Adapter struct {
 	client *whatsmeow.Client
 	qr     <-chan whatsmeow.QRChannelItem
 	events chan adapter.Event
+
+	// whatsmeow calls the event handler on its receive loop, so the handler must never block:
+	// it appends here and a forwarder feeds Events at whatever pace the consumer reads.
+	qmu     sync.Mutex
+	pending []adapter.Event
+	wake    chan struct{}
 }
 
 func New(accountID, dataDir string) (adapter.Adapter, error) {
-	return &Adapter{
+	a := &Adapter{
 		accountID: accountID,
 		dataDir:   dataDir,
-		events:    make(chan adapter.Event, 1024),
-	}, nil
+		events:    make(chan adapter.Event, 256),
+		wake:      make(chan struct{}, 1),
+	}
+	go a.forward()
+	return a, nil
+}
+
+// emit queues an event without blocking the caller.
+func (a *Adapter) emit(ev adapter.Event) {
+	a.qmu.Lock()
+	a.pending = append(a.pending, ev)
+	a.qmu.Unlock()
+	select {
+	case a.wake <- struct{}{}:
+	default: // the forwarder is already awake
+	}
+}
+
+func (a *Adapter) forward() {
+	for range a.wake {
+		for {
+			a.qmu.Lock()
+			batch := a.pending
+			a.pending = nil
+			a.qmu.Unlock()
+			if len(batch) == 0 {
+				break
+			}
+			for _, ev := range batch {
+				a.events <- ev // blocks only this goroutine, never whatsmeow
+			}
+		}
+	}
 }
 
 func (a *Adapter) Network() string { return Network }
@@ -157,7 +194,7 @@ func (a *Adapter) handle(evt any) {
 	switch e := evt.(type) {
 	case *events.Message:
 		if ev, ok := a.convert(e, false); ok {
-			a.events <- ev
+			a.emit(ev)
 		}
 	case *events.HistorySync:
 		// WhatsApp pushes recent history to a new companion device. It is not years of
@@ -173,12 +210,12 @@ func (a *Adapter) handle(evt any) {
 					continue
 				}
 				if ev, ok := a.convert(msg, true); ok {
-					a.events <- ev
+					a.emit(ev)
 				}
 			}
 		}
 	case *events.LoggedOut:
-		a.events <- adapter.Event{Kind: adapter.EventLogout, Network: Network}
+		a.emit(adapter.Event{Kind: adapter.EventLogout, Network: Network})
 	}
 }
 

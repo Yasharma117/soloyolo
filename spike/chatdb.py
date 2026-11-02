@@ -33,6 +33,8 @@ def decode_attributed_body(blob: bytes | None) -> str | None:
     if i < 0:
         return None
     i += 2
+    if i >= len(blob):
+        return None  # truncated: skip the row rather than abort the whole read
     n = blob[i]
     i += 1
     if n == 0x81:  # typedstream int16 length follows

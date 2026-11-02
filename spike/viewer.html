@@ -127,6 +127,7 @@ async function select(id) {
   renderList();
   const p = people.find((x) => x.id === id);
   const thread = await (await fetch(`/api/thread/${id}`)).json();
+  if (current !== id) return; // a later click won the race
   const src = new Set(p.commitments.map((c) => c.source_message_id));
   const fin = new Set(p.commitments.map((c) => c.done_message_id).filter(Boolean));
   const mine = p.commitments.filter((c) => c.owner === "me"), theirs = p.commitments.filter((c) => c.owner === "them");
@@ -140,7 +141,7 @@ async function select(id) {
   }).join("");
   $("#detail").innerHTML = `
     <h2>${esc(p.name)}</h2>
-    <div class="meta">${p.count} messages · last ${ago(p.last)} · extracted by ${esc(p.commitments[0]?.extractor ?? "—")}</div>
+    <div class="meta">${p.count} messages · last ${ago(p.last)} · ${p.extractor ? `extracted by ${esc(p.extractor)}` : "not extracted yet"}</div>
     ${p.topics.length ? `<div class="topics">${p.topics.map((t) => `<span class="topic">${esc(t)}</span>`).join("")}</div>` : ""}
     <section><h3>You owe</h3>${mine.map(commitmentRow).join("") || `<div class="empty">Nothing.</div>`}</section>
     <section><h3>Owes you</h3>${theirs.map(commitmentRow).join("") || `<div class="empty">Nothing.</div>`}</section>
@@ -159,7 +160,7 @@ $("#detail").addEventListener("click", (e) => {
 
 fetch("/api/people").then((r) => r.json()).then((data) => {
   people = data;
-  const models = [...new Set(people.flatMap((p) => p.commitments.map((c) => c.extractor)))].filter((m) => m !== "heuristic");
+  const models = [...new Set(people.map((p) => p.extractor))].filter((m) => m && m !== "heuristic");
   $("#foot").textContent = models.length
     ? `Served from 127.0.0.1 · thread text was sent to ${models.join(", ")} for extraction`
     : "Local only · 127.0.0.1 · no message text has left this machine";

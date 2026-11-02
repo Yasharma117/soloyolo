@@ -1,7 +1,11 @@
 package whatsapp
 
 import (
+	"fmt"
 	"testing"
+	"time"
+
+	"github.com/yasharma117/soloyolo/connectord/internal/adapter"
 
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
@@ -39,5 +43,27 @@ func TestConvertPrefersPhoneOverLID(t *testing.T) {
 	e.Info.IsGroup = true
 	if _, ok := a.convert(e, false); ok {
 		t.Fatal("group message should be dropped")
+	}
+}
+
+func TestEmitNeverBlocksAndKeepsOrder(t *testing.T) {
+	ad, _ := New("t", t.TempDir())
+	a := ad.(*Adapter)
+	done := make(chan struct{})
+	go func() { // nobody is reading Events: this must still return at once
+		for i := 0; i < 5000; i++ {
+			a.emit(adapter.Event{RemoteID: fmt.Sprint(i)})
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("emit blocked with no consumer")
+	}
+	for i := 0; i < 5000; i++ {
+		if ev := <-a.Events(); ev.RemoteID != fmt.Sprint(i) {
+			t.Fatalf("event %d out of order: %s", i, ev.RemoteID)
+		}
 	}
 }

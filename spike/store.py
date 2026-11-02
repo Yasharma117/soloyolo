@@ -74,6 +74,10 @@ class Store:
                 "INSERT OR IGNORE INTO topic(person_id, label) VALUES (?, ?)",
                 [(person_id, t) for t in topics],
             )
+            self.conn.execute(
+                "INSERT OR REPLACE INTO extraction_run(person_id, extractor, ran_at) VALUES (?, ?, ?)",
+                (person_id, extractor, time.time()),
+            )
 
     # --- reads -------------------------------------------------------------------------
     def thread(self, person_id: int, limit: int | None = None) -> list[sqlite3.Row]:
@@ -87,33 +91,47 @@ class Store:
         return [r[0] for r in self.conn.execute("SELECT id FROM person ORDER BY id")]
 
     def people(self, now: float | None = None) -> list[dict]:
-        """Everyone, ranked: open promises you made first, then the mini_mesh decay score."""
+        """Everyone, ranked: open promises you made first, then the mini_mesh decay score.
+
+        Three queries in total, not one per person: the viewer calls this on every load.
+        """
         now = now or time.time()
-        out = []
-        for p in self.conn.execute("SELECT id, display_name FROM person"):
-            msgs = self.conn.execute(
-                "SELECT ts, from_me FROM message WHERE person_id = ?", (p["id"],)
-            ).fetchall()
-            if not msgs:
-                continue
-            score = sum(math.exp(-math.log(2) * (now - m["ts"]) / 86400 / HALF_LIFE_DAYS) for m in msgs)
-            sent = sum(m["from_me"] for m in msgs)
-            if not (sent and len(msgs) - sent):
-                score *= 0.2  # one-way traffic is rarely a relationship
-            cs = [dict(c) for c in self.conn.execute(
-                "SELECT c.id, c.owner, c.action, c.due, c.status, c.source_message_id,"
+        k = math.log(2) / 86400 / HALF_LIFE_DAYS
+        stats: dict[int, dict] = {}
+        for pid, ts, from_me in self.conn.execute("SELECT person_id, ts, from_me FROM message"):
+            s = stats.setdefault(pid, {"score": 0.0, "sent": 0, "count": 0, "last": 0.0})
+            s["score"] += math.exp(-k * (now - ts))
+            s["sent"] += from_me
+            s["count"] += 1
+            s["last"] = max(s["last"], ts)
+        commitments: dict[int, list[dict]] = {}
+        for c in self.conn.execute(
+                "SELECT c.person_id, c.id, c.owner, c.action, c.due, c.status, c.source_message_id,"
                 " c.done_message_id, c.extractor, m.ts AS source_ts"
                 " FROM commitment c JOIN message m ON m.id = c.source_message_id"
-                " WHERE c.person_id = ? ORDER BY c.status DESC, m.ts DESC", (p["id"],))]
+                " ORDER BY c.status DESC, m.ts DESC"):
+            d = dict(c)
+            commitments.setdefault(d.pop("person_id"), []).append(d)
+        topics: dict[int, list[str]] = {}
+        for pid, label in self.conn.execute("SELECT person_id, label FROM topic ORDER BY label"):
+            topics.setdefault(pid, []).append(label)
+        out = []
+        for p in self.conn.execute(
+                "SELECT p.id, p.display_name, r.extractor FROM person p"
+                " LEFT JOIN extraction_run r ON r.person_id = p.id"):
+            s = stats.get(p["id"])
+            if not s:
+                continue
+            score = s["score"] if s["sent"] and s["count"] - s["sent"] else s["score"] * 0.2  # one-way traffic
             out.append({
                 "id": p["id"],
                 "name": p["display_name"],
                 "score": round(score, 2),
-                "last": max(m["ts"] for m in msgs),
-                "count": len(msgs),
-                "commitments": cs,
-                "topics": [r[0] for r in self.conn.execute(
-                    "SELECT label FROM topic WHERE person_id = ? ORDER BY label", (p["id"],))],
+                "last": s["last"],
+                "count": s["count"],
+                "extractor": p["extractor"],  # None until extracted
+                "commitments": commitments.get(p["id"], []),
+                "topics": topics.get(p["id"], []),
             })
         owed = lambda p: sum(c["owner"] == "me" and c["status"] == "open" for c in p["commitments"])
         return sorted(out, key=lambda p: (-owed(p), -p["score"]))

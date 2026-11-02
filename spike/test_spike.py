@@ -26,6 +26,7 @@ class ChatDBTest(unittest.TestCase):
         for text in ["hi", "x" * 200, "emoji 🎉 ok"]:
             self.assertEqual(chatdb.decode_attributed_body(fixture.attributed_body(text)), text)
         self.assertIsNone(chatdb.decode_attributed_body(b"garbage"))
+        self.assertIsNone(chatdb.decode_attributed_body(b"..NSString\x01+"))  # truncated: skipped, no crash
 
     def test_text_recovered_from_attributed_body(self):
         self.assertIn("Sent, check your email", [r.text for r in self.rows])
@@ -182,6 +183,85 @@ class EvalTest(unittest.TestCase):
         rows = [score(c, ex.extract(thread_of(c, now)).commitments) for c in CASES]
         tp, fn = sum(r["tp"] for r in rows), sum(r["fn"] for r in rows)
         self.assertGreaterEqual(tp / (tp + fn), 0.4)
+
+
+class ReviewFixesTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_demo_never_touches_the_real_store(self):
+        import os
+        from spike.__main__ import main
+        real = self.dir / "soloyolo.db"
+        Store(real).close()
+        real.write_bytes(real.read_bytes())  # exists, with content
+        before = real.read_bytes()
+        cwd = os.getcwd()
+        os.chdir(self.dir)
+        try:
+            main(["--db", str(real), "demo", "--no-serve", "--demo-db", str(self.dir / "demo.db")])
+            with self.assertRaises(SystemExit):  # pointing the demo at the real store is refused
+                main(["--db", str(real), "demo", "--no-serve", "--demo-db", str(real)])
+        finally:
+            os.chdir(cwd)
+        self.assertEqual(real.read_bytes(), before)
+
+    def test_one_failed_thread_does_not_stop_the_rest(self):
+        from spike import __main__ as cli
+        st = Store(self.dir / "s.db")
+        st.add_messages("imessage", chatdb.read(fixture.build(self.dir / "c.db")), fixture.NAMES)
+        first = st.person_ids()[0]
+
+        class Flaky(HeuristicExtractor):
+            name = "flaky"
+            def extract(self, thread):
+                if thread[0]["id"] in {m["id"] for m in st.thread(first)}:
+                    raise RuntimeError("declined")
+                return super().extract(thread)
+
+        with mock.patch.dict(cli.EXTRACTORS, {"heuristic": Flaky}):
+            failed = cli.extract(st, "heuristic", window=300)
+        self.assertEqual(failed, 1)
+        ran = {p["id"]: p["extractor"] for p in st.people()}
+        self.assertIsNone(ran[first])
+        self.assertTrue(all(v == "flaky" for k, v in ran.items() if k != first))
+        st.close()
+
+    def test_extraction_run_recorded_even_with_no_commitments(self):
+        st = Store(self.dir / "s.db")
+        st.add_messages("imessage", chatdb.read(fixture.build(self.dir / "c.db")), fixture.NAMES)
+        pid = st.person_ids()[0]
+        st.replace_extraction(pid, [], [], "claude-opus-5-5 (claude code)")
+        p = next(p for p in st.people() if p["id"] == pid)
+        self.assertEqual((p["commitments"], p["extractor"]), ([], "claude-opus-5-5 (claude code)"))
+        st.close()
+
+    def test_viewer_rejects_foreign_host(self):
+        import threading
+        import urllib.request
+        from functools import partial
+        from http.server import ThreadingHTTPServer
+        from spike.server import Handler
+        db = self.dir / "s.db"
+        Store(db).close()
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), lambda *a, **k: None)
+        port = httpd.server_address[1]
+        httpd.RequestHandlerClass = partial(Handler, db=str(db), port=port)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            ok = urllib.request.urlopen(f"http://127.0.0.1:{port}/api/people?x=1")
+            self.assertEqual(ok.status, 200)  # query strings no longer 404
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/api/people", headers={"Host": f"evil.example:{port}"})
+            with self.assertRaises(urllib.error.HTTPError) as err:
+                urllib.request.urlopen(req)
+            self.assertEqual(err.exception.code, 403)
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
 
 
 if __name__ == "__main__":

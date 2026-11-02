@@ -117,3 +117,21 @@ func TestShortcode(t *testing.T) {
 		}
 	}
 }
+
+func TestConnectTwiceIsOnePoller(t *testing.T) {
+	a := &Adapter{Path: fixture(t), Interval: 10 * time.Millisecond, events: make(chan adapter.Event, 16)}
+	ctx := context.Background()
+	if err := a.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(60 * time.Millisecond)
+	if err := a.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(a.events); n != 2 { // one poller: each fixture message exactly once
+		t.Fatalf("got %d events, want 2", n)
+	}
+}

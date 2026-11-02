@@ -24,15 +24,25 @@ def ingest(store: Store, source: Path, days: int, names: dict[str, str] | None =
 EXTRACTORS = {"heuristic": HeuristicExtractor, "claude-code": ClaudeCodeExtractor, "api": ClaudeExtractor}
 
 
-def extract(store: Store, kind: str, window: int, only: int | None = None) -> None:
+def extract(store: Store, kind: str, window: int, only: int | None = None) -> int:
+    """Returns how many people failed. One failure (a refusal, a timeout) never stops the rest."""
     ex = EXTRACTORS[kind]()
+    failed = 0
     for pid in [only] if only else store.person_ids():
         thread = [dict(r) for r in store.thread(pid, limit=window)]
         if not thread:
             continue
-        result = ex.extract(thread)
+        try:
+            result = ex.extract(thread)
+        except Exception as err:  # keep going; rerun with --person to retry one
+            failed += 1
+            print(f"person {pid}: failed, kept previous results ({str(err)[:160]})", file=sys.stderr)
+            continue
         store.replace_extraction(pid, [c.model_dump() for c in result.commitments], result.topics, ex.name)
         print(f"person {pid}: {len(result.commitments)} commitments ({ex.name})")
+    if failed:
+        print(f"{failed} failed; rerun `extract --person <id>` for each", file=sys.stderr)
+    return failed
 
 
 def show(store: Store) -> None:
@@ -52,6 +62,8 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     d = sub.add_parser("demo", help="build a synthetic chat.db, ingest, extract, then serve")
+    d.add_argument("--demo-db", default="soloyolo-demo.db",
+                   help="demo store, recreated each run (default: %(default)s). Never your --db")
     d.add_argument("--extractor", choices=EXTRACTORS, default="heuristic",
                    help="claude-code or api send the (synthetic) demo text to Claude")
     d.add_argument("--no-serve", action="store_true")
@@ -74,16 +86,19 @@ def main(argv: list[str] | None = None) -> int:
 
     a = ap.parse_args(argv)
     if a.cmd == "demo":
-        Path(a.db).unlink(missing_ok=True)
-        store = Store(a.db)
-        src = fixture.build(Path(a.db).with_name("demo-chat.db"))
+        # Its own file: recreating the demo must never touch the store `ingest` filled with real messages.
+        if Path(a.demo_db).resolve() == Path(a.db).resolve():
+            ap.error("--demo-db must differ from --db, which holds your real messages")
+        Path(a.demo_db).unlink(missing_ok=True)
+        store = Store(a.demo_db)
+        src = fixture.build(Path(a.demo_db).with_name("demo-chat.db"))
         ingest(store, src, days=0, names=fixture.NAMES)
         extract(store, a.extractor, window=300)
         show(store)
         store.close()
         if not a.no_serve:
             from .server import serve
-            serve(a.db, a.port)
+            serve(a.demo_db, a.port)
         return 0
 
     store = Store(a.db)
@@ -91,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         if a.cmd == "ingest":
             ingest(store, a.chatdb, a.days)
         elif a.cmd == "extract":
-            extract(store, a.extractor, a.window, a.person)
+            return 1 if extract(store, a.extractor, a.window, a.person) else 0
         elif a.cmd == "show":
             show(store)
         elif a.cmd == "serve":

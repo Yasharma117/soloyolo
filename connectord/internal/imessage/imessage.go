@@ -94,15 +94,23 @@ func (a *Adapter) open() error {
 	return nil
 }
 
-// Connect starts polling. The first pass emits history; later passes emit new rows.
+// Connect starts polling. The first pass emits history; later passes emit new rows. Calling it
+// again while polling is a no-op: the daemon may connect on resume and again after a login.
 func (a *Adapter) Connect(ctx context.Context) error {
 	if err := a.open(); err != nil {
 		return err
 	}
-	ctx, a.cancel = context.WithCancel(ctx)
-	a.done = make(chan struct{})
+	a.mu.Lock()
+	if a.cancel != nil {
+		a.mu.Unlock()
+		return nil
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	a.cancel, a.done = cancel, done
+	a.mu.Unlock()
 	go func() {
-		defer close(a.done)
+		defer close(done)
 		history := true
 		for {
 			if _, err := a.Poll(ctx, history); err != nil && ctx.Err() == nil {
@@ -219,9 +227,12 @@ func (a *Adapter) Contacts(context.Context) ([]adapter.Contact, error) {
 }
 
 func (a *Adapter) Close() error {
-	if a.cancel != nil {
-		a.cancel()
-		<-a.done
+	a.mu.Lock()
+	cancel, done := a.cancel, a.done
+	a.mu.Unlock()
+	if cancel != nil {
+		cancel()
+		<-done
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
