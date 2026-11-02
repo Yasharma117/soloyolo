@@ -24,11 +24,21 @@ def ingest(store: Store, source: Path, days: int, names: dict[str, str] | None =
 EXTRACTORS = {"heuristic": HeuristicExtractor, "claude-code": ClaudeCodeExtractor, "api": ClaudeExtractor}
 
 
-def extract(store: Store, kind: str, window: int, only: int | None = None) -> int:
-    """Returns how many people failed. One failure (a refusal, a timeout) never stops the rest."""
+def extract(store: Store, kind: str, window: int, only: int | None = None, top: int | None = None) -> int:
+    """Returns how many people failed. One failure (a refusal, a timeout) never stops the rest.
+
+    `top` limits the run to the N most active people (the viewer's ranking), so a first pass with
+    a Claude extractor costs a few dozen calls, not one per person you've ever texted.
+    """
     ex = EXTRACTORS[kind]()
     failed = 0
-    for pid in [only] if only else store.person_ids():
+    if only:
+        ids = [only]
+    elif top:
+        ids = [p["id"] for p in sorted(store.people(), key=lambda p: -p["score"])[:top]]
+    else:
+        ids = store.person_ids()
+    for pid in ids:
         thread = [dict(r) for r in store.thread(pid, limit=window)]
         if not thread:
             continue
@@ -79,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
                         "api: Anthropic API key. Both Claude options send each thread's text off this machine")
     e.add_argument("--window", type=int, default=300, help="most recent N messages per person")
     e.add_argument("--person", type=int, help="only this person id")
+    e.add_argument("--top", type=int, help="only the N most active people (start here: --top 25)")
 
     sub.add_parser("show", help="print people and commitments")
     s = sub.add_parser("serve", help="open the local viewer")
@@ -106,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
         if a.cmd == "ingest":
             ingest(store, a.chatdb, a.days)
         elif a.cmd == "extract":
-            return 1 if extract(store, a.extractor, a.window, a.person) else 0
+            return 1 if extract(store, a.extractor, a.window, a.person, a.top) else 0
         elif a.cmd == "show":
             show(store)
         elif a.cmd == "serve":

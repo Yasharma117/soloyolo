@@ -231,6 +231,16 @@ class ReviewFixesTest(unittest.TestCase):
         self.assertTrue(all(v == "flaky" for k, v in ran.items() if k != first))
         st.close()
 
+    def test_top_limits_to_most_active(self):
+        from spike import __main__ as cli
+        st = Store(self.dir / "s.db")
+        st.add_messages("imessage", chatdb.read(fixture.build(self.dir / "c.db")), fixture.NAMES)
+        cli.extract(st, "heuristic", window=300, top=2)
+        ran = [p for p in st.people() if p["extractor"]]
+        best = sorted(st.people(), key=lambda p: -p["score"])[:2]
+        self.assertEqual({p["id"] for p in ran}, {p["id"] for p in best})
+        st.close()
+
     def test_extraction_run_recorded_even_with_no_commitments(self):
         st = Store(self.dir / "s.db")
         st.add_messages("imessage", chatdb.read(fixture.build(self.dir / "c.db")), fixture.NAMES)

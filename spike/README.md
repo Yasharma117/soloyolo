@@ -31,7 +31,7 @@ python -m spike ingest --days 90
 ```
 
 ```bash
-python -m spike extract --extractor claude-code   # Claude via your Claude Code login; see the privacy note
+python -m spike extract --extractor claude-code --top 25   # your 25 most active people first
 ```
 
 No API key needed: `claude-code` runs `claude -p`, so it uses the Claude account you're logged into Claude Code
