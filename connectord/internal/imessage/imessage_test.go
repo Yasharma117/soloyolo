@@ -127,7 +127,11 @@ func TestConnectTwiceIsOnePoller(t *testing.T) {
 	if err := a.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(60 * time.Millisecond)
+	deadline := time.Now().Add(5 * time.Second) // slow CI with -race: wait for the first pass, bounded
+	for len(a.events) < 2 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	time.Sleep(5 * a.Interval) // a second poller, if any, would add duplicates in this window
 	if err := a.Close(); err != nil {
 		t.Fatal(err)
 	}

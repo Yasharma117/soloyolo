@@ -42,6 +42,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/people":
                 return self._json(store.people())
+            if path == "/api/disclosures":
+                return self._json(store.disclosures())
             m = re.fullmatch(r"/api/thread/(\d+)", path)
             if m:
                 return self._json([dict(r) for r in store.thread(int(m.group(1)))])

@@ -42,3 +42,9 @@ CREATE TABLE IF NOT EXISTS extraction_run (
   extractor TEXT NOT NULL,         -- who read this thread last: 'heuristic' | model id
   ran_at REAL NOT NULL             -- recorded even when nothing was found, so "did text leave?" is answerable
 );
+CREATE TABLE IF NOT EXISTS disclosure (
+  id INTEGER PRIMARY KEY,
+  person_id INTEGER NOT NULL REFERENCES person(id),
+  recipient TEXT NOT NULL,         -- who received thread text, e.g. 'claude-opus-5-5 (claude code)'
+  at REAL NOT NULL                 -- written *before* sending; never deleted, so a later local run can't hide it
+);

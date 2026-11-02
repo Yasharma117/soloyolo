@@ -241,6 +241,24 @@ class ReviewFixesTest(unittest.TestCase):
         self.assertEqual({p["id"] for p in ran}, {p["id"] for p in best})
         st.close()
 
+    def test_disclosure_logged_before_sending_and_never_by_heuristic(self):
+        from spike import __main__ as cli
+        st = Store(self.dir / "s.db")
+        st.add_messages("imessage", chatdb.read(fixture.build(self.dir / "c.db")), fixture.NAMES)
+        cli.extract(st, "heuristic", window=300)
+        self.assertEqual(st.disclosures(), [])
+
+        class Cloud(HeuristicExtractor):
+            name, remote = "claude-test (cloud)", True
+            def extract(self, thread):
+                raise RuntimeError("network down")  # text may already have left
+
+        with mock.patch.dict(cli.EXTRACTORS, {"claude-code": Cloud}):
+            cli.extract(st, "claude-code", window=300, top=1)
+        cli.extract(st, "heuristic", window=300)  # a later local run must not hide it
+        self.assertEqual(st.disclosures(), ["claude-test (cloud)"])
+        st.close()
+
     def test_extraction_run_recorded_even_with_no_commitments(self):
         st = Store(self.dir / "s.db")
         st.add_messages("imessage", chatdb.read(fixture.build(self.dir / "c.db")), fixture.NAMES)
@@ -330,6 +348,20 @@ class WhatsAppExportTest(unittest.TestCase):
         self.assertEqual((when.month, when.day, when.hour, when.minute), (11, 13, 0, 5))
         first = datetime.fromtimestamp(ana[0].ts, ZoneInfo("Asia/Kolkata"))
         self.assertEqual((first.month, first.day, first.hour), (11, 2, 21))
+
+    def test_spanish_am_pm_and_tz_independent_ids(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from spike import whatsapp_export as wa
+        f = Path(self.tmp.name) / "es.txt"
+        f.write_text("2/11/26, 9:10 p. m. - Ana: Te pago el viernes\n"
+                     "2/11/26, 12:05 a. m. - Yash Sharma: Vale\n")
+        rows, _, _ = wa.load([f], me="Yash Sharma", tz="Europe/Madrid")
+        hours = [datetime.fromtimestamp(r.ts, ZoneInfo("Europe/Madrid")).hour for r in rows]
+        self.assertEqual(hours, [21, 0])
+        other, _, _ = wa.load([f], me="Yash Sharma", tz="Asia/Kolkata")
+        self.assertEqual([r.guid for r in rows], [r.guid for r in other])  # --tz must not change identity
+        self.assertNotEqual(rows[0].ts, other[0].ts)
 
     def test_single_chat_needs_me(self):
         from spike import whatsapp_export as wa

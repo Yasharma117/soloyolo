@@ -42,6 +42,8 @@ def extract(store: Store, kind: str, window: int, only: int | None = None, top: 
         thread = [dict(r) for r in store.thread(pid, limit=window)]
         if not thread:
             continue
+        if getattr(ex, "remote", True):  # unknown extractors are assumed to send text
+            store.record_disclosure(pid, ex.name)  # before sending, so a failed call is still on record
         try:
             result = ex.extract(thread)
         except Exception as err:  # keep going; rerun with --person to retry one

@@ -18,16 +18,18 @@ Mesh understands the people but can't see what you said or send anything. soloyo
 
 ## Quick start
 
+From the repository root:
+
 ```bash
-python -m spike demo
+pip install -r spike/requirements.txt && python -m spike demo
 ```
 
 ```bash
-cd connectord && go test ./...
+(cd connectord && go test ./...)
 ```
 
 ```bash
-cd site && npm install && npm run dev
+(cd site && npm install && npm run dev)
 ```
 
 ## The next decision

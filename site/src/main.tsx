@@ -11,8 +11,8 @@ function App() {
           <p className="eyebrow">soloyolo</p>
           <h1>Keep the promises you make in passing.</h1>
           <p className="lede">
-            soloyolo reads your iMessage and WhatsApp threads on your Mac, finds what you said you'd do, and lets you
-            follow through in one click. Your messages never leave your machine.
+            soloyolo reads your WhatsApp and iMessage threads, finds what you said you'd do, and lets you follow
+            through in one click. Your messages stay on your device unless you choose cloud extraction.
           </p>
         </div>
         <div className="demo">

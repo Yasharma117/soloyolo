@@ -79,6 +79,16 @@ class Store:
                 (person_id, extractor, time.time()),
             )
 
+    def record_disclosure(self, person_id: int, recipient: str) -> None:
+        """Log that a thread's text is about to leave this machine. Call before sending."""
+        with self.conn:
+            self.conn.execute("INSERT INTO disclosure(person_id, recipient, at) VALUES (?, ?, ?)",
+                              (person_id, recipient, time.time()))
+
+    def disclosures(self) -> list[str]:
+        """Every service that has ever received thread text from this store."""
+        return [r[0] for r in self.conn.execute("SELECT DISTINCT recipient FROM disclosure ORDER BY recipient")]
+
     # --- reads -------------------------------------------------------------------------
     def thread(self, person_id: int, limit: int | None = None) -> list[sqlite3.Row]:
         rows = self.conn.execute(

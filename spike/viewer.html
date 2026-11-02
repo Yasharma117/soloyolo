@@ -7,7 +7,7 @@
 <style>
   :root {
     --bg: #f6f6f4; --surface: #ffffff; --ink: #161616; --ink-2: #5c5c58; --ink-3: #9a9a95;
-    --line: #e4e4e0; --accent: #e8590c; --accent-soft: #fdeee4; --ok: #2f7d4f; --ok-soft: #e7f3ec;
+    --line: #e4e4e0; --accent: #e8590c; --accent-text: #be490a; --accent-soft: #fdeee4; --ok: #2f7d4f; --ok-soft: #e7f3ec;
     --me: #161616; --me-ink: #ffffff; --them: #ecece8;
     --mono: ui-monospace, "SF Mono", Menlo, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
@@ -15,7 +15,7 @@
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #111110; --surface: #1a1a19; --ink: #ededea; --ink-2: #a3a39e; --ink-3: #6b6b67;
-      --line: #2a2a28; --accent: #ff7a2f; --accent-soft: #2e1c11; --ok: #5cbf86; --ok-soft: #13261b;
+      --line: #2a2a28; --accent: #ff7a2f; --accent-text: #ff8f4f; --accent-soft: #2e1c11; --ok: #5cbf86; --ok-soft: #13261b;
       --me: #ededea; --me-ink: #111110; --them: #262624;
     }
   }
@@ -36,7 +36,7 @@
   .name { font-weight: 600; }
   .when { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
   .hint { margin-top: 3px; font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .hint.owe { color: var(--accent); }
+  .hint.owe { color: var(--accent-text); }
   main { overflow-y: auto; min-height: 0; }
   .detail { max-width: 720px; margin: 0 auto; padding: 32px 32px 64px; }
   .detail h2 { margin: 0; font-size: 22px; letter-spacing: -0.02em; }
@@ -54,11 +54,11 @@
   .c.done .dot { background: var(--ok); border-color: var(--ok); }
   .c.done .what { text-decoration: line-through; text-decoration-color: var(--ink-3); }
   .due { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .due.late { color: var(--accent); font-weight: 600; }
+  .due.late { color: var(--accent-text); font-weight: 600; }
   .empty { color: var(--ink-3); font-size: 13px; }
   .thread { display: flex; flex-direction: column; gap: 4px; }
   .day { align-self: center; font-size: 11px; color: var(--ink-3); margin: 14px 0 6px; }
-  .b { max-width: 78%; padding: 7px 12px; border-radius: 16px; font-size: 14px; scroll-margin: 120px; }
+  .b { max-width: 78%; padding: 7px 12px; border-radius: 16px; font-size: 14px; scroll-margin: 120px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .b.me { align-self: flex-end; background: var(--me); color: var(--me-ink); }
   .b.them { align-self: flex-start; background: var(--them); }
   .b.src { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -94,7 +94,10 @@ const ago = (ts) => {
 };
 const dueLabel = (iso) => {
   if (!iso) return { text: "", late: false };
-  const d = Math.round((new Date(iso + "T23:59:59") - Date.now()) / DAY);
+  // Whole calendar days between today and the due date, both at local midnight.
+  const [y, m, day] = iso.split("-").map(Number);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = Math.round((new Date(y, m - 1, day) - today) / DAY);
   if (d < 0) return { text: `${-d}d overdue`, late: true };
   return { text: d === 0 ? "due today" : `due in ${d}d`, late: false };
 };
@@ -160,10 +163,13 @@ $("#detail").addEventListener("click", (e) => {
 
 fetch("/api/people").then((r) => r.json()).then((data) => {
   people = data;
-  const models = [...new Set(people.map((p) => p.extractor))].filter((m) => m && m !== "heuristic");
-  $("#foot").textContent = models.length
-    ? `Served from 127.0.0.1 · thread text was sent to ${models.join(", ")} for extraction`
-    : "Local only · 127.0.0.1 · no message text has left this machine";
+  // From the disclosure log (written before any text is sent, never cleared), not from whichever
+  // extractor ran last: a later local run must not hide that text was sent earlier.
+  fetch("/api/disclosures").then((r) => r.json()).then((sentTo) => {
+    $("#foot").textContent = sentTo.length
+      ? `Served from 127.0.0.1 · thread text has been sent to ${sentTo.join(", ")} for extraction`
+      : "Local only · 127.0.0.1 · no thread text has been sent anywhere from this store";
+  });
   renderList();
   if (people.length) select(people[0].id); else $("#detail").innerHTML = `<p class="empty">No messages yet. Run <code>python -m spike ingest</code>.</p>`;
 });

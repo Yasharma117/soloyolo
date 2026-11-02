@@ -81,6 +81,7 @@ def _sentence(s: str) -> str:
 
 class HeuristicExtractor:
     name = "heuristic"
+    remote = False  # never sends text anywhere
 
     def extract(self, thread: Sequence) -> Extraction:
         out: list[Commitment] = []
@@ -140,6 +141,8 @@ class ClaudeCodeExtractor:
     instructions leak in.
     """
 
+    remote = True  # sends thread text to Anthropic
+
     def __init__(self, model: str = "claude-opus-5-5", effort: str = "medium", binary: str = "claude",
                  timeout: float = 300):
         path = shutil.which(binary)
@@ -177,6 +180,8 @@ class ClaudeCodeExtractor:
 
 class ClaudeExtractor:
     """One structured-output call per thread. Needs credentials (ANTHROPIC_API_KEY or `ant auth login`)."""
+
+    remote = True  # sends thread text to Anthropic
 
     def __init__(self, model: str = "claude-opus-5-5", effort: str = "medium"):
         import anthropic  # imported lazily so the offline path has no dependency on it

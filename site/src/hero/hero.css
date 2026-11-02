@@ -99,7 +99,7 @@
     font-size: 11px;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
-    color: var(--ss-accent);
+    color: var(--ss-accent-text); /* 11px text: the darker shade passes WCAG AA (5.1:1); the accent is 3.6:1 */
     transition: color 0.2s ease;
   }
 

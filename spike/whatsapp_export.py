@@ -109,7 +109,7 @@ def date_order(chats: list[Chat]) -> str | None:
     return None
 
 
-def _timestamp(d: str, t: str, order: str, tz: ZoneInfo) -> float:
+def _timestamp(d: str, t: str, order: str, tz: ZoneInfo | None) -> float:
     parts = [int(x) for x in re.split(r"[./-]", d)]
     if order == "ymd":
         y, mo, day = parts
@@ -120,8 +120,8 @@ def _timestamp(d: str, t: str, order: str, tz: ZoneInfo) -> float:
     if y < 100:
         y += 2000
     t = t.replace(" ", " ").replace(" ", " ").replace(".", ":").strip()
-    pm = re.search(r"[Pp]\s?:?[Mm]", t)
-    am = re.search(r"[Aa]\s?:?[Mm]", t)
+    marker = re.sub(r"[^a-z]", "", t.lower())  # "PM", "pm", "p. m." (es), "A.M." -> "pm" / "am"
+    pm, am = marker == "pm", marker == "am"
     hms = [int(x) for x in re.findall(r"\d+", t)[:3]]
     h, mi, s = (hms + [0, 0])[:3]
     if pm and h < 12:
@@ -148,7 +148,8 @@ def load(paths: list[Path], me: str | None = None, tz: str | None = None,
     me = me or infer_me(chats)
     if not me:
         raise ValueError("can't tell which sender is you: pass --me \"Your Name\" exactly as it appears in the export")
-    zone = ZoneInfo(tz) if tz else datetime.now().astimezone().tzinfo  # type: ignore[assignment]
+    # No --tz: naive local time, so each date gets its own DST offset (not today's fixed one).
+    zone = ZoneInfo(tz) if tz else None
     # Per file: exports from different phones can use different orders. An ambiguous file
     # (every date <= 12/12) follows the other files, else day-first as most locales do.
     fallback = date_order(chats) or "dmy"
@@ -172,10 +173,12 @@ def load(paths: list[Path], me: str | None = None, tz: str | None = None,
             body = EDITED.sub("", body).strip()
             if not body or SKIP_TEXT.match(body):
                 continue
-            ts = _timestamp(d, t, chat_order, zone)  # type: ignore[arg-type]
-            key = f"{other}|{ts}|{sender}|{body}"
+            ts = _timestamp(d, t, chat_order, zone)
+            # The raw export stamp, not ts: the guid must not change with --tz or a DST switch,
+            # or a re-import would duplicate every message.
+            key = f"{other}|{d}|{t}|{sender}|{body}"
             seen[key] += 1  # identical lines in the same second stay distinct
-            guid = hashlib.sha1(f"{key}|{seen[key]}".encode()).hexdigest()
+            guid = hashlib.sha256(f"{key}|{seen[key]}".encode()).hexdigest()[:40]  # a dedupe key, not security
             out.append(Message(guid, handle, ts, sender == me, body))
             kept += 1
         notes.append(f"{chat.source}: {other}, {kept} messages")

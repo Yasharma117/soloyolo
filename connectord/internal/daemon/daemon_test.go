@@ -150,3 +150,34 @@ func TestDaemonEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestServeStopsOnCancelWithStdinOpen(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "s.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	inR, inW := io.Pipe() // never closed: stdin stays open, as under a parent process
+	defer inW.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- New(adapter.NewRegistry(), st, t.TempDir()).Serve(ctx, inR, io.Discard) }()
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Serve returned %v, want nil on cancel", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Serve ignored cancellation while stdin was open")
+	}
+}
+
+func TestAccountsListIsEmptyArray(t *testing.T) {
+	st, _ := store.Open(filepath.Join(t.TempDir(), "s.db"))
+	defer st.Close()
+	accts, err := st.Accounts(context.Background())
+	if b, _ := json.Marshal(accts); err != nil || string(b) != "[]" {
+		t.Fatalf("got %s %v, want []", b, err)
+	}
+}

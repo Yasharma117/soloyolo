@@ -18,6 +18,7 @@ import (
 	"io"
 	"log"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"github.com/yasharma117/soloyolo/connectord/internal/adapter"
@@ -84,12 +85,38 @@ func (d *Daemon) notify(method string, params any) {
 func (d *Daemon) Serve(ctx context.Context, r io.Reader, w io.Writer) error {
 	d.out = json.NewEncoder(w)
 	d.resume(ctx)
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 1<<20), 16<<20)
+	// Read stdin on its own goroutine so a cancelled ctx (SIGINT/SIGTERM) ends Serve even while
+	// stdin stays open; the scanner would otherwise block until EOF and skip closeAll.
+	lines := make(chan []byte)
+	scanErr := make(chan error, 1)
+	go func() {
+		defer close(lines)
+		sc := bufio.NewScanner(r)
+		sc.Buffer(make([]byte, 1<<20), 16<<20)
+		for sc.Scan() {
+			select {
+			case lines <- append([]byte(nil), sc.Bytes()...):
+			case <-ctx.Done():
+				return
+			}
+		}
+		scanErr <- sc.Err()
+	}()
 	var wg sync.WaitGroup
-	for sc.Scan() {
+loop:
+	for {
+		var line []byte
+		select {
+		case <-ctx.Done():
+			break loop
+		case b, ok := <-lines:
+			if !ok {
+				break loop
+			}
+			line = b
+		}
 		var req request
-		if err := json.Unmarshal(sc.Bytes(), &req); err != nil {
+		if err := json.Unmarshal(line, &req); err != nil {
 			d.write(response{JSONRPC: "2.0", ID: json.RawMessage("null"), Error: &rpcError{-32700, "parse error"}})
 			continue
 		}
@@ -120,7 +147,12 @@ func (d *Daemon) Serve(ctx context.Context, r io.Reader, w io.Writer) error {
 	}
 	wg.Wait()
 	d.closeAll()
-	return sc.Err()
+	select {
+	case err := <-scanErr:
+		return err
+	default:
+		return nil // cancelled
+	}
 }
 
 var errUnknownMethod = errors.New("method not found")
@@ -193,8 +225,9 @@ func (d *Daemon) addAccount(ctx context.Context, network string) (store.Account,
 		}
 	}
 	acct := store.Account{ID: fmt.Sprintf("%s-%d", network, n), Network: network}
-	if _, err := d.reg.New(network, acct.ID, d.accountDir(acct.ID)); err != nil {
-		return store.Account{}, err // unknown network: don't persist it
+	// Check the name only: building an adapter here would start (and leak) its goroutines.
+	if !slices.Contains(d.reg.Networks(), network) {
+		return store.Account{}, fmt.Errorf("unknown network %q", network)
 	}
 	return acct, d.store.PutAccount(ctx, acct)
 }

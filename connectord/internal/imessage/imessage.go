@@ -113,11 +113,14 @@ func (a *Adapter) Connect(ctx context.Context) error {
 		defer close(done)
 		history := true
 		for {
-			if _, err := a.Poll(ctx, history); err != nil && ctx.Err() == nil {
-				// chat.db is mid-checkpoint or briefly locked: try again next tick.
-				log.Printf("imessage: poll: %v", err)
+			if _, err := a.Poll(ctx, history); err != nil {
+				if ctx.Err() == nil {
+					// chat.db is mid-checkpoint or briefly locked: try again next tick.
+					log.Printf("imessage: poll: %v", err)
+				}
+			} else {
+				history = false // only once the backlog is fully read, or it would replay as live
 			}
-			history = false
 			select {
 			case <-ctx.Done():
 				return

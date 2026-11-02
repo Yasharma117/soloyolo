@@ -126,7 +126,7 @@ func (s *Store) Accounts(ctx context.Context) ([]Account, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Account
+	out := []Account{} // [] not null in JSON on a fresh install
 	for rows.Next() {
 		var a Account
 		if err := rows.Scan(&a.ID, &a.Network, &a.RemoteUser); err != nil {

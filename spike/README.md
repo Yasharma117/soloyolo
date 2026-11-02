@@ -74,7 +74,8 @@ in `eval/RESULTS.md`.
 - `ingest` reads `chat.db` read-only and copies 1:1 thread text into `soloyolo.db` in the current folder.
   That file is your message history: it's git-ignored, and you should treat it like `chat.db`.
 - `extract --extractor claude-code` (or `api`) **sends each thread's text to Anthropic.** That breaks the local-first promise,
-  which is why it needs a flag and the viewer's footer says so. It's fine for testing whether the idea works on
+  which is why it needs a flag. Each send is logged *before* it happens (the `disclosure` table, never cleared), and the
+  viewer's footer reads that log. It's fine for testing whether the idea works on
   your own data. A shipping product needs on-device extraction, or explicit per-person consent.
 - The viewer binds to `127.0.0.1` only and never logs message text.
 
@@ -94,7 +95,8 @@ items. Below that, the thesis is weak: ranking by message counts (what Mesh does
 ## Known limits (deliberate, for a spike)
 
 - **1:1 threads only.** Group chats need per-speaker attribution and a different prompt.
-- **iMessage/SMS only.** WhatsApp arrives through `connectord` (the Go daemon), which writes to the same model.
+- **iMessage, and WhatsApp exports only.** The spike reads `chat.db` and WhatsApp "Export chat" files; live
+  WhatsApp sync goes through `connectord` (the Go daemon), which writes to the same model.
 - **No contact names** from Apple Contacts yet; people show as phone numbers or emails outside the demo.
 - **Reads the last 300 messages per person.** Older promises are out of scope.
 - **Re-extraction replaces the person's commitments**, so manual edits wouldn't survive it. There are no manual edits yet.
