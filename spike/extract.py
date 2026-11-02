@@ -1,15 +1,24 @@
 """Find commitments in a 1:1 thread: who promised what, by when, and whether it got done.
 
-Two extractors behind one call shape, `extract(thread) -> (commitments, topics)`:
+Three extractors behind one call shape, `extract(thread) -> Extraction`:
 
 - HeuristicExtractor: regexes, no network. Exists so the pipeline runs offline and as a
-  floor to beat. It will miss most real-world phrasing.
-- ClaudeExtractor: sends the thread *text* to the Claude API. This leaves the machine, which
-  breaks the local-first promise, so the CLI only uses it with an explicit --cloud flag.
+  floor to beat. It misses most real-world phrasing (see spike/eval/RESULTS.md).
+- ClaudeCodeExtractor: runs Claude through the Claude Code CLI (`claude -p`), so it uses your
+  Claude login. No API key needed.
+- ClaudeExtractor: the Anthropic API directly. Needs ANTHROPIC_API_KEY or `ant auth login`.
+
+Both Claude extractors send the thread *text* off the machine, which breaks the local-first
+promise, so the CLI only uses them when asked for by name.
 """
 from __future__ import annotations
 
+import json
+import os
 import re
+import shutil
+import subprocess
+import tempfile
 import time
 from datetime import date, datetime, timedelta
 from typing import Literal, Optional, Sequence
@@ -106,6 +115,66 @@ the message timestamp), and whether a later message shows it was done. Cite mess
 Also give up to 4 recurring topics. Return an empty list when there are no commitments."""
 
 
+def _today() -> str:
+    return datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d")
+
+
+def _checked(result: Extraction, thread: Sequence) -> Extraction:
+    """Never trust a citation the thread doesn't contain."""
+    valid = {m["id"] for m in thread}
+    result.commitments = [c for c in result.commitments if c.source_message_id in valid]
+    for c in result.commitments:
+        if c.done_message_id not in valid:
+            c.done_message_id = None
+        if c.done_message_id is None and c.status == "done":
+            c.status = "open"  # "done" must point at the message that shows it
+    result.topics = result.topics[:4]
+    return result
+
+
+class ClaudeCodeExtractor:
+    """One `claude -p` call per thread, with the output validated against Extraction's schema.
+
+    The thread goes in on stdin, never argv, so its text doesn't show up in `ps`. The call runs
+    with no tools, no MCP servers and no saved session, from an empty directory so no project
+    instructions leak in.
+    """
+
+    def __init__(self, model: str = "claude-opus-5-5", effort: str = "medium", binary: str = "claude",
+                 timeout: float = 300):
+        path = shutil.which(binary)
+        if not path:
+            raise RuntimeError("Claude Code CLI not found. Install it and log in (`claude`), or use --extractor heuristic.")
+        self.cmd = [path]
+        self.name = f"{model} (claude code)"
+        self.model, self.effort, self.timeout = model, effort, timeout
+        self.schema = json.dumps(Extraction.model_json_schema())
+
+    def extract(self, thread: Sequence) -> Extraction:
+        prompt = f"Today is {_today()}. List the commitments in the thread on stdin."
+        args = self.cmd + [
+            "-p", prompt,
+            "--system-prompt", SYSTEM,
+            "--tools", "",
+            "--strict-mcp-config",
+            "--no-session-persistence",
+            "--json-schema", self.schema,
+            "--output-format", "json",
+            "--model", self.model,
+            "--effort", self.effort,
+        ]
+        with tempfile.TemporaryDirectory() as empty:
+            proc = subprocess.run(args, input=f"<thread>\n{render(thread)}\n</thread>", capture_output=True,
+                                  text=True, timeout=self.timeout, cwd=empty, env={**os.environ, "NO_COLOR": "1"})
+        try:
+            out = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            raise RuntimeError(f"claude -p failed (exit {proc.returncode}): {proc.stderr.strip()[:300]}") from None
+        if out.get("is_error") or out.get("structured_output") is None:
+            raise RuntimeError(f"no extraction: {out.get('subtype')} {out.get('stop_reason')} {str(out.get('result'))[:200]}")
+        return _checked(Extraction.model_validate(out["structured_output"]), thread)
+
+
 class ClaudeExtractor:
     """One structured-output call per thread. Needs credentials (ANTHROPIC_API_KEY or `ant auth login`)."""
 
@@ -117,12 +186,11 @@ class ClaudeExtractor:
         self.effort = effort
 
     def extract(self, thread: Sequence) -> Extraction:
-        today = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d")
         response = self.client.beta.messages.parse(
             model=self.name,
             max_tokens=16000,
             system=SYSTEM,
-            messages=[{"role": "user", "content": f"Today is {today}.\n\n<thread>\n{render(thread)}\n</thread>"}],
+            messages=[{"role": "user", "content": f"Today is {_today()}.\n\n<thread>\n{render(thread)}\n</thread>"}],
             output_format=Extraction,
             output_config={"effort": self.effort},
             # On a safety decline, re-run on a fallback model chosen by refusal category.
@@ -131,12 +199,4 @@ class ClaudeExtractor:
         )
         if response.stop_reason == "refusal" or response.parsed_output is None:
             raise RuntimeError(f"no extraction (stop_reason={response.stop_reason}, request={response._request_id})")
-        valid = {m["id"] for m in thread}
-        result = response.parsed_output
-        # Never trust a citation the thread doesn't contain.
-        result.commitments = [c for c in result.commitments if c.source_message_id in valid]
-        for c in result.commitments:
-            if c.done_message_id not in valid:
-                c.done_message_id = None
-        result.topics = result.topics[:4]
-        return result
+        return _checked(response.parsed_output, thread)

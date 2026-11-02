@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import chatdb, fixture
-from .extract import ClaudeExtractor, HeuristicExtractor
+from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor
 from .store import Store
 
 DEFAULT_DB = "soloyolo.db"
@@ -21,8 +21,11 @@ def ingest(store: Store, source: Path, days: int, names: dict[str, str] | None =
     print(f"read {len(rows)} messages from {source}, {added} new")
 
 
-def extract(store: Store, cloud: bool, window: int, only: int | None = None) -> None:
-    ex = ClaudeExtractor() if cloud else HeuristicExtractor()
+EXTRACTORS = {"heuristic": HeuristicExtractor, "claude-code": ClaudeCodeExtractor, "api": ClaudeExtractor}
+
+
+def extract(store: Store, kind: str, window: int, only: int | None = None) -> None:
+    ex = EXTRACTORS[kind]()
     for pid in [only] if only else store.person_ids():
         thread = [dict(r) for r in store.thread(pid, limit=window)]
         if not thread:
@@ -49,7 +52,8 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     d = sub.add_parser("demo", help="build a synthetic chat.db, ingest, extract, then serve")
-    d.add_argument("--cloud", action="store_true", help="extract with Claude (sends the demo text to the API)")
+    d.add_argument("--extractor", choices=EXTRACTORS, default="heuristic",
+                   help="claude-code or api send the (synthetic) demo text to Claude")
     d.add_argument("--no-serve", action="store_true")
     d.add_argument("--port", type=int, default=8765)
 
@@ -58,8 +62,9 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("--days", type=int, default=180, help="how far back to read (0 = everything)")
 
     e = sub.add_parser("extract", help="find commitments in each thread")
-    e.add_argument("--cloud", action="store_true",
-                   help="use Claude. Sends each thread's text to the Anthropic API: off-device")
+    e.add_argument("--extractor", choices=EXTRACTORS, default="heuristic",
+                   help="heuristic: offline regexes. claude-code: Claude via your Claude Code login (no API key). "
+                        "api: Anthropic API key. Both Claude options send each thread's text off this machine")
     e.add_argument("--window", type=int, default=300, help="most recent N messages per person")
     e.add_argument("--person", type=int, help="only this person id")
 
@@ -73,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
         store = Store(a.db)
         src = fixture.build(Path(a.db).with_name("demo-chat.db"))
         ingest(store, src, days=0, names=fixture.NAMES)
-        extract(store, a.cloud, window=300)
+        extract(store, a.extractor, window=300)
         show(store)
         store.close()
         if not a.no_serve:
@@ -86,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         if a.cmd == "ingest":
             ingest(store, a.chatdb, a.days)
         elif a.cmd == "extract":
-            extract(store, a.cloud, a.window, a.person)
+            extract(store, a.extractor, a.window, a.person)
         elif a.cmd == "show":
             show(store)
         elif a.cmd == "serve":

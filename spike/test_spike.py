@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from spike import chatdb, fixture
-from spike.extract import ClaudeExtractor, Commitment, Extraction, HeuristicExtractor, render
+from spike.extract import ClaudeCodeExtractor, ClaudeExtractor, Commitment, Extraction, HeuristicExtractor, render
 from spike.store import Store
 
 
@@ -102,6 +102,65 @@ class PipelineTest(unittest.TestCase):
     def test_render_marks_speaker(self):
         line = render([{"id": 7, "ts": 0, "from_me": 1, "text": "hello"}])
         self.assertTrue(line.startswith("[7] ") and line.endswith("me: hello"))
+
+
+FAKE_CLAUDE = r"""#!/usr/bin/env python3
+import json, os, sys
+thread = sys.stdin.read()
+log = os.environ["FAKE_CLAUDE_LOG"]
+json.dump({"argv": sys.argv[1:], "stdin": thread, "cwd": os.getcwd()}, open(log, "w"))
+if os.environ.get("FAKE_CLAUDE_MODE") == "error":
+    print(json.dumps({"type": "result", "is_error": True, "subtype": "error_during_execution", "result": "boom"}))
+    sys.exit(1)
+print(json.dumps({"type": "result", "is_error": False, "subtype": "success", "structured_output": {
+    "topics": ["hiring"],
+    "commitments": [
+        {"owner": "me", "action": "Intro Sam to Priya", "due": None, "status": "done",
+         "source_message_id": int(os.environ["FAKE_SRC"]), "done_message_id": 424242},
+        {"owner": "them", "action": "Invented", "due": None, "status": "open",
+         "source_message_id": 99999, "done_message_id": None}]}}))
+"""
+
+
+class ClaudeCodeExtractorTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        d = Path(self.tmp.name)
+        fake = d / "claude"
+        fake.write_text(FAKE_CLAUDE)
+        fake.chmod(0o755)
+        self.log = d / "call.json"
+        self.thread = [{"id": 7, "ts": 0, "from_me": 1, "text": "I'll intro you to Priya zq-private-77"},
+                       {"id": 8, "ts": 60, "from_me": 0, "text": "thanks"}]
+        self.env = mock.patch.dict("os.environ", {"FAKE_CLAUDE_LOG": str(self.log), "FAKE_SRC": "7"})
+        self.env.start()
+        self.ex = ClaudeCodeExtractor(binary=str(fake))
+
+    def tearDown(self):
+        self.env.stop()
+        self.tmp.cleanup()
+
+    def test_thread_goes_on_stdin_and_output_is_checked(self):
+        import json
+        out = self.ex.extract(self.thread)
+        call = json.loads(self.log.read_text())
+        self.assertIn("zq-private-77", call["stdin"])
+        self.assertFalse(any("zq-private-77" in a for a in call["argv"]))  # message text never in argv
+        for flag in ["--tools", "--strict-mcp-config", "--no-session-persistence", "--json-schema"]:
+            self.assertIn(flag, call["argv"])
+        self.assertNotEqual(Path(call["cwd"]).resolve(), Path.cwd().resolve())  # no project context
+        self.assertEqual([c.action for c in out.commitments], ["Intro Sam to Priya"])
+        # done_message_id 424242 isn't in the thread, so "done" can't be claimed
+        self.assertEqual((out.commitments[0].status, out.commitments[0].done_message_id), ("open", None))
+
+    def test_cli_error_raises(self):
+        with mock.patch.dict("os.environ", {"FAKE_CLAUDE_MODE": "error"}):
+            with self.assertRaisesRegex(RuntimeError, "no extraction"):
+                self.ex.extract(self.thread)
+
+    def test_missing_cli_explains(self):
+        with self.assertRaisesRegex(RuntimeError, "Claude Code CLI not found"):
+            ClaudeCodeExtractor(binary="definitely-not-claude-xyz")
 
 
 if __name__ == "__main__":
