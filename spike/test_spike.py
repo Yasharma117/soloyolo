@@ -382,5 +382,27 @@ class WhatsAppExportTest(unittest.TestCase):
         st.close()
 
 
+class JsonImportTest(unittest.TestCase):
+    def test_import_merges_threads_by_handle_and_dedupes(self):
+        import json
+        from spike import json_import
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "c.json"
+            f.write_text(json.dumps({"source": "gmail", "threads": [
+                {"person": "Sumit (Cars24)", "handle": "Sumit@Cars24.com", "messages": [
+                    {"id": "a", "ts": "2026-10-05T02:30:00Z", "from_me": True, "text": "I'll send the file"},
+                    {"id": "b", "ts": "2026-10-05T11:38:25Z", "from_me": False, "text": "Thanks"}]},
+                {"person": "Sumit (Cars24)", "handle": "sumit@cars24.com", "messages": [
+                    {"id": "c", "ts": "2026-10-28T13:45:21Z", "from_me": True, "text": "Following up"},
+                    {"id": "d", "ts": "2026-10-28T13:46:00Z", "from_me": True, "text": "  "}]}]}))
+            source, rows, names = json_import.load(f)
+            self.assertEqual((source, len(rows), names), ("gmail", 3, {"sumit@cars24.com": "Sumit (Cars24)"}))
+            st = Store(Path(d) / "s.db")
+            self.assertEqual(st.add_messages(source, rows, names), 3)
+            self.assertEqual(st.add_messages(source, rows, names), 0)
+            self.assertEqual([p["count"] for p in st.people()], [3])
+            st.close()
+
+
 if __name__ == "__main__":
     unittest.main()

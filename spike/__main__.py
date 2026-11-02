@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import chatdb, fixture, whatsapp_export
+from . import chatdb, fixture, json_import, whatsapp_export
 from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor
 from .store import Store
 
@@ -91,6 +91,9 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--tz", help="the phone's time zone, e.g. Asia/Kolkata (default: this machine's)")
     w.add_argument("--date-order", choices=["dmy", "mdy", "ymd"], help="override date order detection")
 
+    j = sub.add_parser("import-json", help="import conversations from a JSON file (format in spike/json_import.py)")
+    j.add_argument("file", type=Path)
+
     e = sub.add_parser("extract", help="find commitments in each thread")
     e.add_argument("--extractor", choices=EXTRACTORS, default="heuristic",
                    help="heuristic: offline regexes. claude-code: Claude via your Claude Code login (no API key). "
@@ -131,6 +134,9 @@ def main(argv: list[str] | None = None) -> int:
                 ap.error(str(err))
             print("\n".join(notes))
             print(f"{store.add_messages('whatsapp', rows, names)} new messages from {len(names)} chats")
+        elif a.cmd == "import-json":
+            source, rows, names = json_import.load(a.file)
+            print(f"{store.add_messages(source, rows, names)} new messages from {len(names)} people ({source})")
         elif a.cmd == "extract":
             return 1 if extract(store, a.extractor, a.window, a.person, a.top) else 0
         elif a.cmd == "show":
