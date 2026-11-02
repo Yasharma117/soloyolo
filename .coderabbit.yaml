@@ -1,0 +1,10 @@
+# CodeRabbit: review soloyolo's own code, not vendored third-party copies.
+reviews:
+  path_filters:
+    - "!.claude/skills/**"   # vendored Stageshow skill (MIT, upstream: benjitaylor/skills)
+    - "!site/src/kit/**"     # Stageshow's React kit, copied in as the skill intends
+    - "!**/package-lock.json"
+    - "!**/go.sum"
+  auto_review:
+    enabled: true
+    drafts: false
