@@ -163,5 +163,26 @@ class ClaudeCodeExtractorTest(unittest.TestCase):
             ClaudeCodeExtractor(binary="definitely-not-claude-xyz")
 
 
+class EvalTest(unittest.TestCase):
+    def test_scorer_matches_by_owner_and_citation(self):
+        from spike.eval.__main__ import score
+        case = {"id": "x", "expected": [{"owner": "me", "sources": [2], "done": [3]},
+                                        {"owner": "them", "sources": [4], "done": []}]}
+        pred = [Commitment(owner="me", action="a", due=None, status="done", source_message_id=2, done_message_id=3),
+                Commitment(owner="me", action="b", due=None, status="open", source_message_id=2, done_message_id=None),
+                Commitment(owner="me", action="c", due=None, status="open", source_message_id=4, done_message_id=None)]
+        r = score(case, pred)
+        self.assertEqual((r["tp"], r["fp"], r["fn"], r["status_ok"]), (1, 2, 1, 1))
+
+    def test_heuristic_floor_holds(self):
+        """Offline regression guard: the heuristic's recall on the labeled cases shouldn't silently drop."""
+        from spike.eval.__main__ import score, thread_of
+        from spike.eval.cases import CASES
+        ex, now = HeuristicExtractor(), time.time()
+        rows = [score(c, ex.extract(thread_of(c, now)).commitments) for c in CASES]
+        tp, fn = sum(r["tp"] for r in rows), sum(r["fn"] for r in rows)
+        self.assertGreaterEqual(tp / (tp + fn), 0.4)
+
+
 if __name__ == "__main__":
     unittest.main()

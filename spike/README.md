@@ -9,7 +9,7 @@ nobody needs. So this comes first.
 ```
 chat.db (read-only) ──► store (SQLite: person, handle, message, commitment, topic) ──► viewer (127.0.0.1)
                                          ▲
-                       extractor: heuristic (offline) │ Claude (--cloud, opt-in)
+                       extractor: heuristic (offline) │ Claude (opt-in, no API key needed)
 ```
 
 ## Run it
@@ -31,35 +31,44 @@ python -m spike ingest --days 90
 ```
 
 ```bash
-python -m spike extract            # offline regexes: a floor, misses most phrasing
+python -m spike extract --extractor claude-code   # Claude via your Claude Code login; see the privacy note
 ```
 
-```bash
-python -m spike extract --cloud    # Claude; see the privacy note below
-```
+No API key needed: `claude-code` runs `claude -p`, so it uses the Claude account you're logged into Claude Code
+with. If you do have a key, `--extractor api` uses it directly. The default, `heuristic`, is offline regexes that
+miss over half of real phrasing (`eval/RESULTS.md`).
 
 ```bash
 python -m spike serve              # http://127.0.0.1:8765
 ```
 
-Tests (offline, never call the API):
+Tests (offline, never call Claude):
 
 ```bash
 python -m unittest spike.test_spike
 ```
 
+Accuracy on 25 labeled threads (`eval/`):
+
+```bash
+python -m spike.eval --extractor claude-code
+```
+
+Last run: Claude found 16/16 commitments at 0.89–0.94 precision; the regexes found 7/16. Details and caveats
+in `eval/RESULTS.md`.
+
 ## Privacy, stated plainly
 
 - `ingest` reads `chat.db` read-only and copies 1:1 thread text into `soloyolo.db` in the current folder.
   That file is your message history: it's git-ignored, and you should treat it like `chat.db`.
-- `extract --cloud` **sends each thread's text to the Anthropic API.** That breaks the local-first promise,
+- `extract --extractor claude-code` (or `api`) **sends each thread's text to Anthropic.** That breaks the local-first promise,
   which is why it needs a flag and the viewer's footer says so. It's fine for testing whether the idea works on
   your own data. A shipping product needs on-device extraction, or explicit per-person consent.
 - The viewer binds to `127.0.0.1` only and never logs message text.
 
 ## How to judge the result (the actual experiment)
 
-Run `ingest --days 90`, then `extract --cloud`, then go through the "You owe" lists and score each item:
+Run `ingest --days 90`, then `extract --extractor claude-code`, then go through the "You owe" lists and score each item:
 
 | Score | Meaning |
 |---|---|
