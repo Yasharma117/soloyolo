@@ -36,8 +36,9 @@ to often, then:
 python -m spike import-whatsapp ~/Downloads/WhatsApp*.zip --tz Asia/Kolkata
 ```
 
-It reads iPhone and Android layouts, any date order and 12/24-hour clocks, drops media placeholders and
-system notices, and skips group chats. With 2+ chats it works out which sender is you; with one, add
+It reads iPhone and Android layouts, any date order and 12/24-hour clocks, and skips group chats. System
+notices and stickers are dropped. Photos, videos, documents, voice notes and logged calls are kept as markers,
+because "send me the pic" is done by the photo and "I'll call you back" by the call. With 2+ chats it works out which sender is you; with one, add
 `--me "Your Name"`. Re-importing a newer export of the same chat only adds new messages.
 
 Or from your own Messages history (macOS; give your terminal Full Disk Access first):
@@ -104,5 +105,7 @@ items. Below that, the thesis is weak: ranking by message counts (what Mesh does
   WhatsApp sync goes through `connectord` (the Go daemon), which writes to the same model.
 - **No contact names** from Apple Contacts yet; people show as phone numbers or emails outside the demo.
 - **Reads the last 300 messages per person.** Older promises are out of scope.
+- **Each thread is read alone.** Family logistics often close in a sibling thread (Dad asks if you wished
+  your aunt; you'd told Mum). Those show as open.
 - **Asks are judged on text alone.** A reply in another app, or on a call, won't close one.
 - **Re-extraction replaces the person's commitments**, so manual edits wouldn't survive it. There are no manual edits yet.

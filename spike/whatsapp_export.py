@@ -39,7 +39,7 @@ HEADER = re.compile(
 )
 
 SKIP_TEXT = re.compile(
-    r"^(<media omitted>|<[^>]+ omitted>|(image|video|audio|sticker|gif|document|contact card) omitted"
+    r"^(<media omitted>|<[^>]+ omitted>|<album message>|(image|video|audio|sticker|gif|document|contact card) omitted"
     r"|this message was deleted|you deleted this message|null|missed (voice|video) call.*"
     r"|waiting for this message.*|.*\.(jpg|jpeg|png|webp|opus|mp4|pdf|vcf) \(file attached\)"
     # system notices iPhone exports attribute to the contact
@@ -48,7 +48,26 @@ SKIP_TEXT = re.compile(
     r"|disappearing messages were turned (on|off).*|.*changed (their|the) phone number.*)$",
     re.I,
 )
+# A call the export logged on its own line ("[10/13/26, 5:36:43 PM] - [Call]"). The direction isn't
+# recorded, but that a call happened is what closes "I'll call you back".
+CALL_LINE = re.compile(r"^\[(?:voice |video )?call\]$", re.I)
+CALL = "[call]"  # stored text for a call; spike.extract.render shows it without a speaker
 EDITED = re.compile(r"\s*<this message was edited>\s*$", re.I)
+# "[Forwarded] <image omitted> caption": the label goes. A photo, video, document or voice note
+# becomes a marker, because "send me the pic" is done by the photo; stickers and GIFs go.
+FORWARDED = re.compile(r"^\[forwarded\]\s*", re.I)
+MEDIA = re.compile(r"^<(?P<kind>image|video|document|audio|voice message|[a-z ]+?) omitted>\s*", re.I)
+MEDIA_MARK = {"image": "[photo]", "video": "[video]", "document": "[document]", "audio": "[voice note]",
+              "voice message": "[voice note]"}
+
+
+def _media(body: str) -> str:
+    m = MEDIA.match(body)
+    if not m:
+        return body
+    mark = MEDIA_MARK.get(m["kind"].lower())
+    rest = body[m.end():].strip()
+    return f"{mark} {rest}".strip() if mark else rest
 
 
 @dataclass(frozen=True)
@@ -67,7 +86,7 @@ class Chat:
 
     @property
     def senders(self) -> Counter:
-        return Counter(s for _, _, s, _ in self.lines)
+        return Counter(s for _, _, s, _ in self.lines if s)  # "" is a logged call, not a person
 
 
 def _read_texts(path: Path) -> list[tuple[str, str]]:
@@ -86,7 +105,9 @@ def parse(source: str, text: str) -> Chat:
         m = HEADER.match(line)
         if m:
             sender, sep, body = m["rest"].partition(": ")
-            if sep:
+            if CALL_LINE.match(m["rest"].strip()):
+                lines.append([m["date"], m["time"], "", CALL])  # type: ignore[arg-type]
+            elif sep:
                 lines.append([m["date"], m["time"], sender.strip(), body])  # type: ignore[arg-type]
             # no "Sender: " means a system line (the encryption notice, "X changed the subject"): drop it
             continue
@@ -170,8 +191,8 @@ def load(paths: list[Path], me: str | None = None, tz: str | None = None,
         seen: Counter = Counter()
         kept = 0
         for d, t, sender, body in chat.lines:
-            body = EDITED.sub("", body).strip()
-            if not body or SKIP_TEXT.match(body):
+            body = _media(FORWARDED.sub("", EDITED.sub("", body).strip())).strip()
+            if not body or (sender and SKIP_TEXT.match(body)):
                 continue
             ts = _timestamp(d, t, chat_order, zone)
             # The raw export stamp, not ts: the guid must not change with --tz or a DST switch,

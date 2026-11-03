@@ -440,6 +440,32 @@ class WhatsAppExportTest(unittest.TestCase):
         st.close()
 
 
+class WhatsAppBracketExportTest(unittest.TestCase):
+    """Exports where every line is bracketed, 'You' is the sender and calls get their own line."""
+
+    def test_calls_forwards_and_placeholders(self):
+        from spike import whatsapp_export
+        text = ("Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them.\n"
+                "[10/12/26, 8:01:46 PM] PAPA: Jio Fiber recharge kar dena\n"
+                "[10/12/26, 8:01:58 PM] You: Ok\n"
+                "[10/13/26, 5:36:43 PM] - [Call]\n"
+                "[10/13/26, 8:35:39 PM] You: <image omitted> Jiofi done ji\n"
+                "[10/14/26, 9:42:16 AM] PAPA: [Forwarded] <sticker omitted>\n"
+                "[10/19/26, 4:34:51 PM] PAPA: <album message>\n"
+                "[10/19/26, 4:34:52 PM] PAPA: [Forwarded] <image omitted>\n")
+        with tempfile.TemporaryDirectory() as d:
+            for name in ("PAPA", "Gaurav"):
+                (Path(d) / f"{name}.txt").write_text(text.replace("PAPA", name))
+            rows, names, _ = whatsapp_export.load(sorted(Path(d).glob("*.txt")), tz="Asia/Kolkata")
+        papa = [(r.from_me, r.text) for r in rows if r.handle == "export:PAPA"]
+        self.assertEqual(papa, [(False, "Jio Fiber recharge kar dena"), (True, "Ok"), (False, "[call]"),
+                                (True, "[photo] Jiofi done ji"), (False, "[photo]")])
+        thread = [{"id": i, "ts": r.ts, "from_me": r.from_me, "text": r.text}
+                  for i, r in enumerate((r for r in rows if r.handle == "export:PAPA"), start=1)]
+        self.assertIn("[3] ", render(thread))
+        self.assertIn("(a call between us)", render(thread).splitlines()[2])
+
+
 class JsonImportTest(unittest.TestCase):
     def test_import_merges_threads_by_handle_and_dedupes(self):
         import json

@@ -61,6 +61,7 @@
   .thread { display: flex; flex-direction: column; gap: 4px; }
   .day { align-self: center; font-size: 11px; color: var(--ink-3); margin: 14px 0 6px; }
   .b { max-width: 78%; padding: 7px 12px; border-radius: 16px; font-size: 14px; scroll-margin: 120px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .b.call { align-self: center; background: none; color: var(--ink-3); font-size: 12px; padding: 2px 8px; }
   .b.me { align-self: flex-end; background: var(--me); color: var(--me-ink); }
   .b.them { align-self: flex-start; background: var(--them); }
   .b.src { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -142,8 +143,9 @@ async function select(id) {
     const day = new Date(m.ts * 1000).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
     const sep = day !== lastDay ? `<div class="day">${day}</div>` : "";
     lastDay = day;
-    const cls = [m.from_me ? "me" : "them", src.has(m.id) ? "src" : "", fin.has(m.id) ? "fin" : ""].join(" ");
-    return `${sep}<div class="b ${cls}" id="m${m.id}">${esc(m.text)}</div>`;
+    const call = m.text === "[call]";
+    const cls = [call ? "call" : m.from_me ? "me" : "them", src.has(m.id) ? "src" : "", fin.has(m.id) ? "fin" : ""].join(" ");
+    return `${sep}<div class="b ${cls}" id="m${m.id}">${call ? "📞 Call" : esc(m.text)}</div>`;
   }).join("");
   $("#detail").innerHTML = `
     <h2>${esc(p.name)}</h2>

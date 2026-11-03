@@ -43,12 +43,16 @@ class Extraction(BaseModel):
     topics: list[str] = Field(description="Up to 4 recurring subjects of this relationship, 1-3 words each")
 
 
+CALL = "[call]"  # a logged call (spike.whatsapp_export): it happened, direction unknown
+
+
 def render(thread: Sequence) -> str:
-    return "\n".join(
-        f"[{m['id']}] {datetime.fromtimestamp(m['ts']).strftime('%Y-%m-%d %a %H:%M')} "
-        f"{'me' if m['from_me'] else 'them'}: {m['text']}"
-        for m in thread
-    )
+    def line(m) -> str:
+        stamp = f"[{m['id']}] {datetime.fromtimestamp(m['ts']).strftime('%Y-%m-%d %a %H:%M')}"
+        if m["text"] == CALL:
+            return f"{stamp} (a call between us)"
+        return f"{stamp} {'me' if m['from_me'] else 'them'}: {m['text']}"
+    return "\n".join(line(m) for m in thread)
 
 
 # --- heuristic -------------------------------------------------------------------------
@@ -168,7 +172,8 @@ message chasing something already on the list ("any luck with that intro?") is n
 
 For each item: a short imperative action that names the people or things involved, a due date only if stated or
 clearly implied (resolve relative dates against the message timestamp), and whether a later message shows it was
-done. A promise is done when a later message shows it was delivered. An ask is done when it was fulfilled or, if
+done. A promise is done when a later message shows it was delivered; "(a call between us)" lines are calls
+that happened, so a promised call is done by the next one. An ask is done when it was fulfilled or, if
 it asked for information or an update, answered. Cite message ids from the [id] prefixes. Also give up to 4
 recurring topics. Return an empty list when there is nothing."""
 
