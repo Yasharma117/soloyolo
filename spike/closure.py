@@ -15,12 +15,14 @@ explicit flag as extraction, and every send is written to the disclosure log fir
 from __future__ import annotations
 
 import re
+import sys
 import time
 from datetime import datetime
 
 from pydantic import BaseModel, Field
 
 from .extract import CALL
+from .sms import short_date
 
 WINDOW_DAYS = 45      # how long after an item a closing message can come
 MAX_EVIDENCE = 250    # lines sent per person; the most relevant win when there are more
@@ -128,8 +130,12 @@ def run(store, ex, only: int | None = None, now: float | None = None,
         # Logged before sending: whose text leaves. Group lines are logged against this person.
         for p in {pid} | {l["ref"][2] for l in lines if l["ref"][2] is not None}:
             store.record_disclosure(p, ex.name)
-        result = ex.ask(CLOSE_SYSTEM, f"Today is {_day(now)[:10]}. Which open items do the later messages settle?",
-                        render(items[0]["name"], items, lines), Closures)
+        try:
+            result = ex.ask(CLOSE_SYSTEM, f"Today is {_day(now)[:10]}. Which open items do the later messages settle?",
+                            render(items[0]["name"], items, lines), Closures)
+        except Exception as err:  # one refusal or timeout must not stop the others
+            print(f"person {pid}: closure check failed: {str(err)[:200]}", file=sys.stderr)
+            continue
         by_id = {l["id"]: l for l in lines}
         for c in result.closures:
             if not 1 <= c.item <= len(items) or c.evidence not in by_id:
@@ -137,7 +143,7 @@ def run(store, ex, only: int | None = None, now: float | None = None,
             item, line = items[c.item - 1], by_id[c.evidence]
             if line["ts"] <= item["source_ts"]:
                 continue
-            note = f"{line['chat']}, {datetime.fromtimestamp(line['ts']).strftime('%-d %b')}: “{line['text'][:90]}”"
+            note = f"{line['chat']}, {short_date(line['ts'])}: “{line['text'][:90]}”"
             eid = line["ref"][1] if line["ref"][0] == "evidence" else None
             if store.resolve(pid, item["source_message_id"], item["owner"], "suggested", "closure",
                              evidence=f"{note} ({c.reason})", evidence_id=eid):

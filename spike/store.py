@@ -7,6 +7,7 @@ The schema lives in connectord/internal/store/core.sql so the Go daemon and this
 from __future__ import annotations
 
 import math
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -29,12 +30,12 @@ class Store:
         # resolution's state CHECK gained 'suggested': SQLite can't alter a CHECK, so rebuild the table.
         sql = self.conn.execute("SELECT sql FROM sqlite_master WHERE name = 'resolution'").fetchone()
         if sql and "'suggested'" not in sql[0]:
-            with self.conn:
-                self.conn.execute("ALTER TABLE resolution RENAME TO resolution_old")
-                self.conn.executescript(SCHEMA)
-                cols = ", ".join(r[1] for r in self.conn.execute("PRAGMA table_info(resolution_old)"))
-                self.conn.execute(f"INSERT INTO resolution({cols}) SELECT {cols} FROM resolution_old")
-                self.conn.execute("DROP TABLE resolution_old")
+            ddl = re.search(r"CREATE TABLE IF NOT EXISTS resolution \(.*?\n\);", SCHEMA, re.S).group(0)
+            cols = ", ".join(r[1] for r in self.conn.execute("PRAGMA table_info(resolution)"))
+            # One script, one transaction: a crash midway leaves the old table, not an empty new one.
+            self.conn.executescript(
+                f"BEGIN; ALTER TABLE resolution RENAME TO resolution_old; {ddl}"
+                f" INSERT INTO resolution({cols}) SELECT {cols} FROM resolution_old; DROP TABLE resolution_old; COMMIT;")
         cols = {r[1] for r in self.conn.execute("PRAGMA table_info(commitment)")}
         if "kind" not in cols:
             with self.conn:

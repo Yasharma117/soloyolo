@@ -220,13 +220,14 @@ async function refresh() {
 
 const SAID = { done: "Marked done", dismissed: "Marked not real", snoozed: "Snoozed for 3 days", open: "Kept open", clear: "Undone" };
 
-async function mark(row, state, days) {
-  const body = { person_id: current, source_message_id: Number(row.dataset.src), owner: row.dataset.owner, state };
+async function mark(row, state, days, personId = current) {
+  // personId is fixed when the mark is made, so the toast's Undo still targets that person after you switch.
+  const body = { person_id: personId, source_message_id: Number(row.dataset.src), owner: row.dataset.owner, state };
   if (days) body.days = days;
   const r = await fetch("/api/mark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok) return toast("Couldn't save that. Is the viewer still running?");
   await refresh();
-  toast(SAID[state], state === "clear" ? null : () => mark(row, "clear"));
+  toast(SAID[state], state === "clear" ? null : () => mark(row, "clear", undefined, personId));
 }
 
 function toast(text, undo) {

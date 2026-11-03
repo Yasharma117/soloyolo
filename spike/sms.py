@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 
 # --- parsing bank alerts ---------------------------------------------------------------------
-_AMOUNT = r"(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{1,2})?)"
+_AMOUNT = r"(?:(?<![a-z])rs\.?|(?<![a-z])inr|₹)\s*([\d,]+(?:\.\d{1,2})?)"  # not the "rs" in "Hrs 15"
 _AMT = re.compile(_AMOUNT, re.I)
 # SBI writes "debited by 950.0" / "credited by Rs1000" with or without the currency.
 _AMT_BY = re.compile(r"\b(?:debited|credited)\s+(?:by|for|with)\s+(?:rs\.?|inr|₹)?\s*([\d,]+(?:\.\d{1,2})?)", re.I)
@@ -84,7 +84,7 @@ def load_backup(path: Path | str) -> tuple[list[Payment], int]:
                 el.clear()
             continue
         read += 1
-        body, address, date, kind = (el.get("body") or "", el.get("address") or "", el.get("date") or "0",
+        body, address, date, kind = (el.get("body") or "", el.get("address") or "", el.get("date") or "",
                                      el.get("type") or "1")
         el.clear()
         if kind != "1":  # 1 = received; banks don't get texts from you
@@ -92,9 +92,13 @@ def load_backup(path: Path | str) -> tuple[list[Payment], int]:
         parsed = parse_alert(body)
         if not parsed:
             continue
+        try:
+            ts = int(date) / 1000
+        except ValueError:
+            continue  # one malformed row must not sink the whole backup
         amount, direction, who = parsed
         rid = hashlib.sha256(f"{address}|{date}|{body}".encode()).hexdigest()[:40]
-        payments.append(Payment(rid, int(date) / 1000, address, body, amount, direction, who))
+        payments.append(Payment(rid, ts, address, body, amount, direction, who))
     return payments, read
 
 
@@ -135,8 +139,13 @@ def is_money_item(item: dict) -> bool:
     return bool(_MONEY_WORDS.search(item["action"]) or _MONEY_WORDS.search(item.get("source_text") or ""))
 
 
+def short_date(ts: float) -> str:
+    d = datetime.fromtimestamp(ts)
+    return f"{d.day} {d:%b}"  # not %-d: that's glibc/BSD only
+
+
 def describe(p: dict) -> str:
-    when = datetime.fromtimestamp(p["ts"]).strftime("%-d %b")
+    when = short_date(p["ts"])
     who = f" {'from' if p['direction'] == 'in' else 'to'} {p['counterparty']}" if p["counterparty"] else ""
     verb = "credited" if p["direction"] == "in" else "debited"
     return f"₹{p['amount']:,.0f} {verb}{who}, {when} ({p['sender']})"

@@ -59,6 +59,35 @@ miss over half of real phrasing (`eval/RESULTS.md`).
 python -m spike serve              # http://127.0.0.1:8765
 ```
 
+Every open item has **Done**, **Snooze 3d** and **Not real**. Your marks are kept across re-extraction, and no
+signal overrides them. That matters because some things only you know, like a call where it got sorted.
+
+### Closing what the chats don't show
+
+In the first real test, 6 of 19 items were already done somewhere a chat can't show: a UPI app, a call, a group
+chat. Two kinds of evidence close or flag those.
+
+**Bank SMS (Android, local, closes):** install *SMS Backup & Restore*, back up messages to an XML file, then:
+
+```bash
+python -m spike import-sms ~/Downloads/sms-*.xml
+```
+
+Only bank payment alerts are kept. OTPs, offers, reminders and personal texts are dropped while reading and
+never stored. An open money item closes when a payment arrives after it, in the right direction, for its
+amount ("send ₹950", or "2.7k meds + 700 cab" = 3,400). The viewer says which alert closed it, with a **Not done**
+button.
+
+**Group chats (Claude, suggests):** export them with the 1:1s; `import-whatsapp` keeps groups as evidence only.
+
+```bash
+python -m spike close --extractor claude-code
+```
+
+This marks items a later group message seems to settle as **Maybe settled?** with the message beside it, and
+you decide. It never closes anything itself. Tested on the real scored items, reading other 1:1 chats "settled"
+3 items, and all 3 were still open. So 1:1 chats are opt-in (`--other-chats`) and nothing closes on a guess.
+
 Tests (offline, never call Claude):
 
 ```bash
@@ -105,7 +134,9 @@ items. Below that, the thesis is weak: ranking by message counts (what Mesh does
   WhatsApp sync goes through `connectord` (the Go daemon), which writes to the same model.
 - **No contact names** from Apple Contacts yet; people show as phone numbers or emails outside the demo.
 - **Reads the last 300 messages per person.** Older promises are out of scope.
-- **Each thread is read alone.** Family logistics often close in a sibling thread (Dad asks if you wished
-  your aunt; you'd told Mum). Those show as open.
+- **Each thread is read alone for new items.** Family logistics often close in a group chat; `close` can
+  suggest those, but only you can close them.
+- **Marks follow the message an item came from.** If a re-extraction cites a different message for the same
+  item (the request instead of the "On it"), your mark won't carry over to it.
 - **Asks are judged on text alone.** A reply in another app, or on a call, won't close one.
 - **Re-extraction replaces the person's commitments**, so manual edits wouldn't survive it. There are no manual edits yet.

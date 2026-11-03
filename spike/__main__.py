@@ -154,12 +154,12 @@ def main(argv: list[str] | None = None) -> int:
             ingest(store, a.chatdb, a.days)
         elif a.cmd == "import-whatsapp":
             try:
-                rows, names, notes = whatsapp_export.load(a.files, a.me, a.tz, a.date_order)
+                chats = whatsapp_export.read_chats(a.files)
+                rows, names, notes = whatsapp_export.load(a.files, a.me, a.tz, a.date_order, chats=chats)
+                groups, group_notes = whatsapp_export.load_groups(a.files, a.me, a.tz, a.date_order, chats=chats)
             except ValueError as err:
                 ap.error(str(err))
-            groups, group_notes = whatsapp_export.load_groups(a.files, a.me, a.tz, a.date_order)
-            print("\n".join(n for n in notes if "load_groups" not in n))
-            print("\n".join(group_notes))
+            print("\n".join(notes + group_notes))
             print(f"{store.add_messages('whatsapp', rows, names)} new messages from {len(names)} chats")
             for name, lines in groups.items():
                 store.add_evidence(f"whatsapp-group:{name}", lines)

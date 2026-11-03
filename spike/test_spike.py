@@ -476,6 +476,12 @@ class SmsTest(unittest.TestCase):
         for body in self.NOT_PAYMENTS:
             self.assertIsNone(parse_alert(body), body)
 
+    def test_rs_inside_words_is_not_money(self):
+        from spike.sms import amounts, parse_alert
+        self.assertEqual(amounts("flight at 15:10 Hrs 1500 and 3 yrs 14"), set())
+        self.assertEqual(amounts("Rs 950 and INR 1,200 and ₹40"), {950.0, 1200.0, 40.0})
+        self.assertEqual(parse_alert("Sent Rs.950.00 From HDFC Bank A/C *1234 To SHENA On 17/10/26 at 10 Hrs 15")[0], 950.0)
+
     def test_backup_keeps_only_received_payment_alerts(self):
         from xml.sax.saxutils import quoteattr
         from spike.sms import load_backup
@@ -483,12 +489,14 @@ class SmsTest(unittest.TestCase):
                  ("+919800000000", 1, "dinner at 8?"), ("VM-HDFCBK", 2, list(self.ALERTS)[0])]
         xml = "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<smses count='4'>" + "".join(
             f"<sms protocol='0' address={quoteattr(a)} date='{1_760_000_000_000 + i}' type='{t}' body={quoteattr(b)} />"
-            for i, (a, t, b) in enumerate(texts)) + "<mms date='1' /></smses>"
+            for i, (a, t, b) in enumerate(texts)) + \
+            f"<sms address='VM-HDFCBK' date='' type='1' body={quoteattr(list(self.ALERTS)[0])} />" \
+            "<mms date='1' /></smses>"
         with tempfile.TemporaryDirectory() as d:
             f = Path(d) / "sms.xml"
             f.write_text(xml)
             pays, read = load_backup(f)
-        self.assertEqual(read, 4)
+        self.assertEqual(read, 5)  # the row with no date is read and skipped, not fatal
         self.assertEqual([(p.amount, p.direction, p.sender) for p in pays], [(950.0, "in", "VM-HDFCBK")])
 
     def test_matcher_closes_only_the_matching_money_item(self):
@@ -604,6 +612,14 @@ class ClosureTest(unittest.TestCase):
         self.st.resolve(self.papa, self.src, "me", "done", "sms", evidence="₹950 credited")
         self.assertFalse(self.st.resolve(self.papa, self.src, "me", "suggested", "closure", evidence="guess"))
 
+    def test_one_failure_does_not_stop_the_rest(self):
+        from spike import closure
+
+        class Boom(self.Fake):
+            def ask(self, *a):
+                raise RuntimeError("timeout")
+        self.assertEqual(closure.run(self.st, Boom([])), [])  # reported, not raised
+
     def test_other_chats_when_asked(self):
         from spike import closure
         ex = self.Fake([])
@@ -671,8 +687,8 @@ class WhatsAppExportTest(unittest.TestCase):
         from spike import whatsapp_export as wa
         rows, names, notes = wa.load(self.files, tz="Asia/Kolkata")
         self.assertEqual(sorted(names.values()), ["Ana Torres", "Sam Okafor"])
-        self.assertTrue(any("evidence only" in n for n in notes))
         groups, gnotes = wa.load_groups(self.files, tz="Asia/Kolkata")
+        self.assertTrue(any("kept as evidence" in n for n in gnotes))
         self.assertEqual(list(groups), ["group"])
         self.assertEqual([g.sender for g in groups["group"]], ["me", "Sam Okafor", "Priya Nair"])
         self.assertEqual(wa.chat_name("WhatsApp Chat with Family.txt"), "Family")
@@ -683,7 +699,9 @@ class WhatsAppExportTest(unittest.TestCase):
         self.assertEqual(sam[3].text, "I'll intro you to Priya\nshe built the design team at her last startup")
         self.assertEqual(sam[-1].text, "Any luck reaching Priya?")  # edit marker stripped
         ana = [r for r in rows if r.handle == "export:Ana Torres"]
-        self.assertEqual([r.text for r in ana], ["Thanks for covering lunch, I'll pay you back on Friday", "No rush", "Sent!"])
+        # Android writes every attachment as "<Media omitted>": kept as a marker, it can close "send me the pic".
+        self.assertEqual([r.text for r in ana], ["Thanks for covering lunch, I'll pay you back on Friday", "No rush",
+                                                  "[media]", "Sent!"])
         # month-first detected from "11/13/26"; 12:05 AM is just after midnight
         when = datetime.fromtimestamp(ana[-1].ts, ZoneInfo("Asia/Kolkata"))
         self.assertEqual((when.month, when.day, when.hour, when.minute), (11, 13, 0, 5))

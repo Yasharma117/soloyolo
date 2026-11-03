@@ -58,7 +58,8 @@ EDITED = re.compile(r"\s*<this message was edited>\s*$", re.I)
 FORWARDED = re.compile(r"^\[forwarded\]\s*", re.I)
 MEDIA = re.compile(r"^<(?P<kind>image|video|document|audio|voice message|[a-z ]+?) omitted>\s*", re.I)
 MEDIA_MARK = {"image": "[photo]", "video": "[video]", "document": "[document]", "audio": "[voice note]",
-              "voice message": "[voice note]"}
+              "voice message": "[voice note]",
+              "media": "[media]"}  # native Android exports write every attachment as "<Media omitted>"
 
 
 def _media(body: str) -> str:
@@ -181,10 +182,15 @@ def infer_me(chats: list[Chat]) -> str | None:
     return common.pop() if len(common) == 1 else None
 
 
+def read_chats(paths: list[Path]) -> list[Chat]:
+    """Read and parse every export once; load() and load_groups() both take the result."""
+    return [parse(src, text) for p in paths for src, text in _read_texts(Path(p))]
+
+
 def load(paths: list[Path], me: str | None = None, tz: str | None = None,
-         order: str | None = None) -> tuple[list[Message], dict[str, str], list[str]]:
-    """Returns (messages, {handle: display name}, notes for the user)."""
-    chats = [parse(src, text) for p in paths for src, text in _read_texts(Path(p))]
+         order: str | None = None, chats: list[Chat] | None = None) -> tuple[list[Message], dict[str, str], list[str]]:
+    """1:1 chats: (messages, {handle: display name}, notes for the user). Groups are load_groups()'s."""
+    chats = chats if chats is not None else read_chats(paths)
     notes: list[str] = []
     me = me or infer_me(chats)
     if not me:
@@ -202,8 +208,7 @@ def load(paths: list[Path], me: str | None = None, tz: str | None = None,
             notes.append(f"{chat.source}: skipped, '{me}' never speaks in it")
             continue
         if len(others) != 1:
-            notes.append(f"{chat.source}: group ({len(others)} others), read by load_groups as evidence only")
-            continue
+            continue  # a group: load_groups() keeps it as evidence
         other = others[0]
         handle = f"export:{other}"
         names[handle] = other
@@ -226,10 +231,10 @@ def load(paths: list[Path], me: str | None = None, tz: str | None = None,
     return out, names, notes
 
 
-def load_groups(paths: list[Path], me: str | None = None, tz: str | None = None,
-                order: str | None = None) -> tuple[dict[str, list[GroupLine]], list[str]]:
+def load_groups(paths: list[Path], me: str | None = None, tz: str | None = None, order: str | None = None,
+                chats: list[Chat] | None = None) -> tuple[dict[str, list[GroupLine]], list[str]]:
     """Group chats as evidence: {group name: lines}, notes. 1:1 chats are left to load()."""
-    chats = [parse(src, text) for p in paths for src, text in _read_texts(Path(p))]
+    chats = chats if chats is not None else read_chats(paths)
     me = me or infer_me(chats)
     if not me:
         raise ValueError("can't tell which sender is you: pass --me \"Your Name\" exactly as it appears in the export")

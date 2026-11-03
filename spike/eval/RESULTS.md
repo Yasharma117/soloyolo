@@ -1,5 +1,25 @@
 # Extraction eval: results
 
+## Run 4 (2026-11-04): closing what chats don't show
+
+Built from run 3's six ❌, then checked against the same 19 items the user scored. The scores are kept
+privately, outside the repo.
+
+| Fix | For the ❌ caused by | Result on the real scored items |
+|---|---|---|
+| One tap: Done / Snooze / Not real | calls (2) | Any item, one tap. Survives re-extraction |
+| Bank SMS matcher (local, closes) | UPI payments (3) | With alerts shaped like the 3 payments, it closes exactly those 3, including "2.7k + 700" as 3,400. Decoys stay: wrong amount, wrong direction, a payment before the item. **None of the 13 real items close.** |
+| Closure pass over group chats (Claude, suggests) | family group chat (1) | With a synthetic family group, it suggests only that item. Decoys mention Myntra, Ena bhua and Diwali; none of the 13 real items is suggested |
+| Same pass over *other 1:1 chats* | (cross-chat) | **0 of 3 right.** It "settled" items 2, 13 and 17 in both runs; the user had scored all three as still open |
+
+**The last row changed the design.** In other 1:1 chats, evidence like "Yesss" to Dad about a birthday wish
+looks conclusive to a model, and to me: my own guesses at cross-chat closures were also mostly wrong. So the
+pass only suggests, each item is asked once, your answer is final, and other 1:1 chats are opt-in.
+
+**Still unproven on real data:** bank SMS and group chats were synthetic here, shaped on the real items. The
+next real test needs an SMS backup and the family group export.
+
+
 ## Run 3 (2026-11-03): the kill-or-continue test on real WhatsApp chats
 
 The protocol in `spike/README.md`: the user's own threads, every open item scored by the user. Counts and
