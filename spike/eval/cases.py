@@ -8,10 +8,16 @@ An expected commitment names:
 - sources: the message ids that count as where it was made (an offer and its acceptance can
   both be fair citations)
 - done: the message ids that show it was done; empty means it is still open
+- kind: "promise" (the default) or "ask". Matching ignores kind; it's scored separately
 
 Labels follow the extractor's own definition (spike/extract.py SYSTEM): concrete things one side
-said they would do, accepted offers included; no pleasantries, questions, plans both sides just
-attend, reports of the past, or promises made by someone outside the thread.
+said they would do, accepted offers and accepted requests included (as promises), and concrete
+requests the other side hasn't said yes or no to (asks, owned by whoever was asked). No
+pleasantries, conversational or rhetorical questions, declined asks, plans both sides just attend,
+reports of the past, or anything promised by or asked of someone outside the thread.
+
+The ask cases (and the widened sources on accepted requests) were added after the first Gmail
+run showed the gap, and the prompt was written alongside them. Treat their scores as optimistic.
 
 These were written by the same model family that does the extraction, which can flatter it.
 Add your own real-world cases (anonymised) before trusting the numbers.
@@ -50,7 +56,7 @@ CASES = [
             (5, 11, 0, "Not yet, I'll dig it out tonight and text you"),
             (2, 9, 1, "Still keen on that number when you get a sec"),
         ],
-        "expected": [{"owner": "them", "sources": [2], "done": []}],
+        "expected": [{"owner": "them", "sources": [1, 2], "done": []}],
     },
     {
         "id": "accepted-offer-them",
@@ -69,16 +75,16 @@ CASES = [
             (4, 9, 0, "Can you send me the signed lease when you get a chance?"),
             (4, 9, 1, "On it 👍"),
         ],
-        "expected": [{"owner": "me", "sources": [2], "done": []}],
+        "expected": [{"owner": "me", "sources": [1, 2], "done": []}],
     },
     {
         "id": "unanswered-request",
-        "note": "A request with no acceptance is not a commitment",
+        "note": "A request I never answered is an ask on me",
         "messages": [
             (6, 13, 0, "Could you review my essay this week?"),
             (6, 20, 0, "No pressure if you're swamped"),
         ],
-        "expected": [],
+        "expected": [{"owner": "me", "kind": "ask", "sources": [1], "done": []}],
     },
     {
         "id": "vague-catchup",
@@ -99,7 +105,7 @@ CASES = [
             (3, 19, 1, "Spoke to him, it's available till 15th. Rent 42k"),
             (3, 19, 0, "Super, thanks yaar"),
         ],
-        "expected": [{"owner": "me", "sources": [2], "done": [3]}],
+        "expected": [{"owner": "me", "sources": [1, 2], "done": [3]}],
     },
     {
         "id": "typos-tmrw",
@@ -108,7 +114,7 @@ CASES = [
             (1, 22, 0, "u still have my charger?"),
             (1, 22, 1, "ya ill drop it at ur place tmrw morning"),
         ],
-        "expected": [{"owner": "me", "sources": [2], "done": []}],
+        "expected": [{"owner": "me", "sources": [1, 2], "done": []}],
     },
     {
         "id": "past-report",
@@ -165,7 +171,7 @@ CASES = [
             (7, 10, 1, "Sure, will share in a few mins"),
             (7, 11, 0, "Got it, thanks!"),
         ],
-        "expected": [{"owner": "me", "sources": [2], "done": [3]}],
+        "expected": [{"owner": "me", "sources": [1, 2], "done": [3]}],
     },
     {
         "id": "two-sides",
@@ -207,7 +213,7 @@ CASES = [
             (2, 17, 0, "Would love your take on the pricing model when you're free"),
             (2, 17, 1, "Happy to. I'll call you Thursday afternoon"),
         ],
-        "expected": [{"owner": "me", "sources": [2], "done": []}],
+        "expected": [{"owner": "me", "sources": [1, 2], "done": []}],
     },
     {
         "id": "reply-in-thread-later",
@@ -239,7 +245,7 @@ CASES = [
             (1, 9, 1, "Will do"),
             (1, 10, 1, "Booked. Room 4B"),
         ],
-        "expected": [{"owner": "me", "sources": [2], "done": [3]}],
+        "expected": [{"owner": "me", "sources": [1, 2], "done": [3]}],
     },
     {
         "id": "them-pay",
@@ -265,6 +271,52 @@ CASES = [
         "messages": [
             (5, 9, 0, "Here's the piece on hiring loops I mentioned"),
             (5, 10, 1, "Perfect, reading it tonight"),
+        ],
+        "expected": [],
+    },
+    {
+        "id": "upload-docs",
+        "note": "A company asks me for documents and chases; I never replied",
+        "messages": [
+            (9, 11, 0, "Hi, to process your deposit refund please upload your ID proof and a cancelled cheque on the portal."),
+            (4, 10, 0, "Gentle reminder: your refund is on hold until the documents are uploaded."),
+        ],
+        "expected": [{"owner": "me", "kind": "ask", "sources": [1, 2], "done": []}],
+    },
+    {
+        "id": "status-chase",
+        "note": "I asked for an update twice and got silence: waiting on them",
+        "messages": [
+            (8, 10, 1, "Hi, I submitted the take-home on Monday. Could you share an update on the review?"),
+            (3, 9, 1, "Following up on the above, happy to walk through it on a call"),
+        ],
+        "expected": [{"owner": "them", "kind": "ask", "sources": [1, 2], "done": []}],
+    },
+    {
+        "id": "access-done",
+        "note": "An ask fulfilled straight away, with no promise in between",
+        "messages": [
+            (2, 15, 1, "Can you give me edit access to the budget sheet?"),
+            (2, 15, 0, "Done, added you"),
+        ],
+        "expected": [{"owner": "them", "kind": "ask", "sources": [1], "done": [2]}],
+    },
+    {
+        "id": "declined-ask",
+        "note": "An ask turned down leaves nothing owed",
+        "messages": [
+            (3, 19, 0, "Can you lend me your car this weekend?"),
+            (3, 19, 1, "Sorry, I need it for a trip to Mysore"),
+            (3, 20, 0, "No worries, I'll figure something out"),
+        ],
+        "expected": [],
+    },
+    {
+        "id": "rhetorical",
+        "note": "Rhetorical questions are not asks",
+        "messages": [
+            (1, 21, 0, "Can you believe it's November already?"),
+            (1, 21, 1, "I know, this year vanished"),
         ],
         "expected": [],
     },

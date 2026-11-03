@@ -3,6 +3,10 @@
 **The question:** does reading what you said beat counting how often you said it? Mesh knows you texted Sam
 40 times. This spike tries to find that you *promised Sam an intro nine days ago and haven't sent it*.
 
+It lists two kinds of item per person. **Promises**: something one side said they'd do. **Asks**: a concrete
+request the other side hasn't said yes or no to. Each is owned by whoever has to act next, which gives two lists:
+**You owe** (your promises, requests to you) and **Waiting on them** (their promises, your unanswered requests).
+
 If that works on real threads, it's soloyolo's wedge. If it doesn't, the Go daemon is plumbing for a product
 nobody needs. So this comes first.
 
@@ -32,8 +36,9 @@ to often, then:
 python -m spike import-whatsapp ~/Downloads/WhatsApp*.zip --tz Asia/Kolkata
 ```
 
-It reads iPhone and Android layouts, any date order and 12/24-hour clocks, drops media placeholders and
-system notices, and skips group chats. With 2+ chats it works out which sender is you; with one, add
+It reads iPhone and Android layouts, any date order and 12/24-hour clocks, and skips group chats. System
+notices and stickers are dropped. Photos, videos, documents, voice notes and logged calls are kept as markers,
+because "send me the pic" is done by the photo and "I'll call you back" by the call. With 2+ chats it works out which sender is you; with one, add
 `--me "Your Name"`. Re-importing a newer export of the same chat only adds new messages.
 
 Or from your own Messages history (macOS; give your terminal Full Disk Access first):
@@ -54,6 +59,35 @@ miss over half of real phrasing (`eval/RESULTS.md`).
 python -m spike serve              # http://127.0.0.1:8765
 ```
 
+Every open item has **Done**, **Snooze 3d** and **Not real**. Your marks are kept across re-extraction, and no
+signal overrides them. That matters because some things only you know, like a call where it got sorted.
+
+### Closing what the chats don't show
+
+In the first real test, 6 of 19 items were already done somewhere a chat can't show: a UPI app, a call, a group
+chat. Two kinds of evidence close or flag those.
+
+**Bank SMS (Android, local, closes):** install *SMS Backup & Restore*, back up messages to an XML file, then:
+
+```bash
+python -m spike import-sms ~/Downloads/sms-*.xml
+```
+
+Only bank payment alerts are kept. OTPs, offers, reminders and personal texts are dropped while reading and
+never stored. An open money item closes when a payment arrives after it, in the right direction, for its
+amount ("send ₹950", or "2.7k meds + 700 cab" = 3,400). The viewer says which alert closed it, with a **Not done**
+button.
+
+**Group chats (Claude, suggests):** export them with the 1:1s; `import-whatsapp` keeps groups as evidence only.
+
+```bash
+python -m spike close --extractor claude-code
+```
+
+This marks items a later group message seems to settle as **Maybe settled?** with the message beside it, and
+you decide. It never closes anything itself. Tested on the real scored items, reading other 1:1 chats "settled"
+3 items, and all 3 were still open. So 1:1 chats are opt-in (`--other-chats`) and nothing closes on a guess.
+
 Tests (offline, never call Claude):
 
 ```bash
@@ -66,8 +100,8 @@ Accuracy on 25 labeled threads (`eval/`):
 python -m spike.eval --extractor claude-code
 ```
 
-Last run: Claude found 16/16 commitments at 0.89–0.94 precision; the regexes found 7/16. Details and caveats
-in `eval/RESULTS.md`.
+Last run (30 cases, promises and asks): Claude scored F1 0.95–1.00 over three runs; the regexes scored 0.83.
+Details, the Gmail before/after and the caveats are in `eval/RESULTS.md`.
 
 ## Privacy, stated plainly
 
@@ -81,15 +115,16 @@ in `eval/RESULTS.md`.
 
 ## How to judge the result (the actual experiment)
 
-Run `ingest --days 90`, then `extract --extractor claude-code`, then go through the "You owe" lists and score each item:
+Run `ingest --days 90`, then `extract --extractor claude-code`, then go through the "You owe" and "Waiting on them"
+lists and score each open item:
 
 | Score | Meaning |
 |---|---|
-| ✅ useful | A real promise you'd forgotten or were about to drop |
-| ➖ true but known | A real promise you already had in mind |
-| ❌ wrong | Not a promise, wrong person, or already done |
+| ✅ useful | Something you'd forgotten or were about to drop: a promise, a request to you, or someone to chase |
+| ➖ true but known | Real, but already on your mind |
+| ❌ wrong | Not owed by anyone, wrong person, or already done |
 
-**Kill or continue:** continue if the last 90 days surface **at least 5 ✅** and **❌ stays under a third** of
+**Kill or continue** (first real run passed: 13 ✅ / 6 ❌, see `eval/RESULTS.md`): continue if the last 90 days surface **at least 5 ✅** and **❌ stays under a third** of
 items. Below that, the thesis is weak: ranking by message counts (what Mesh does) would be nearly as good.
 
 ## Known limits (deliberate, for a spike)
@@ -99,4 +134,9 @@ items. Below that, the thesis is weak: ranking by message counts (what Mesh does
   WhatsApp sync goes through `connectord` (the Go daemon), which writes to the same model.
 - **No contact names** from Apple Contacts yet; people show as phone numbers or emails outside the demo.
 - **Reads the last 300 messages per person.** Older promises are out of scope.
+- **Each thread is read alone for new items.** Family logistics often close in a group chat; `close` can
+  suggest those, but only you can close them.
+- **Marks follow the message an item came from.** If a re-extraction cites a different message for the same
+  item (the request instead of the "On it"), your mark won't carry over to it.
+- **Asks are judged on text alone.** A reply in another app, or on a call, won't close one.
 - **Re-extraction replaces the person's commitments**, so manual edits wouldn't survive it. There are no manual edits yet.

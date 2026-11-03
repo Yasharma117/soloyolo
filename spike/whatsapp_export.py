@@ -39,7 +39,7 @@ HEADER = re.compile(
 )
 
 SKIP_TEXT = re.compile(
-    r"^(<media omitted>|<[^>]+ omitted>|(image|video|audio|sticker|gif|document|contact card) omitted"
+    r"^(<media omitted>|<[^>]+ omitted>|<album message>|(image|video|audio|sticker|gif|document|contact card) omitted"
     r"|this message was deleted|you deleted this message|null|missed (voice|video) call.*"
     r"|waiting for this message.*|.*\.(jpg|jpeg|png|webp|opus|mp4|pdf|vcf) \(file attached\)"
     # system notices iPhone exports attribute to the contact
@@ -48,7 +48,27 @@ SKIP_TEXT = re.compile(
     r"|disappearing messages were turned (on|off).*|.*changed (their|the) phone number.*)$",
     re.I,
 )
+# A call the export logged on its own line ("[10/13/26, 5:36:43 PM] - [Call]"). The direction isn't
+# recorded, but that a call happened is what closes "I'll call you back".
+CALL_LINE = re.compile(r"^\[(?:voice |video )?call\]$", re.I)
+CALL = "[call]"  # stored text for a call; spike.extract.render shows it without a speaker
 EDITED = re.compile(r"\s*<this message was edited>\s*$", re.I)
+# "[Forwarded] <image omitted> caption": the label goes. A photo, video, document or voice note
+# becomes a marker, because "send me the pic" is done by the photo; stickers and GIFs go.
+FORWARDED = re.compile(r"^\[forwarded\]\s*", re.I)
+MEDIA = re.compile(r"^<(?P<kind>image|video|document|audio|voice message|[a-z ]+?) omitted>\s*", re.I)
+MEDIA_MARK = {"image": "[photo]", "video": "[video]", "document": "[document]", "audio": "[voice note]",
+              "voice message": "[voice note]",
+              "media": "[media]"}  # native Android exports write every attachment as "<Media omitted>"
+
+
+def _media(body: str) -> str:
+    m = MEDIA.match(body)
+    if not m:
+        return body
+    mark = MEDIA_MARK.get(m["kind"].lower())
+    rest = body[m.end():].strip()
+    return f"{mark} {rest}".strip() if mark else rest
 
 
 @dataclass(frozen=True)
@@ -60,6 +80,15 @@ class Message:
     text: str
 
 
+@dataclass(frozen=True)
+class GroupLine:
+    """A group-chat line. Kept as evidence that something got done; never a source of new items."""
+    remote_id: str
+    ts: float
+    sender: str  # 'me' for you
+    text: str
+
+
 @dataclass
 class Chat:
     source: str
@@ -67,7 +96,7 @@ class Chat:
 
     @property
     def senders(self) -> Counter:
-        return Counter(s for _, _, s, _ in self.lines)
+        return Counter(s for _, _, s, _ in self.lines if s)  # "" is a logged call, not a person
 
 
 def _read_texts(path: Path) -> list[tuple[str, str]]:
@@ -76,7 +105,18 @@ def _read_texts(path: Path) -> list[tuple[str, str]]:
         with zipfile.ZipFile(path) as z:
             return [(f"{path.name}:{n}", z.read(n).decode("utf-8-sig", "replace"))
                     for n in z.namelist() if n.lower().endswith(".txt")]
-    return [(path.name, path.read_text("utf-8-sig", errors="replace"))]
+    # "Family from WhatsApp/chat.txt" (some exporters): the folder is the chat's name.
+    name = f"{path.parent.name}/{path.name}" if path.stem.lower().lstrip("_") == "chat" else path.name
+    return [(name, path.read_text("utf-8-sig", errors="replace"))]
+
+
+def chat_name(source: str) -> str:
+    """'WhatsApp Chat with Family.txt' / 'Family from WhatsApp/chat.txt' / 'x.zip:_chat.txt' -> 'Family'."""
+    parts = [p for p in re.split(r"[/:]", source) if p]
+    stem = next((p for p in reversed(parts) if Path(p).stem.lower().lstrip("_") != "chat"), parts[-1])
+    stem = Path(stem).stem if stem.lower().endswith((".txt", ".zip")) else stem
+    stem = re.sub(r"^WhatsApp Chat (?:with|-)\s*", "", stem, flags=re.I)
+    return re.sub(r"\s+from WhatsApp$", "", stem, flags=re.I).strip() or source
 
 
 def parse(source: str, text: str) -> Chat:
@@ -86,7 +126,9 @@ def parse(source: str, text: str) -> Chat:
         m = HEADER.match(line)
         if m:
             sender, sep, body = m["rest"].partition(": ")
-            if sep:
+            if CALL_LINE.match(m["rest"].strip()):
+                lines.append([m["date"], m["time"], "", CALL])  # type: ignore[arg-type]
+            elif sep:
                 lines.append([m["date"], m["time"], sender.strip(), body])  # type: ignore[arg-type]
             # no "Sender: " means a system line (the encryption notice, "X changed the subject"): drop it
             continue
@@ -140,10 +182,15 @@ def infer_me(chats: list[Chat]) -> str | None:
     return common.pop() if len(common) == 1 else None
 
 
+def read_chats(paths: list[Path]) -> list[Chat]:
+    """Read and parse every export once; load() and load_groups() both take the result."""
+    return [parse(src, text) for p in paths for src, text in _read_texts(Path(p))]
+
+
 def load(paths: list[Path], me: str | None = None, tz: str | None = None,
-         order: str | None = None) -> tuple[list[Message], dict[str, str], list[str]]:
-    """Returns (messages, {handle: display name}, notes for the user)."""
-    chats = [parse(src, text) for p in paths for src, text in _read_texts(Path(p))]
+         order: str | None = None, chats: list[Chat] | None = None) -> tuple[list[Message], dict[str, str], list[str]]:
+    """1:1 chats: (messages, {handle: display name}, notes for the user). Groups are load_groups()'s."""
+    chats = chats if chats is not None else read_chats(paths)
     notes: list[str] = []
     me = me or infer_me(chats)
     if not me:
@@ -161,8 +208,7 @@ def load(paths: list[Path], me: str | None = None, tz: str | None = None,
             notes.append(f"{chat.source}: skipped, '{me}' never speaks in it")
             continue
         if len(others) != 1:
-            notes.append(f"{chat.source}: skipped, {len(others)} other people (groups aren't supported yet)")
-            continue
+            continue  # a group: load_groups() keeps it as evidence
         other = others[0]
         handle = f"export:{other}"
         names[handle] = other
@@ -170,8 +216,8 @@ def load(paths: list[Path], me: str | None = None, tz: str | None = None,
         seen: Counter = Counter()
         kept = 0
         for d, t, sender, body in chat.lines:
-            body = EDITED.sub("", body).strip()
-            if not body or SKIP_TEXT.match(body):
+            body = _media(FORWARDED.sub("", EDITED.sub("", body).strip())).strip()
+            if not body or (sender and SKIP_TEXT.match(body)):
                 continue
             ts = _timestamp(d, t, chat_order, zone)
             # The raw export stamp, not ts: the guid must not change with --tz or a DST switch,
@@ -183,3 +229,34 @@ def load(paths: list[Path], me: str | None = None, tz: str | None = None,
             kept += 1
         notes.append(f"{chat.source}: {other}, {kept} messages")
     return out, names, notes
+
+
+def load_groups(paths: list[Path], me: str | None = None, tz: str | None = None, order: str | None = None,
+                chats: list[Chat] | None = None) -> tuple[dict[str, list[GroupLine]], list[str]]:
+    """Group chats as evidence: {group name: lines}, notes. 1:1 chats are left to load()."""
+    chats = chats if chats is not None else read_chats(paths)
+    me = me or infer_me(chats)
+    if not me:
+        raise ValueError("can't tell which sender is you: pass --me \"Your Name\" exactly as it appears in the export")
+    zone = ZoneInfo(tz) if tz else None
+    fallback = date_order(chats) or "dmy"
+    groups: dict[str, list[GroupLine]] = {}
+    notes: list[str] = []
+    for chat in chats:
+        if len([s for s in chat.senders if s != me]) < 2:
+            continue
+        name = chat_name(chat.source)
+        chat_order = order or date_order([chat]) or fallback
+        seen: Counter = Counter()
+        out = groups.setdefault(name, [])
+        for d, t, sender, body in chat.lines:
+            body = _media(FORWARDED.sub("", EDITED.sub("", body).strip())).strip()
+            if not body or not sender or SKIP_TEXT.match(body):
+                continue  # calls in a group say nothing about who talked to whom
+            key = f"group:{name}|{d}|{t}|{sender}|{body}"
+            seen[key] += 1
+            out.append(GroupLine(hashlib.sha256(f"{key}|{seen[key]}".encode()).hexdigest()[:40],
+                                 _timestamp(d, t, chat_order, zone), "me" if sender == me else sender, body))
+        notes.append(f"{chat.source}: group '{name}', {len(out)} lines kept as evidence (closes items, never creates them)")
+    return groups, notes
+

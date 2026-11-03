@@ -8,7 +8,7 @@ Mesh understands the people but can't see what you said or send anything. soloyo
 |---|---|---|
 | `REPORT.md` | Teardown of how Beeper and Mesh work | Research |
 | `BUILD-WITHOUT-BEEPER.md` | The plan: own the data model, use protocol libraries directly | Current plan |
-| `spike/` | **Start here.** Tests the thesis: extract commitments from your iMessage threads, view them locally | Runs; tested offline |
+| `spike/` | **Start here.** Tests the thesis: extract promises and asks from your message threads, view them locally | Runs; tested offline |
 | `connectord/` | Go daemon: iMessage and WhatsApp adapters → one SQLite store, JSON-RPC over stdio | Builds; unit-tested; not run on a Mac |
 | `site/` | Landing hero, an animated demo built with the Stageshow skill | Builds; filmed and gated |
 | `mini_mesh.py` | Mesh-style ranking from message counts alone (the baseline to beat) | Runs |

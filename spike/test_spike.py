@@ -83,9 +83,9 @@ class PipelineTest(unittest.TestCase):
         thread = [dict(r) for r in self.store.thread(self.pid("Sam Okafor"))]
         real = thread[3]["id"]
         fake = Extraction(topics=["hiring", "design", "intros", "dinner", "extra"], commitments=[
-            Commitment(owner="me", action="Intro Sam to Priya", due=None, status="open",
+            Commitment(kind="promise", owner="me", action="Intro Sam to Priya", due=None, status="open",
                        source_message_id=real, done_message_id=99999),
-            Commitment(owner="them", action="Invented", due=None, status="open",
+            Commitment(kind="promise", owner="them", action="Invented", due=None, status="open",
                        source_message_id=99999, done_message_id=None),
         ])
         ex = ClaudeExtractor.__new__(ClaudeExtractor)  # skip client construction
@@ -116,9 +116,9 @@ if os.environ.get("FAKE_CLAUDE_MODE") == "error":
 print(json.dumps({"type": "result", "is_error": False, "subtype": "success", "structured_output": {
     "topics": ["hiring"],
     "commitments": [
-        {"owner": "me", "action": "Intro Sam to Priya", "due": None, "status": "done",
+        {"kind": "promise", "owner": "me", "action": "Intro Sam to Priya", "due": None, "status": "done",
          "source_message_id": int(os.environ["FAKE_SRC"]), "done_message_id": 424242},
-        {"owner": "them", "action": "Invented", "due": None, "status": "open",
+        {"kind": "ask", "owner": "them", "action": "Invented", "due": None, "status": "open",
          "source_message_id": 99999, "done_message_id": None}]}}))
 """
 
@@ -156,7 +156,7 @@ class ClaudeCodeExtractorTest(unittest.TestCase):
 
     def test_cli_error_raises(self):
         with mock.patch.dict("os.environ", {"FAKE_CLAUDE_MODE": "error"}):
-            with self.assertRaisesRegex(RuntimeError, "no extraction"):
+            with self.assertRaisesRegex(RuntimeError, "no result"):
                 self.ex.extract(self.thread)
 
     def test_missing_cli_explains(self):
@@ -169,9 +169,9 @@ class EvalTest(unittest.TestCase):
         from spike.eval.__main__ import score
         case = {"id": "x", "expected": [{"owner": "me", "sources": [2], "done": [3]},
                                         {"owner": "them", "sources": [4], "done": []}]}
-        pred = [Commitment(owner="me", action="a", due=None, status="done", source_message_id=2, done_message_id=3),
-                Commitment(owner="me", action="b", due=None, status="open", source_message_id=2, done_message_id=None),
-                Commitment(owner="me", action="c", due=None, status="open", source_message_id=4, done_message_id=None)]
+        pred = [Commitment(kind="promise", owner="me", action="a", due=None, status="done", source_message_id=2, done_message_id=3),
+                Commitment(kind="promise", owner="me", action="b", due=None, status="open", source_message_id=2, done_message_id=None),
+                Commitment(kind="promise", owner="me", action="c", due=None, status="open", source_message_id=4, done_message_id=None)]
         r = score(case, pred)
         self.assertEqual((r["tp"], r["fp"], r["fn"], r["status_ok"]), (1, 2, 1, 1))
 
@@ -182,7 +182,65 @@ class EvalTest(unittest.TestCase):
         ex, now = HeuristicExtractor(), time.time()
         rows = [score(c, ex.extract(thread_of(c, now)).commitments) for c in CASES]
         tp, fn = sum(r["tp"] for r in rows), sum(r["fn"] for r in rows)
-        self.assertGreaterEqual(tp / (tp + fn), 0.4)
+        self.assertGreaterEqual(tp / (tp + fn), 0.7)
+
+    def test_scorer_counts_kind_separately(self):
+        from spike.eval.__main__ import score
+        case = {"id": "x", "expected": [{"owner": "me", "kind": "ask", "sources": [1], "done": []}]}
+        wrong_kind = [Commitment(kind="promise", owner="me", action="a", due=None, status="open",
+                                 source_message_id=1, done_message_id=None)]
+        r = score(case, wrong_kind)
+        self.assertEqual((r["tp"], r["kind_ok"]), (1, 0))
+
+
+class AskTest(unittest.TestCase):
+    """Asks: concrete requests nobody has said yes or no to. Owner is whoever was asked."""
+
+    def thread(self, *msgs):
+        return [{"id": i, "ts": 1_700_000_000 + i * 3600, "from_me": me, "text": t}
+                for i, (me, t) in enumerate(msgs, start=1)]
+
+    def found(self, *msgs):
+        return [(c.kind, c.owner, c.status, c.source_message_id, c.done_message_id)
+                for c in HeuristicExtractor().extract(self.thread(*msgs)).commitments]
+
+    def test_unanswered_request_is_an_ask_on_whoever_was_asked(self):
+        self.assertEqual(self.found((0, "Please upload your ID proof on the portal")),
+                         [("ask", "me", "open", 1, None)])
+        self.assertEqual(self.found((1, "Could you share an update on the review?")),
+                         [("ask", "them", "open", 1, None)])
+
+    def test_accepted_request_becomes_one_promise(self):
+        self.assertEqual(self.found((0, "Please book the room for Friday"), (1, "Will do"), (1, "Booked, 4B")),
+                         [("promise", "me", "done", 2, 3)])
+
+    def test_fulfilled_request_is_a_done_ask(self):
+        self.assertEqual(self.found((1, "Can you give me edit access to the sheet?"), (0, "Done, added you")),
+                         [("ask", "them", "done", 1, 2)])
+
+    def test_chasing_is_not_a_new_item(self):
+        self.assertEqual(self.found((1, "Could you share an update on the review?"), (1, "Following up on this")),
+                         [("ask", "them", "open", 1, None)])
+
+    def test_kind_round_trips_and_old_stores_migrate(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "old.db"
+            old = sqlite3.connect(path)  # a store from before `kind` existed
+            old.executescript("""CREATE TABLE commitment (id INTEGER PRIMARY KEY, person_id INTEGER NOT NULL,
+                owner TEXT NOT NULL, action TEXT NOT NULL, due TEXT, status TEXT NOT NULL,
+                source_message_id INTEGER NOT NULL, done_message_id INTEGER, extractor TEXT NOT NULL);
+                INSERT INTO commitment VALUES (1, 1, 'me', 'old', NULL, 'open', 1, NULL, 'heuristic');""")
+            old.commit(); old.close()
+            st = Store(path)
+            self.assertEqual(st.conn.execute("SELECT kind FROM commitment").fetchone()[0], "promise")
+            st.add_messages("x", [type("M", (), dict(guid="g", handle="h", ts=1.0, from_me=False, text="hi"))()])
+            pid = st.person_ids()[0]
+            mid = st.thread(pid)[0]["id"]
+            st.replace_extraction(pid, [dict(kind="ask", owner="me", action="Upload ID", due=None, status="open",
+                                             source_message_id=mid, done_message_id=None)], [], "heuristic")
+            self.assertEqual([(c["kind"], c["action"]) for c in st.people()[0]["commitments"]], [("ask", "Upload ID")])
+            st.close()
 
 
 class ReviewFixesTest(unittest.TestCase):
@@ -292,6 +350,299 @@ class ReviewFixesTest(unittest.TestCase):
             httpd.server_close()
 
 
+class MarkTest(unittest.TestCase):
+    """Your own marks on items: done, not real, snooze. They outlive re-extraction and beat signals."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.db = Path(self.tmp.name) / "s.db"
+        self.st = Store(self.db)
+        Msg = type("M", (), {})
+        rows = []
+        for i, (me, text) in enumerate([(0, "Can you send the lease?"), (1, "I'll send it tonight")]):
+            m = Msg(); m.guid, m.handle, m.ts, m.from_me, m.text = f"g{i}", "sam", 1_700_000_000.0 + i, bool(me), text
+            rows.append(m)
+        self.st.add_messages("x", rows, {"sam": "Sam"})
+        self.pid = self.st.person_ids()[0]
+        self.src = self.st.thread(self.pid)[1]["id"]
+        self.extract()
+
+    def tearDown(self):
+        self.st.close()
+        self.tmp.cleanup()
+
+    def extract(self, action="Send Sam the lease"):
+        self.st.replace_extraction(self.pid, [dict(kind="promise", owner="me", action=action, due=None, status="open",
+                                                   source_message_id=self.src, done_message_id=None)], [], "heuristic")
+
+    def item(self):
+        return self.st.people()[0]["commitments"][0]
+
+    def test_done_survives_reextraction(self):
+        self.st.resolve(self.pid, self.src, "me", "done", "you")
+        self.extract(action="Send the signed lease to Sam")  # a re-run rewords the item
+        self.assertEqual((self.item()["status"], self.item()["resolved_by"]), ("done", "you"))
+        self.assertEqual(self.st.people()[0]["id"], self.pid)
+        self.assertEqual(self.st.open_items(), [])
+
+    def test_signal_never_overrides_you(self):
+        self.st.resolve(self.pid, self.src, "me", "open", "you")
+        self.assertFalse(self.st.resolve(self.pid, self.src, "me", "done", "sms", evidence="₹950 debited"))
+        self.assertEqual(self.item()["status"], "open")
+        self.st.unresolve(self.pid, self.src, "me")
+        self.assertTrue(self.st.resolve(self.pid, self.src, "me", "done", "sms", evidence="₹950 debited"))
+        self.assertEqual((self.item()["status"], self.item()["evidence"]), ("done", "₹950 debited"))
+
+    def test_snooze_expires_and_dismiss_hides(self):
+        self.st.resolve(self.pid, self.src, "me", "snoozed", "you", until=time.time() + 3600)
+        self.assertTrue(self.item()["snoozed"])
+        self.assertEqual(self.st.open_items(), [])
+        self.st.resolve(self.pid, self.src, "me", "snoozed", "you", until=time.time() - 1)
+        self.assertFalse(self.item()["snoozed"])
+        self.assertEqual(len(self.st.open_items()), 1)
+        self.st.resolve(self.pid, self.src, "me", "dismissed", "you")
+        self.assertTrue(self.item()["dismissed"])
+        self.assertEqual((self.st.people()[0]["hidden"], self.st.open_items()), (1, []))
+
+    def test_mark_endpoint_guards(self):
+        import json
+        import threading
+        import urllib.request
+        from functools import partial
+        from http.server import ThreadingHTTPServer
+        from spike.server import Handler
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), lambda *a, **k: None)
+        port = httpd.server_address[1]
+        httpd.RequestHandlerClass = partial(Handler, db=str(self.db), port=port)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+
+        def post(body, **headers):
+            h = {"Content-Type": "application/json", **headers}
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/api/mark", data=json.dumps(body).encode(),
+                                         headers=h, method="POST")
+            try:
+                return urllib.request.urlopen(req).status
+            except urllib.error.HTTPError as e:
+                return e.code
+        good = {"person_id": self.pid, "source_message_id": self.src, "owner": "me", "state": "done"}
+        try:
+            self.assertEqual(post(good, Origin="https://evil.example"), 403)
+            self.assertEqual(post(good, **{"Content-Type": "text/plain"}), 415)
+            self.assertEqual(post({**good, "source_message_id": 999}), 404)
+            self.assertEqual(post({**good, "state": "deleted"}), 400)
+            self.assertEqual(post({**good, "state": "snoozed", "days": 999}), 400)
+            self.assertEqual(self.item()["status"], "open")  # nothing above wrote anything
+            self.assertEqual(post(good, Origin=f"http://127.0.0.1:{port}"), 200)
+            self.assertEqual(self.item()["resolved_by"], "you")
+            self.assertEqual(post({**good, "state": "clear"}), 200)
+            self.assertIsNone(self.item()["resolved_by"])
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
+class SmsTest(unittest.TestCase):
+    ALERTS = {
+        # Shapes of real Indian bank alerts (numbers and names invented).
+        "Credit Alert!\nRs.950.00 credited to HDFC Bank A/c XX1234 on 17-10-26 from VPA rajesh.s@okhdfc (UPI 529012345678)":
+            (950.0, "in", "rajesh.s@okhdfc"),
+        "Sent Rs.1,000.00\nFrom HDFC Bank A/C *1234\nTo SHENA SHARMA\nOn 18/10/26\nRef 529012345679\nNot You? Call 18002586161":
+            (1000.0, "out", "SHENA SHARMA"),
+        "Dear UPI user A/C X1234 debited by 950.0 on date 17Oct26 trf to SHENA Refno 529012345670. If not u? call 1800111109. -SBI":
+            (950.0, "out", "SHENA"),
+        "Dear SBI UPI User, ur A/cX1234 credited by Rs1000 on 18Oct26 by RAJESH SHARMA (Ref no 529012345671)":
+            (1000.0, "in", "RAJESH SHARMA"),
+        "ICICI Bank Acct XX123 debited for Rs 3,400.00 on 13-Oct-26; RAJESH SHARMA credited. UPI:529012345672. Call 18002662 for dispute.":
+            (3400.0, "out", None),
+        "INR 700.00 credited\nA/c no. XX1234\n13-10-26, 18:23:11\nUPI/P2A/529012345673/RAJESH SHARMA\nNot you? Call 18604195555 - Axis Bank":
+            (700.0, "in", "RAJESH SHARMA"),
+        "Sent Rs.37,000.00 from Kotak Bank AC X1234 to landlord@ybl on 31-10-26.UPI Ref 529012345674. Not you, kotak.com/fraud":
+            (37000.0, "out", "landlord@ybl"),
+    }
+    NOT_PAYMENTS = [
+        "Alert:\nUSD.23.60 will be debited on 08/10/2026 from HDFC Bank Card 0223 for Anthropic",
+        "123456 is your OTP for UPI txn of Rs 950 at A/c XX1234. Do not share. -HDFC",
+        "RAJESH SHARMA has requested money from you on Google Pay. Rs 500. UPI ID rajesh@okhdfc",
+        "Your Credit Card bill of Rs 4,512 is due on 20-Nov. Pay via UPI.",
+        "Get a pre-approved personal loan of Rs 5,00,000 credited to your account in 10 mins!",
+        "Txn of Rs 950.00 on A/c XX1234 failed. Amount will be reversed.",
+        "Bhai 950 bhej de na",
+    ]
+
+    def test_parses_bank_alerts(self):
+        from spike.sms import parse_alert
+        for body, want in self.ALERTS.items():
+            self.assertEqual(parse_alert(body), want, body)
+        for body in self.NOT_PAYMENTS:
+            self.assertIsNone(parse_alert(body), body)
+
+    def test_rs_inside_words_is_not_money(self):
+        from spike.sms import amounts, parse_alert
+        self.assertEqual(amounts("flight at 15:10 Hrs 1500 and 3 yrs 14"), set())
+        self.assertEqual(amounts("Rs 950 and INR 1,200 and ₹40"), {950.0, 1200.0, 40.0})
+        self.assertEqual(parse_alert("Sent Rs.950.00 From HDFC Bank A/C *1234 To SHENA On 17/10/26 at 10 Hrs 15")[0], 950.0)
+
+    def test_backup_keeps_only_received_payment_alerts(self):
+        from xml.sax.saxutils import quoteattr
+        from spike.sms import load_backup
+        texts = [("VM-HDFCBK", 1, list(self.ALERTS)[0]), ("VM-HDFCBK", 1, self.NOT_PAYMENTS[1]),
+                 ("+919800000000", 1, "dinner at 8?"), ("VM-HDFCBK", 2, list(self.ALERTS)[0])]
+        xml = "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<smses count='4'>" + "".join(
+            f"<sms protocol='0' address={quoteattr(a)} date='{1_760_000_000_000 + i}' type='{t}' body={quoteattr(b)} />"
+            for i, (a, t, b) in enumerate(texts)) + \
+            f"<sms address='VM-HDFCBK' date='' type='1' body={quoteattr(list(self.ALERTS)[0])} />" \
+            "<mms date='1' /></smses>"
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "sms.xml"
+            f.write_text(xml)
+            pays, read = load_backup(f)
+        self.assertEqual(read, 5)  # the row with no date is read and skipped, not fatal
+        self.assertEqual([(p.amount, p.direction, p.sender) for p in pays], [(950.0, "in", "VM-HDFCBK")])
+
+    def test_matcher_closes_only_the_matching_money_item(self):
+        from spike import sms
+        from spike.sms import Payment
+        with tempfile.TemporaryDirectory() as d:
+            st = Store(Path(d) / "s.db")
+            M = type("M", (), {})
+            t0 = 1_760_000_000.0
+            chat = [(1, "Ek baar 950 bhejna mere upi pe, mattress topper"), (0, "Ok"),
+                    (1, "2.7k meds aur 700 cab ke lage, monies dedo"), (0, "Ok will send"),
+                    (1, "Bring the charger tomorrow"), (0, "Sure")]
+            rows = []
+            for i, (me, text) in enumerate(chat):
+                m = M(); m.guid, m.handle, m.ts, m.from_me, m.text = f"g{i}", "papa", t0 + i * 3600, bool(me), text
+                rows.append(m)
+            st.add_messages("whatsapp", rows, {"papa": "PAPA"})
+            pid = st.person_ids()[0]
+            ids = [r["id"] for r in st.thread(pid)]
+            items = [dict(kind="promise", owner="them", action="Send ₹950 for the mattress topper", due=None,
+                          status="open", source_message_id=ids[1], done_message_id=None),
+                     dict(kind="promise", owner="them", action="Send money for the medicine refills and cab costs",
+                          due=None, status="open", source_message_id=ids[3], done_message_id=None),
+                     dict(kind="promise", owner="them", action="Bring the charger", due=None, status="open",
+                          source_message_id=ids[5], done_message_id=None)]
+            st.replace_extraction(pid, items, [], "test")
+            pay = lambda n, amt, direction, dt: Payment(f"p{n}", t0 + dt, "VM-HDFCBK", "alert", amt, direction, "RAJESH")
+            st.add_evidence("sms", [
+                pay(1, 950, "in", -3600),         # before the item was made: not it
+                pay(2, 950, "out", 7200),         # wrong direction: you paid someone 950
+                pay(3, 950, "in", 86400),         # this one
+                pay(4, 3400, "in", 2 * 86400),    # 2.7k + 700
+                pay(5, 950, "in", 3 * 86400),     # a second 950 has nothing left to close
+            ])
+            closed = sms.match(st)
+            self.assertEqual(sorted((i["action"], p["remote_id"]) for i, p in closed),
+                             [("Send money for the medicine refills and cab costs", "p4"),
+                              ("Send ₹950 for the mattress topper", "p3")])
+            self.assertEqual([i["action"] for i in st.open_items()], ["Bring the charger"])
+            self.assertEqual(sms.match(st), [])  # idempotent
+            # You said it's not done: a later import never re-closes it.
+            st.resolve(pid, ids[1], "them", "open", "you")
+            st.conn.execute("DELETE FROM resolution WHERE decided_by = 'sms'")
+            closed = sms.match(st)
+            self.assertNotIn("Send ₹950 for the mattress topper", [i["action"] for i, _ in closed])
+            st.close()
+
+
+class ClosureTest(unittest.TestCase):
+    """The cross-chat pass suggests; it never closes, never re-asks, and only sends what it must."""
+
+    def setUp(self):
+        from spike.whatsapp_export import GroupLine
+        self.tmp = tempfile.TemporaryDirectory()
+        self.st = Store(Path(self.tmp.name) / "s.db")
+        M = type("M", (), {})
+        t0 = 1_760_000_000.0
+        rows = []
+        for i, (h, me, text) in enumerate([("papa", 0, "Talk to Mama and finalise the flight"), ("papa", 1, "Ok"),
+                                           ("mum", 1, "secret-1to1-zq: I booked the 9:30 one")]):
+            m = M(); m.guid, m.handle, m.ts, m.from_me, m.text = f"g{i}", h, t0 + i * 3600, bool(me), text
+            rows.append(m)
+        self.st.add_messages("whatsapp", rows, {"papa": "PAPA", "mum": "Mum"})
+        self.papa = next(p["id"] for p in self.st.people() if p["name"] == "PAPA")
+        self.src = self.st.thread(self.papa)[1]["id"]
+        self.st.replace_extraction(self.papa, [dict(kind="promise", owner="me", action="Talk to Mama and say which flight",
+                                                    due=None, status="open", source_message_id=self.src,
+                                                    done_message_id=None)], [], "test")
+        self.st.add_evidence("whatsapp-group:Family", [
+            GroupLine("e1", t0 - 86400, "Mum", "old line before the item"),
+            GroupLine("e2", t0 + 7200, "Mum", "Done, 9:30 flight booked for Yash")])
+
+    def tearDown(self):
+        self.st.close()
+        self.tmp.cleanup()
+
+    class Fake:
+        name = "fake-model"
+        def __init__(self, closures):
+            self.closures, self.sent = closures, []
+        def ask(self, system, prompt, stdin, schema):
+            self.sent.append(stdin)
+            return schema.model_validate({"closures": self.closures})
+
+    def test_suggests_and_keeps_it_open(self):
+        from spike import closure
+        lines = closure.candidates(self.st, self.papa, self.st.open_items())
+        booked = next(l["id"] for l in lines if "booked" in l["text"])
+        ex = self.Fake([{"item": 1, "evidence": booked, "reason": "Mum booked it"},
+                        {"item": 7, "evidence": booked, "reason": "no such item"},
+                        {"item": 1, "evidence": 99, "reason": "no such line"}])
+        out = closure.run(self.st, ex)
+        self.assertEqual(len(out), 1)
+        item = self.st.people()[0]["commitments"] if self.st.people()[0]["id"] == self.papa else None
+        item = next(c for p in self.st.people() if p["id"] == self.papa for c in p["commitments"])
+        self.assertEqual(item["status"], "open")
+        self.assertIn("9:30 flight booked", item["suggestion"])
+        self.assertNotIn("old line", ex.sent[0])          # before the item: never a candidate
+        self.assertNotIn("secret-1to1-zq", ex.sent[0])    # other 1:1 chats are opt-in
+        self.assertEqual(self.st.disclosures(), ["fake-model"])
+        # Asked once: the next run sends nothing for it.
+        again = self.Fake([])
+        closure.run(self.st, again)
+        self.assertEqual(again.sent, [])
+
+    def test_your_answer_stands_and_sms_beats_a_guess(self):
+        from spike import closure
+        self.st.resolve(self.papa, self.src, "me", "open", "you")
+        ex = self.Fake([{"item": 1, "evidence": 1, "reason": "x"}])
+        closure.run(self.st, ex)
+        self.assertEqual(ex.sent, [])  # you already said: not sent at all
+        self.st.unresolve(self.papa, self.src, "me")
+        self.st.resolve(self.papa, self.src, "me", "done", "sms", evidence="₹950 credited")
+        self.assertFalse(self.st.resolve(self.papa, self.src, "me", "suggested", "closure", evidence="guess"))
+
+    def test_one_failure_does_not_stop_the_rest(self):
+        from spike import closure
+
+        class Boom(self.Fake):
+            def ask(self, *a):
+                raise RuntimeError("timeout")
+        self.assertEqual(closure.run(self.st, Boom([])), [])  # reported, not raised
+
+    def test_other_chats_when_asked(self):
+        from spike import closure
+        ex = self.Fake([])
+        closure.run(self.st, ex, other_chats=True)
+        self.assertIn("secret-1to1-zq", ex.sent[0])
+        self.assertEqual(sorted(self.st.disclosures()), ["fake-model"])
+
+    def test_old_resolution_table_migrates(self):
+        import sqlite3
+        path = Path(self.tmp.name) / "old.db"
+        c = sqlite3.connect(path)
+        c.executescript("""CREATE TABLE resolution (person_id INTEGER NOT NULL, source_message_id INTEGER NOT NULL,
+            owner TEXT NOT NULL, state TEXT NOT NULL CHECK (state IN ('done', 'dismissed', 'snoozed', 'open')),
+            until REAL, decided_by TEXT NOT NULL, evidence TEXT, evidence_id INTEGER, at REAL NOT NULL,
+            PRIMARY KEY (person_id, source_message_id, owner));
+            INSERT INTO resolution VALUES (1, 1, 'me', 'done', NULL, 'you', NULL, NULL, 0);""")
+        c.commit(); c.close()
+        st = Store(path)
+        st.conn.execute("INSERT INTO resolution VALUES (1, 2, 'me', 'suggested', NULL, 'closure', 'x', NULL, 0)")
+        self.assertEqual(st.conn.execute("SELECT count(*) FROM resolution").fetchone()[0], 2)
+        st.close()
+
+
 IOS_EXPORT = (
     "\u200e[28/10/2026, 19:02:11] Sam Okafor: \u200eMessages and calls are end-to-end encrypted.\n"
     "[28/10/2026, 19:02:11] Sam Okafor: Good seeing you at the dinner\n"
@@ -336,13 +687,21 @@ class WhatsAppExportTest(unittest.TestCase):
         from spike import whatsapp_export as wa
         rows, names, notes = wa.load(self.files, tz="Asia/Kolkata")
         self.assertEqual(sorted(names.values()), ["Ana Torres", "Sam Okafor"])
-        self.assertTrue(any("groups aren't supported" in n for n in notes))
+        groups, gnotes = wa.load_groups(self.files, tz="Asia/Kolkata")
+        self.assertTrue(any("kept as evidence" in n for n in gnotes))
+        self.assertEqual(list(groups), ["group"])
+        self.assertEqual([g.sender for g in groups["group"]], ["me", "Sam Okafor", "Priya Nair"])
+        self.assertEqual(wa.chat_name("WhatsApp Chat with Family.txt"), "Family")
+        self.assertEqual(wa.chat_name("Family from WhatsApp/chat.txt"), "Family")
+        self.assertEqual(wa.chat_name("export.zip:_chat.txt"), "export")
         sam = [r for r in rows if r.handle == "export:Sam Okafor"]
         self.assertEqual([r.from_me for r in sam], [False, True, False, True, False])  # system line + image dropped
         self.assertEqual(sam[3].text, "I'll intro you to Priya\nshe built the design team at her last startup")
         self.assertEqual(sam[-1].text, "Any luck reaching Priya?")  # edit marker stripped
         ana = [r for r in rows if r.handle == "export:Ana Torres"]
-        self.assertEqual([r.text for r in ana], ["Thanks for covering lunch, I'll pay you back on Friday", "No rush", "Sent!"])
+        # Android writes every attachment as "<Media omitted>": kept as a marker, it can close "send me the pic".
+        self.assertEqual([r.text for r in ana], ["Thanks for covering lunch, I'll pay you back on Friday", "No rush",
+                                                  "[media]", "Sent!"])
         # month-first detected from "11/13/26"; 12:05 AM is just after midnight
         when = datetime.fromtimestamp(ana[-1].ts, ZoneInfo("Asia/Kolkata"))
         self.assertEqual((when.month, when.day, when.hour, when.minute), (11, 13, 0, 5))
@@ -380,6 +739,54 @@ class WhatsAppExportTest(unittest.TestCase):
         found = HeuristicExtractor().extract([dict(m) for m in st.thread(sam["id"])]).commitments
         self.assertEqual([(c.owner, c.status) for c in found], [("me", "open")])
         st.close()
+
+
+class WhatsAppBracketExportTest(unittest.TestCase):
+    """Exports where every line is bracketed, 'You' is the sender and calls get their own line."""
+
+    def test_calls_forwards_and_placeholders(self):
+        from spike import whatsapp_export
+        text = ("Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them.\n"
+                "[10/12/26, 8:01:46 PM] PAPA: Jio Fiber recharge kar dena\n"
+                "[10/12/26, 8:01:58 PM] You: Ok\n"
+                "[10/13/26, 5:36:43 PM] - [Call]\n"
+                "[10/13/26, 8:35:39 PM] You: <image omitted> Jiofi done ji\n"
+                "[10/14/26, 9:42:16 AM] PAPA: [Forwarded] <sticker omitted>\n"
+                "[10/19/26, 4:34:51 PM] PAPA: <album message>\n"
+                "[10/19/26, 4:34:52 PM] PAPA: [Forwarded] <image omitted>\n")
+        with tempfile.TemporaryDirectory() as d:
+            for name in ("PAPA", "Gaurav"):
+                (Path(d) / f"{name}.txt").write_text(text.replace("PAPA", name))
+            rows, names, _ = whatsapp_export.load(sorted(Path(d).glob("*.txt")), tz="Asia/Kolkata")
+        papa = [(r.from_me, r.text) for r in rows if r.handle == "export:PAPA"]
+        self.assertEqual(papa, [(False, "Jio Fiber recharge kar dena"), (True, "Ok"), (False, "[call]"),
+                                (True, "[photo] Jiofi done ji"), (False, "[photo]")])
+        thread = [{"id": i, "ts": r.ts, "from_me": r.from_me, "text": r.text}
+                  for i, r in enumerate((r for r in rows if r.handle == "export:PAPA"), start=1)]
+        self.assertIn("[3] ", render(thread))
+        self.assertIn("(a call between us)", render(thread).splitlines()[2])
+
+
+class JsonImportTest(unittest.TestCase):
+    def test_import_merges_threads_by_handle_and_dedupes(self):
+        import json
+        from spike import json_import
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "c.json"
+            f.write_text(json.dumps({"source": "gmail", "threads": [
+                {"person": "Sumit (Cars24)", "handle": "Sumit@Cars24.com", "messages": [
+                    {"id": "a", "ts": "2026-10-05T02:30:00Z", "from_me": True, "text": "I'll send the file"},
+                    {"id": "b", "ts": "2026-10-05T11:38:25Z", "from_me": False, "text": "Thanks"}]},
+                {"person": "Sumit (Cars24)", "handle": "sumit@cars24.com", "messages": [
+                    {"id": "c", "ts": "2026-10-28T13:45:21Z", "from_me": True, "text": "Following up"},
+                    {"id": "d", "ts": "2026-10-28T13:46:00Z", "from_me": True, "text": "  "}]}]}))
+            source, rows, names = json_import.load(f)
+            self.assertEqual((source, len(rows), names), ("gmail", 3, {"sumit@cars24.com": "Sumit (Cars24)"}))
+            st = Store(Path(d) / "s.db")
+            self.assertEqual(st.add_messages(source, rows, names), 3)
+            self.assertEqual(st.add_messages(source, rows, names), 0)
+            self.assertEqual([p["count"] for p in st.people()], [3])
+            st.close()
 
 
 if __name__ == "__main__":

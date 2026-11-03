@@ -1,4 +1,4 @@
-"""python -m spike {demo,ingest,extract,show,serve}. See spike/README.md."""
+"""python -m spike {demo,ingest,import-*,extract,close,show,serve}. See spike/README.md."""
 from __future__ import annotations
 
 import argparse
@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import chatdb, fixture, whatsapp_export
+from . import chatdb, closure, fixture, json_import, sms, whatsapp_export
 from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor
 from .store import Store
 
@@ -57,15 +57,28 @@ def extract(store: Store, kind: str, window: int, only: int | None = None, top: 
     return failed
 
 
+def close_with_sms(store: Store) -> None:
+    for item, pay in sms.match(store):
+        print(f"closed: {item['name']}: {item['action']}  <- {sms.describe(pay)}")
+
+
 def show(store: Store) -> None:
     for p in store.people():
         last = datetime.fromtimestamp(p["last"]).strftime("%b %d")
         print(f"\n{p['name']}  ·  score {p['score']}  ·  last {last}")
         for c in p["commitments"]:
-            who = "you owe" if c["owner"] == "me" else "owes you"
-            mark = "✓" if c["status"] == "done" else "○"
-            due = f"  due {c['due']}" if c["due"] else ""
-            print(f"  {mark} {who}: {c['action']}{due}")
+            if c["dismissed"]:
+                continue
+            who = "you owe" if c["owner"] == "me" else "waiting on"
+            asked = " (asked)" if c.get("kind") == "ask" else ""
+            mark = "✓" if c["status"] == "done" else "z" if c["snoozed"] else "○"
+            due = f"  due {c['due']}" if c["due"] and c["status"] == "open" else ""
+            why = f"  [closed by {c['resolved_by']}: {c['evidence']}]" if c["resolved_by"] not in (None, "you") \
+                and c["status"] == "done" else ""
+            maybe = f"  [maybe settled? {c['suggestion']}]" if c["suggestion"] and c["status"] == "open" else ""
+            print(f"  {mark} {who}{asked}: {c['action']}{due}{why}{maybe}")
+        if p["hidden"]:
+            print(f"  ({p['hidden']} marked not real)")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -91,7 +104,22 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--tz", help="the phone's time zone, e.g. Asia/Kolkata (default: this machine's)")
     w.add_argument("--date-order", choices=["dmy", "mdy", "ymd"], help="override date order detection")
 
-    e = sub.add_parser("extract", help="find commitments in each thread")
+    j = sub.add_parser("import-json", help="import conversations from a JSON file (format in spike/json_import.py)")
+    j.add_argument("file", type=Path)
+
+    m = sub.add_parser("import-sms", help="read bank alerts from an Android 'SMS Backup & Restore' XML; "
+                                          "they close money items. Other texts are never stored")
+    m.add_argument("file", type=Path)
+
+    c = sub.add_parser("close", help="close open items using evidence: bank SMS (local), and with --extractor, "
+                                      "later messages in your other chats and groups (sent to Claude)")
+    c.add_argument("--extractor", choices=["claude-code", "api"],
+                   help="also run the cross-chat closure pass; sends open items and candidate messages off this machine")
+    c.add_argument("--person", type=int, help="only this person's items")
+    c.add_argument("--other-chats", action="store_true",
+                   help="also look in your other 1:1 chats (off by default: on real data its guesses were wrong)")
+
+    e = sub.add_parser("extract", help="find promises and asks in each thread")
     e.add_argument("--extractor", choices=EXTRACTORS, default="heuristic",
                    help="heuristic: offline regexes. claude-code: Claude via your Claude Code login (no API key). "
                         "api: Anthropic API key. Both Claude options send each thread's text off this machine")
@@ -99,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--person", type=int, help="only this person id")
     e.add_argument("--top", type=int, help="only the N most active people (start here: --top 25)")
 
-    sub.add_parser("show", help="print people and commitments")
+    sub.add_parser("show", help="print people and what each side owes")
     s = sub.add_parser("serve", help="open the local viewer")
     s.add_argument("--port", type=int, default=8765)
 
@@ -126,11 +154,30 @@ def main(argv: list[str] | None = None) -> int:
             ingest(store, a.chatdb, a.days)
         elif a.cmd == "import-whatsapp":
             try:
-                rows, names, notes = whatsapp_export.load(a.files, a.me, a.tz, a.date_order)
+                chats = whatsapp_export.read_chats(a.files)
+                rows, names, notes = whatsapp_export.load(a.files, a.me, a.tz, a.date_order, chats=chats)
+                groups, group_notes = whatsapp_export.load_groups(a.files, a.me, a.tz, a.date_order, chats=chats)
             except ValueError as err:
                 ap.error(str(err))
-            print("\n".join(notes))
+            print("\n".join(notes + group_notes))
             print(f"{store.add_messages('whatsapp', rows, names)} new messages from {len(names)} chats")
+            for name, lines in groups.items():
+                store.add_evidence(f"whatsapp-group:{name}", lines)
+        elif a.cmd == "import-json":
+            source, rows, names = json_import.load(a.file)
+            print(f"{store.add_messages(source, rows, names)} new messages from {len(names)} people ({source})")
+        elif a.cmd == "import-sms":
+            pays, read = sms.load_backup(a.file)
+            added = store.add_evidence("sms", pays)
+            print(f"read {read} texts: kept {len(pays)} bank payment alerts ({added} new), discarded the rest")
+            close_with_sms(store)
+        elif a.cmd == "close":
+            close_with_sms(store)
+            if a.extractor:
+                for item, line, reason in closure.run(store, EXTRACTORS[a.extractor](), a.person,
+                                                      other_chats=a.other_chats):
+                    print(f"maybe settled: {item['name']}: {item['action']}  <- {line['chat']}: {line['text'][:70]!r}"
+                          f" ({reason})")
         elif a.cmd == "extract":
             return 1 if extract(store, a.extractor, a.window, a.person, a.top) else 0
         elif a.cmd == "show":

@@ -7,6 +7,7 @@ The schema lives in connectord/internal/store/core.sql so the Go daemon and this
 from __future__ import annotations
 
 import math
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -22,6 +23,24 @@ class Store:
         self.conn = sqlite3.connect(str(path))
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Bring stores made by older versions up to the schema. CREATE IF NOT EXISTS won't add columns."""
+        # resolution's state CHECK gained 'suggested': SQLite can't alter a CHECK, so rebuild the table.
+        sql = self.conn.execute("SELECT sql FROM sqlite_master WHERE name = 'resolution'").fetchone()
+        if sql and "'suggested'" not in sql[0]:
+            ddl = re.search(r"CREATE TABLE IF NOT EXISTS resolution \(.*?\n\);", SCHEMA, re.S).group(0)
+            cols = ", ".join(r[1] for r in self.conn.execute("PRAGMA table_info(resolution)"))
+            # One script, one transaction: a crash midway leaves the old table, not an empty new one.
+            self.conn.executescript(
+                f"BEGIN; ALTER TABLE resolution RENAME TO resolution_old; {ddl}"
+                f" INSERT INTO resolution({cols}) SELECT {cols} FROM resolution_old; DROP TABLE resolution_old; COMMIT;")
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(commitment)")}
+        if "kind" not in cols:
+            with self.conn:
+                self.conn.execute("ALTER TABLE commitment ADD COLUMN kind TEXT NOT NULL DEFAULT 'promise'"
+                                  " CHECK (kind IN ('promise', 'ask'))")
 
     def close(self) -> None:
         self.conn.close()
@@ -65,9 +84,9 @@ class Store:
             self.conn.execute("DELETE FROM topic WHERE person_id = ?", (person_id,))
             for c in commitments:
                 self.conn.execute(
-                    "INSERT INTO commitment(person_id, owner, action, due, status, source_message_id,"
-                    " done_message_id, extractor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (person_id, c["owner"], c["action"], c.get("due"), c["status"],
+                    "INSERT INTO commitment(person_id, kind, owner, action, due, status, source_message_id,"
+                    " done_message_id, extractor) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (person_id, c.get("kind", "promise"), c["owner"], c["action"], c.get("due"), c["status"],
                      c["source_message_id"], c.get("done_message_id"), extractor),
                 )
             self.conn.executemany(
@@ -78,6 +97,64 @@ class Store:
                 "INSERT OR REPLACE INTO extraction_run(person_id, extractor, ran_at) VALUES (?, ?, ?)",
                 (person_id, extractor, time.time()),
             )
+
+    # --- resolutions: what happened to an item after extraction -----------------------------
+    STATES = ("done", "dismissed", "snoozed", "open", "suggested")
+    RANK = {"closure": 0, "sms": 1, "you": 2}  # who may overwrite whom: you > a bank SMS > a guess
+
+    def resolve(self, person_id: int, source_message_id: int, owner: str, state: str, decided_by: str,
+                evidence: str | None = None, until: float | None = None, evidence_id: int | None = None) -> bool:
+        """Record what happened to an item. A signal never overrides your own call, and a guess (closure)
+        never overrides a bank SMS. Returns whether the row was written."""
+        if state not in self.STATES:
+            raise ValueError(f"unknown state {state!r}")
+        with self.conn:
+            if decided_by != "you":
+                row = self.conn.execute(
+                    "SELECT decided_by FROM resolution WHERE person_id = ? AND source_message_id = ? AND owner = ?",
+                    (person_id, source_message_id, owner)).fetchone()
+                if row and self.RANK.get(row[0], 2) > self.RANK.get(decided_by, 0):
+                    return False
+            self.conn.execute(
+                "INSERT OR REPLACE INTO resolution(person_id, source_message_id, owner, state, until, decided_by,"
+                " evidence, evidence_id, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (person_id, source_message_id, owner, state, until, decided_by, evidence, evidence_id, time.time()))
+        return True
+
+    def unresolve(self, person_id: int, source_message_id: int, owner: str) -> None:
+        """Undo: back to whatever the extractor said."""
+        with self.conn:
+            self.conn.execute("DELETE FROM resolution WHERE person_id = ? AND source_message_id = ? AND owner = ?",
+                              (person_id, source_message_id, owner))
+
+    def has_item(self, person_id: int, source_message_id: int, owner: str) -> bool:
+        return self.conn.execute(
+            "SELECT 1 FROM commitment WHERE person_id = ? AND source_message_id = ? AND owner = ?",
+            (person_id, source_message_id, owner)).fetchone() is not None
+
+    def open_items(self, now: float | None = None) -> list[dict]:
+        """Every item that's open after resolutions are applied, with its source message's time and text."""
+        now = now or time.time()
+        return [dict(person_id=p["id"], name=p["name"], **c)
+                for p in self.people(now) for c in p["commitments"] if self.is_open(c)]
+
+    @staticmethod
+    def is_open(c: dict) -> bool:
+        """Open, and not snoozed or marked "not real"."""
+        return c["status"] == "open" and not c["snoozed"] and not c["dismissed"]
+
+    def add_evidence(self, source: str, rows) -> int:
+        """rows: objects with remote_id, ts, sender, text, and optionally amount, direction, counterparty.
+        Returns rows newly inserted (re-importing the same backup adds nothing)."""
+        added = 0
+        with self.conn:
+            for r in rows:
+                added += self.conn.execute(
+                    "INSERT OR IGNORE INTO evidence(source, remote_id, ts, sender, text, amount, direction, counterparty)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (source, r.remote_id, r.ts, r.sender, r.text, getattr(r, "amount", None),
+                     getattr(r, "direction", None), getattr(r, "counterparty", None))).rowcount
+        return added
 
     def record_disclosure(self, person_id: int, recipient: str) -> None:
         """Log that a thread's text is about to leave this machine. Call before sending."""
@@ -101,7 +178,7 @@ class Store:
         return [r[0] for r in self.conn.execute("SELECT id FROM person ORDER BY id")]
 
     def people(self, now: float | None = None) -> list[dict]:
-        """Everyone, ranked: open promises you made first, then the mini_mesh decay score.
+        """Everyone, ranked: most open items on you (promises and asks) first, then the mini_mesh decay score.
 
         Three queries in total, not one per person: the viewer calls this on every load.
         """
@@ -114,14 +191,35 @@ class Store:
             s["sent"] += from_me
             s["count"] += 1
             s["last"] = max(s["last"], ts)
+        resolutions = {(r["person_id"], r["source_message_id"], r["owner"]): dict(r)
+                       for r in self.conn.execute("SELECT * FROM resolution")}
         commitments: dict[int, list[dict]] = {}
+        hidden: dict[int, int] = {}
         for c in self.conn.execute(
-                "SELECT c.person_id, c.id, c.owner, c.action, c.due, c.status, c.source_message_id,"
-                " c.done_message_id, c.extractor, m.ts AS source_ts"
+                "SELECT c.person_id, c.id, c.kind, c.owner, c.action, c.due, c.status, c.source_message_id,"
+                " c.done_message_id, c.extractor, m.ts AS source_ts, m.text AS source_text"
                 " FROM commitment c JOIN message m ON m.id = c.source_message_id"
-                " ORDER BY c.status DESC, m.ts DESC"):
+                " ORDER BY m.ts DESC"):
             d = dict(c)
-            commitments.setdefault(d.pop("person_id"), []).append(d)
+            pid = d.pop("person_id")
+            r = resolutions.get((pid, d["source_message_id"], d["owner"]))
+            d.update(resolved_by=None, evidence=None, snoozed=False, snoozed_until=None, dismissed=False,
+                     suggestion=None)
+            if r:
+                if r["state"] == "dismissed":
+                    hidden[pid] = hidden.get(pid, 0) + 1
+                    d["dismissed"] = True
+                elif r["state"] == "snoozed" and (r["until"] or 0) > now:
+                    d.update(snoozed=True, snoozed_until=r["until"])
+                elif r["state"] in ("done", "open"):
+                    d["status"] = r["state"]
+                if r["state"] == "suggested":
+                    d["suggestion"] = r["evidence"]  # still open: only you can close it
+                else:
+                    d.update(resolved_by=r["decided_by"], evidence=r["evidence"])
+            commitments.setdefault(pid, []).append(d)
+        for items in commitments.values():  # open first, snoozed after open, newest first within each
+            items.sort(key=lambda d: (d["dismissed"], d["status"] != "open", d["snoozed"]))
         topics: dict[int, list[str]] = {}
         for pid, label in self.conn.execute("SELECT person_id, label FROM topic ORDER BY label"):
             topics.setdefault(pid, []).append(label)
@@ -141,7 +239,8 @@ class Store:
                 "count": s["count"],
                 "extractor": p["extractor"],  # None until extracted
                 "commitments": commitments.get(p["id"], []),
+                "hidden": hidden.get(p["id"], 0),  # items you marked "not real"
                 "topics": topics.get(p["id"], []),
             })
-        owed = lambda p: sum(c["owner"] == "me" and c["status"] == "open" for c in p["commitments"])
+        owed = lambda p: sum(c["owner"] == "me" and self.is_open(c) for c in p["commitments"])
         return sorted(out, key=lambda p: (-owed(p), -p["score"]))
