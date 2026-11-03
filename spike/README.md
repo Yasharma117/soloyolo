@@ -95,7 +95,7 @@ lists and score each open item:
 | ➖ true but known | Real, but already on your mind |
 | ❌ wrong | Not owed by anyone, wrong person, or already done |
 
-**Kill or continue:** continue if the last 90 days surface **at least 5 ✅** and **❌ stays under a third** of
+**Kill or continue** (first real run passed: 13 ✅ / 6 ❌, see `eval/RESULTS.md`): continue if the last 90 days surface **at least 5 ✅** and **❌ stays under a third** of
 items. Below that, the thesis is weak: ranking by message counts (what Mesh does) would be nearly as good.
 
 ## Known limits (deliberate, for a spike)

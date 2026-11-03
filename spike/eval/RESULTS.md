@@ -1,5 +1,46 @@
 # Extraction eval: results
 
+## Run 3 (2026-11-03): the kill-or-continue test on real WhatsApp chats
+
+The protocol in `spike/README.md`: the user's own threads, every open item scored by the user. Counts and
+categories only; no chat text is in this repo.
+
+**Input:** 5 Android 1:1 chats (family and friends, Hinglish), 973 messages, Aug to Nov 3. Two more chats
+had no text and were skipped. Extracted with `claude-code`, then 19 open items were scored.
+
+| Score | Items | Share |
+|---|---|---|
+| ✅ real, and forgotten, drifting or avoided | 13 ("almost all", in the user's words) | 68% |
+| ❌ wrong: already done | 6 | 32% |
+
+**Verdict: continue.** The bar was at least 5 ✅ with ❌ under a third. ✅ passes easily; ❌ passes narrowly.
+
+**Every ❌ was done somewhere the extractor can't see. None was a misreading:**
+
+| Where it was done | ❌ |
+|---|---|
+| Paid in a UPI app | 3 |
+| Settled on a phone call | 2 |
+| Settled in a family group chat (groups are skipped) | 1 |
+
+**What the run changed before scoring:** the importer dropped call-log lines and media placeholders, so
+"I'll call you back" and "send me the pic" stayed open after the call or photo. Keeping both as markers
+closed 8 items that would otherwise have been ❌.
+
+**What it means**
+
+- **Precision is now limited by what the data covers, not by the model.** A better prompt won't fix the six ❌.
+  Payment signals (bank SMS on Android), group chats read only to close items, and a one-tap "done"
+  for calls would.
+- **The value is in what people avoid, not only what they forget.** The user said several ✅ were things
+  they'd been avoiding, mostly asks from family. Showing those needs care: a list that nags gets ignored.
+- **My guesses at "probably closed in another thread" were mostly wrong:** 1 of 4. The user is the only
+  judge of what's open.
+
+**Why not to over-read it:** one user, 19 items, family-heavy chats, and the builder ran the test. It's
+a go signal for the next build, not proof of demand.
+
+
 ## Run 2 (2026-11-02): promises and asks
 
 Every item now has a kind. A **promise** is something one side said they'd do. An **ask** is a concrete request
