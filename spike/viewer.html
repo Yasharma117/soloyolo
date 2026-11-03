@@ -23,6 +23,7 @@
   html, body { margin: 0; height: 100%; }
   body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
   .app { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; height: 100vh; }
+  .app > * { min-width: 0; }  /* or a long one-line hint widens the column past the screen */
   header { padding: 20px 20px 12px; border-bottom: 1px solid var(--line); }
   header h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
   header p { margin: 2px 0 0; color: var(--ink-3); font-size: 12px; }
@@ -55,6 +56,24 @@
   .c.done .what { text-decoration: line-through; text-decoration-color: var(--ink-3); }
   .kind { display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3);
           border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 6px; vertical-align: 1px; }
+  .c { grid-template-columns: 18px 1fr auto auto; }
+  .acts { display: flex; gap: 4px; }
+  .act { font: inherit; font-size: 12px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px;
+         background: var(--surface); color: var(--ink-2); cursor: pointer; }
+  .act:hover, .act:focus-visible { border-color: var(--ink-3); color: var(--ink); }
+  .act[hidden] { display: none; }
+  @media (hover: hover) { .c.open .acts, .c.done .acts { opacity: 0; transition: opacity .12s; }
+    .c:hover .acts, .c:focus-within .acts { opacity: 1; } }
+  .c.later, .c.gone { color: var(--ink-3); }
+  .c.later .dot { border-style: dashed; }
+  .c.gone .what { text-decoration: line-through; text-decoration-color: var(--ink-3); }
+  .why { font-size: 12px; color: var(--ok); margin-top: 2px; }
+  details.hidden { margin-top: 4px; font-size: 12px; color: var(--ink-3); }
+  details.hidden summary { cursor: pointer; padding: 4px 0; }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+           padding: 8px 14px; border-radius: 10px; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+  #toast .act { margin-left: 8px; background: transparent; color: inherit; border-color: currentColor; }
+  @media (max-width: 760px) { .c { grid-template-columns: 18px 1fr auto; } .acts { grid-column: 2 / -1; } }
   .due { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .due.late { color: var(--accent-text); font-weight: 600; }
   .empty { color: var(--ink-3); font-size: 13px; }
@@ -86,6 +105,7 @@
     <div class="foot" id="foot">Local only · 127.0.0.1</div>
   </aside>
   <main><div class="detail" id="detail"></div></main>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
 </div>
 <script>
 const DAY = 86400000;
@@ -104,17 +124,19 @@ const dueLabel = (iso) => {
   if (d < 0) return { text: `${-d}d overdue`, late: true };
   return { text: d === 0 ? "due today" : `due in ${d}d`, late: false };
 };
-const openMine = (p) => p.commitments.filter((c) => c.owner === "me" && c.status === "open");
+const live = (c) => c.status === "open" && !c.snoozed && !c.dismissed;
+const openMine = (p) => p.commitments.filter((c) => c.owner === "me" && live(c));
+const openTheirs = (p) => p.commitments.filter((c) => c.owner === "them" && live(c));
+const BY = { you: "you", sms: "a bank SMS", closure: "a message in another chat" };
 
-let people = [], current = null;
+let people = [], current = null, cachedThread = { id: null, rows: [] }, toastTimer = null;
 
 function renderList() {
   const owed = people.reduce((n, p) => n + openMine(p).length, 0);
-  const waiting = people.reduce((n, p) => n + p.commitments.filter((c) => c.owner === "them" && c.status === "open").length, 0);
+  const waiting = people.reduce((n, p) => n + openTheirs(p).length, 0);
   $("#summary").textContent = `${people.length} people · you owe ${owed} · waiting on ${waiting}`;
   $("#list").innerHTML = people.map((p) => {
-    const mine = openMine(p)[0];
-    const theirs = p.commitments.find((c) => c.owner === "them" && c.status === "open");
+    const mine = openMine(p)[0], theirs = openTheirs(p)[0];
     const hint = mine ? `<div class="hint owe">You owe: ${esc(mine.action)}</div>`
       : theirs ? `<div class="hint">Waiting on: ${esc(theirs.action)}</div>`
       : `<div class="hint">${p.count} messages</div>`;
@@ -123,23 +145,51 @@ function renderList() {
   }).join("");
 }
 
-function commitmentRow(c) {
-  const due = c.status === "open" ? dueLabel(c.due) : { text: "done", late: false };
-  return `<div class="c ${c.status} ${c.owner === "me" ? "mine" : ""}" data-src="${c.source_message_id}" data-fin="${c.done_message_id ?? ""}">
-    <span class="dot"></span><span class="what">${esc(c.action)}${c.kind === "ask" ? `<span class="kind" title="Asked, no yes or no yet">asked</span>` : ""}</span><span class="due ${due.late ? "late" : ""}">${due.text}</span></div>`;
+function actions(c) {
+  const btn = (state, label, extra = "") => `<button class="act" data-state="${state}" ${extra}>${label}</button>`;
+  if (c.dismissed) return btn("clear", "Restore");
+  if (c.snoozed) return btn("clear", "Unsnooze");
+  if (c.status === "open") {
+    return btn("done", "Done") + btn("snoozed", "Snooze 3d", 'data-days="3"') + btn("dismissed", "Not real");
+  }
+  if (c.resolved_by === "you") return btn("clear", "Undo");
+  return btn("open", "Not done");  // closed by the extractor or a signal; you can disagree
 }
 
-async function select(id) {
+function commitmentRow(c) {
+  const until = c.snoozed ? new Date(c.snoozed_until * 1000).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "";
+  const label = c.dismissed ? { text: "not real", late: false }
+    : c.snoozed ? { text: `snoozed to ${until}`, late: false }
+    : c.status === "open" ? dueLabel(c.due) : { text: "done", late: false };
+  const why = c.status === "done" && c.resolved_by && c.resolved_by !== "you"
+    ? `<div class="why">Closed by ${BY[c.resolved_by] || esc(c.resolved_by)}${c.evidence ? `: ${esc(c.evidence)}` : ""}</div>` : "";
+  const cls = [c.dismissed ? "gone" : c.snoozed ? "later" : c.status, c.owner === "me" ? "mine" : ""].join(" ");
+  return `<div class="c ${cls}" data-src="${c.source_message_id}" data-fin="${c.done_message_id ?? ""}" data-owner="${c.owner}">
+    <span class="dot"></span>
+    <span class="what">${esc(c.action)}${c.kind === "ask" ? `<span class="kind" title="Asked, no yes or no yet">asked</span>` : ""}${why}</span>
+    <span class="due ${label.late ? "late" : ""}">${label.text}</span>
+    <span class="acts">${actions(c)}</span></div>`;
+}
+
+function section(title, items) {
+  const shown = items.filter((c) => !c.dismissed), gone = items.filter((c) => c.dismissed);
+  return `<section><h3>${title}</h3>${shown.map(commitmentRow).join("") || `<div class="empty">Nothing.</div>`}
+    ${gone.length ? `<details class="hidden"><summary>${gone.length} marked not real</summary>${gone.map(commitmentRow).join("")}</details>` : ""}</section>`;
+}
+
+async function select(id, { keepScroll = false } = {}) {
   current = id;
   renderList();
   const p = people.find((x) => x.id === id);
-  const thread = await (await fetch(`/api/thread/${id}`)).json();
-  if (current !== id) return; // a later click won the race
+  if (cachedThread.id !== id) {
+    const rows = await (await fetch(`/api/thread/${id}`)).json();
+    if (current !== id) return; // a later click won the race
+    cachedThread = { id, rows };
+  }
   const src = new Set(p.commitments.map((c) => c.source_message_id));
   const fin = new Set(p.commitments.map((c) => c.done_message_id).filter(Boolean));
-  const mine = p.commitments.filter((c) => c.owner === "me"), theirs = p.commitments.filter((c) => c.owner === "them");
   let lastDay = "";
-  const bubbles = thread.map((m) => {
+  const bubbles = cachedThread.rows.map((m) => {
     const day = new Date(m.ts * 1000).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
     const sep = day !== lastDay ? `<div class="day">${day}</div>` : "";
     lastDay = day;
@@ -147,18 +197,47 @@ async function select(id) {
     const cls = [call ? "call" : m.from_me ? "me" : "them", src.has(m.id) ? "src" : "", fin.has(m.id) ? "fin" : ""].join(" ");
     return `${sep}<div class="b ${cls}" id="m${m.id}">${call ? "📞 Call" : esc(m.text)}</div>`;
   }).join("");
+  const scroll = $("main").scrollTop;
   $("#detail").innerHTML = `
     <h2>${esc(p.name)}</h2>
     <div class="meta">${p.count} messages · last ${ago(p.last)} · ${p.extractor ? `extracted by ${esc(p.extractor)}` : "not extracted yet"}</div>
     ${p.topics.length ? `<div class="topics">${p.topics.map((t) => `<span class="topic">${esc(t)}</span>`).join("")}</div>` : ""}
-    <section><h3>You owe</h3>${mine.map(commitmentRow).join("") || `<div class="empty">Nothing.</div>`}</section>
-    <section><h3>Waiting on them</h3>${theirs.map(commitmentRow).join("") || `<div class="empty">Nothing.</div>`}</section>
+    ${section("You owe", p.commitments.filter((c) => c.owner === "me"))}
+    ${section("Waiting on them", p.commitments.filter((c) => c.owner === "them"))}
     <section><h3>Thread</h3><div class="thread">${bubbles}</div></section>`;
-  $("main").scrollTop = 0;
+  $("main").scrollTop = keepScroll ? scroll : 0;
+}
+
+async function refresh() {
+  people = await (await fetch("/api/people")).json();
+  renderList();
+  if (current !== null && people.some((p) => p.id === current)) await select(current, { keepScroll: true });
+}
+
+const SAID = { done: "Marked done", dismissed: "Marked not real", snoozed: "Snoozed for 3 days", open: "Reopened", clear: "Undone" };
+
+async function mark(row, state, days) {
+  const body = { person_id: current, source_message_id: Number(row.dataset.src), owner: row.dataset.owner, state };
+  if (days) body.days = days;
+  const r = await fetch("/api/mark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) return toast("Couldn't save that. Is the viewer still running?");
+  await refresh();
+  toast(SAID[state], state === "clear" ? null : () => mark(row, "clear"));
+}
+
+function toast(text, undo) {
+  const t = $("#toast");
+  t.innerHTML = `${esc(text)}${undo ? ` <button class="act" id="undo">Undo</button>` : ""}`;
+  t.hidden = false;
+  if (undo) $("#undo").onclick = () => { t.hidden = true; undo(); };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 6000);
 }
 
 $("#list").addEventListener("click", (e) => { const b = e.target.closest(".person"); if (b) select(Number(b.dataset.id)); });
 $("#detail").addEventListener("click", (e) => {
+  const act = e.target.closest(".act");
+  if (act) return mark(act.closest(".c"), act.dataset.state, act.dataset.days ? Number(act.dataset.days) : undefined);
   const c = e.target.closest(".c"); if (!c) return;
   const el = document.getElementById("m" + (c.dataset.fin || c.dataset.src));
   if (!el) return;

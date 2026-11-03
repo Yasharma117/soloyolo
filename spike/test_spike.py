@@ -350,6 +350,97 @@ class ReviewFixesTest(unittest.TestCase):
             httpd.server_close()
 
 
+class MarkTest(unittest.TestCase):
+    """Your own marks on items: done, not real, snooze. They outlive re-extraction and beat signals."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.db = Path(self.tmp.name) / "s.db"
+        self.st = Store(self.db)
+        Msg = type("M", (), {})
+        rows = []
+        for i, (me, text) in enumerate([(0, "Can you send the lease?"), (1, "I'll send it tonight")]):
+            m = Msg(); m.guid, m.handle, m.ts, m.from_me, m.text = f"g{i}", "sam", 1_700_000_000.0 + i, bool(me), text
+            rows.append(m)
+        self.st.add_messages("x", rows, {"sam": "Sam"})
+        self.pid = self.st.person_ids()[0]
+        self.src = self.st.thread(self.pid)[1]["id"]
+        self.extract()
+
+    def tearDown(self):
+        self.st.close()
+        self.tmp.cleanup()
+
+    def extract(self, action="Send Sam the lease"):
+        self.st.replace_extraction(self.pid, [dict(kind="promise", owner="me", action=action, due=None, status="open",
+                                                   source_message_id=self.src, done_message_id=None)], [], "heuristic")
+
+    def item(self):
+        return self.st.people()[0]["commitments"][0]
+
+    def test_done_survives_reextraction(self):
+        self.st.resolve(self.pid, self.src, "me", "done", "you")
+        self.extract(action="Send the signed lease to Sam")  # a re-run rewords the item
+        self.assertEqual((self.item()["status"], self.item()["resolved_by"]), ("done", "you"))
+        self.assertEqual(self.st.people()[0]["id"], self.pid)
+        self.assertEqual(self.st.open_items(), [])
+
+    def test_signal_never_overrides_you(self):
+        self.st.resolve(self.pid, self.src, "me", "open", "you")
+        self.assertFalse(self.st.resolve(self.pid, self.src, "me", "done", "sms", evidence="₹950 debited"))
+        self.assertEqual(self.item()["status"], "open")
+        self.st.unresolve(self.pid, self.src, "me")
+        self.assertTrue(self.st.resolve(self.pid, self.src, "me", "done", "sms", evidence="₹950 debited"))
+        self.assertEqual((self.item()["status"], self.item()["evidence"]), ("done", "₹950 debited"))
+
+    def test_snooze_expires_and_dismiss_hides(self):
+        self.st.resolve(self.pid, self.src, "me", "snoozed", "you", until=time.time() + 3600)
+        self.assertTrue(self.item()["snoozed"])
+        self.assertEqual(self.st.open_items(), [])
+        self.st.resolve(self.pid, self.src, "me", "snoozed", "you", until=time.time() - 1)
+        self.assertFalse(self.item()["snoozed"])
+        self.assertEqual(len(self.st.open_items()), 1)
+        self.st.resolve(self.pid, self.src, "me", "dismissed", "you")
+        self.assertTrue(self.item()["dismissed"])
+        self.assertEqual((self.st.people()[0]["hidden"], self.st.open_items()), (1, []))
+
+    def test_mark_endpoint_guards(self):
+        import json
+        import threading
+        import urllib.request
+        from functools import partial
+        from http.server import ThreadingHTTPServer
+        from spike.server import Handler
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), lambda *a, **k: None)
+        port = httpd.server_address[1]
+        httpd.RequestHandlerClass = partial(Handler, db=str(self.db), port=port)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+
+        def post(body, **headers):
+            h = {"Content-Type": "application/json", **headers}
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/api/mark", data=json.dumps(body).encode(),
+                                         headers=h, method="POST")
+            try:
+                return urllib.request.urlopen(req).status
+            except urllib.error.HTTPError as e:
+                return e.code
+        good = {"person_id": self.pid, "source_message_id": self.src, "owner": "me", "state": "done"}
+        try:
+            self.assertEqual(post(good, Origin="https://evil.example"), 403)
+            self.assertEqual(post(good, **{"Content-Type": "text/plain"}), 415)
+            self.assertEqual(post({**good, "source_message_id": 999}), 404)
+            self.assertEqual(post({**good, "state": "deleted"}), 400)
+            self.assertEqual(post({**good, "state": "snoozed", "days": 999}), 400)
+            self.assertEqual(self.item()["status"], "open")  # nothing above wrote anything
+            self.assertEqual(post(good, Origin=f"http://127.0.0.1:{port}"), 200)
+            self.assertEqual(self.item()["resolved_by"], "you")
+            self.assertEqual(post({**good, "state": "clear"}), 200)
+            self.assertIsNone(self.item()["resolved_by"])
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
 IOS_EXPORT = (
     "\u200e[28/10/2026, 19:02:11] Sam Okafor: \u200eMessages and calls are end-to-end encrypted.\n"
     "[28/10/2026, 19:02:11] Sam Okafor: Good seeing you at the dinner\n"

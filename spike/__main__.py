@@ -62,11 +62,17 @@ def show(store: Store) -> None:
         last = datetime.fromtimestamp(p["last"]).strftime("%b %d")
         print(f"\n{p['name']}  ·  score {p['score']}  ·  last {last}")
         for c in p["commitments"]:
+            if c["dismissed"]:
+                continue
             who = "you owe" if c["owner"] == "me" else "waiting on"
             asked = " (asked)" if c.get("kind") == "ask" else ""
-            mark = "✓" if c["status"] == "done" else "○"
-            due = f"  due {c['due']}" if c["due"] else ""
-            print(f"  {mark} {who}{asked}: {c['action']}{due}")
+            mark = "✓" if c["status"] == "done" else "z" if c["snoozed"] else "○"
+            due = f"  due {c['due']}" if c["due"] and c["status"] == "open" else ""
+            why = f"  [closed by {c['resolved_by']}: {c['evidence']}]" if c["resolved_by"] not in (None, "you") \
+                and c["status"] == "done" else ""
+            print(f"  {mark} {who}{asked}: {c['action']}{due}{why}")
+        if p["hidden"]:
+            print(f"  ({p['hidden']} marked not real)")
 
 
 def main(argv: list[str] | None = None) -> int:
