@@ -92,7 +92,7 @@ class Store:
     STATES = ("done", "dismissed", "snoozed", "open")
 
     def resolve(self, person_id: int, source_message_id: int, owner: str, state: str, decided_by: str,
-                evidence: str | None = None, until: float | None = None) -> bool:
+                evidence: str | None = None, until: float | None = None, evidence_id: int | None = None) -> bool:
         """Record what happened to an item. A signal (sms, closure) never overrides your own call.
         Returns whether the row was written."""
         if state not in self.STATES:
@@ -106,8 +106,8 @@ class Store:
                     return False
             self.conn.execute(
                 "INSERT OR REPLACE INTO resolution(person_id, source_message_id, owner, state, until, decided_by,"
-                " evidence, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (person_id, source_message_id, owner, state, until, decided_by, evidence, time.time()))
+                " evidence, evidence_id, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (person_id, source_message_id, owner, state, until, decided_by, evidence, evidence_id, time.time()))
         return True
 
     def unresolve(self, person_id: int, source_message_id: int, owner: str) -> None:
@@ -131,6 +131,19 @@ class Store:
     def is_open(c: dict) -> bool:
         """Open, and not snoozed or marked "not real"."""
         return c["status"] == "open" and not c["snoozed"] and not c["dismissed"]
+
+    def add_evidence(self, source: str, rows) -> int:
+        """rows: objects with remote_id, ts, sender, text, and optionally amount, direction, counterparty.
+        Returns rows newly inserted (re-importing the same backup adds nothing)."""
+        added = 0
+        with self.conn:
+            for r in rows:
+                added += self.conn.execute(
+                    "INSERT OR IGNORE INTO evidence(source, remote_id, ts, sender, text, amount, direction, counterparty)"
+                    " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (source, r.remote_id, r.ts, r.sender, r.text, getattr(r, "amount", None),
+                     getattr(r, "direction", None), getattr(r, "counterparty", None))).rowcount
+        return added
 
     def record_disclosure(self, person_id: int, recipient: str) -> None:
         """Log that a thread's text is about to leave this machine. Call before sending."""

@@ -441,6 +441,102 @@ class MarkTest(unittest.TestCase):
             httpd.server_close()
 
 
+class SmsTest(unittest.TestCase):
+    ALERTS = {
+        # Shapes of real Indian bank alerts (numbers and names invented).
+        "Credit Alert!\nRs.950.00 credited to HDFC Bank A/c XX1234 on 17-10-26 from VPA rajesh.s@okhdfc (UPI 529012345678)":
+            (950.0, "in", "rajesh.s@okhdfc"),
+        "Sent Rs.1,000.00\nFrom HDFC Bank A/C *1234\nTo SHENA SHARMA\nOn 18/10/26\nRef 529012345679\nNot You? Call 18002586161":
+            (1000.0, "out", "SHENA SHARMA"),
+        "Dear UPI user A/C X1234 debited by 950.0 on date 17Oct26 trf to SHENA Refno 529012345670. If not u? call 1800111109. -SBI":
+            (950.0, "out", "SHENA"),
+        "Dear SBI UPI User, ur A/cX1234 credited by Rs1000 on 18Oct26 by RAJESH SHARMA (Ref no 529012345671)":
+            (1000.0, "in", "RAJESH SHARMA"),
+        "ICICI Bank Acct XX123 debited for Rs 3,400.00 on 13-Oct-26; RAJESH SHARMA credited. UPI:529012345672. Call 18002662 for dispute.":
+            (3400.0, "out", None),
+        "INR 700.00 credited\nA/c no. XX1234\n13-10-26, 18:23:11\nUPI/P2A/529012345673/RAJESH SHARMA\nNot you? Call 18604195555 - Axis Bank":
+            (700.0, "in", "RAJESH SHARMA"),
+        "Sent Rs.37,000.00 from Kotak Bank AC X1234 to landlord@ybl on 31-10-26.UPI Ref 529012345674. Not you, kotak.com/fraud":
+            (37000.0, "out", "landlord@ybl"),
+    }
+    NOT_PAYMENTS = [
+        "Alert:\nUSD.23.60 will be debited on 08/10/2026 from HDFC Bank Card 0223 for Anthropic",
+        "123456 is your OTP for UPI txn of Rs 950 at A/c XX1234. Do not share. -HDFC",
+        "RAJESH SHARMA has requested money from you on Google Pay. Rs 500. UPI ID rajesh@okhdfc",
+        "Your Credit Card bill of Rs 4,512 is due on 20-Nov. Pay via UPI.",
+        "Get a pre-approved personal loan of Rs 5,00,000 credited to your account in 10 mins!",
+        "Txn of Rs 950.00 on A/c XX1234 failed. Amount will be reversed.",
+        "Bhai 950 bhej de na",
+    ]
+
+    def test_parses_bank_alerts(self):
+        from spike.sms import parse_alert
+        for body, want in self.ALERTS.items():
+            self.assertEqual(parse_alert(body), want, body)
+        for body in self.NOT_PAYMENTS:
+            self.assertIsNone(parse_alert(body), body)
+
+    def test_backup_keeps_only_received_payment_alerts(self):
+        from xml.sax.saxutils import quoteattr
+        from spike.sms import load_backup
+        texts = [("VM-HDFCBK", 1, list(self.ALERTS)[0]), ("VM-HDFCBK", 1, self.NOT_PAYMENTS[1]),
+                 ("+919800000000", 1, "dinner at 8?"), ("VM-HDFCBK", 2, list(self.ALERTS)[0])]
+        xml = "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<smses count='4'>" + "".join(
+            f"<sms protocol='0' address={quoteattr(a)} date='{1_760_000_000_000 + i}' type='{t}' body={quoteattr(b)} />"
+            for i, (a, t, b) in enumerate(texts)) + "<mms date='1' /></smses>"
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "sms.xml"
+            f.write_text(xml)
+            pays, read = load_backup(f)
+        self.assertEqual(read, 4)
+        self.assertEqual([(p.amount, p.direction, p.sender) for p in pays], [(950.0, "in", "VM-HDFCBK")])
+
+    def test_matcher_closes_only_the_matching_money_item(self):
+        from spike import sms
+        from spike.sms import Payment
+        with tempfile.TemporaryDirectory() as d:
+            st = Store(Path(d) / "s.db")
+            M = type("M", (), {})
+            t0 = 1_760_000_000.0
+            chat = [(1, "Ek baar 950 bhejna mere upi pe, mattress topper"), (0, "Ok"),
+                    (1, "2.7k meds aur 700 cab ke lage, monies dedo"), (0, "Ok will send"),
+                    (1, "Bring the charger tomorrow"), (0, "Sure")]
+            rows = []
+            for i, (me, text) in enumerate(chat):
+                m = M(); m.guid, m.handle, m.ts, m.from_me, m.text = f"g{i}", "papa", t0 + i * 3600, bool(me), text
+                rows.append(m)
+            st.add_messages("whatsapp", rows, {"papa": "PAPA"})
+            pid = st.person_ids()[0]
+            ids = [r["id"] for r in st.thread(pid)]
+            items = [dict(kind="promise", owner="them", action="Send ₹950 for the mattress topper", due=None,
+                          status="open", source_message_id=ids[1], done_message_id=None),
+                     dict(kind="promise", owner="them", action="Send money for the medicine refills and cab costs",
+                          due=None, status="open", source_message_id=ids[3], done_message_id=None),
+                     dict(kind="promise", owner="them", action="Bring the charger", due=None, status="open",
+                          source_message_id=ids[5], done_message_id=None)]
+            st.replace_extraction(pid, items, [], "test")
+            pay = lambda n, amt, direction, dt: Payment(f"p{n}", t0 + dt, "VM-HDFCBK", "alert", amt, direction, "RAJESH")
+            st.add_evidence("sms", [
+                pay(1, 950, "in", -3600),         # before the item was made: not it
+                pay(2, 950, "out", 7200),         # wrong direction: you paid someone 950
+                pay(3, 950, "in", 86400),         # this one
+                pay(4, 3400, "in", 2 * 86400),    # 2.7k + 700
+                pay(5, 950, "in", 3 * 86400),     # a second 950 has nothing left to close
+            ])
+            closed = sms.match(st)
+            self.assertEqual(sorted((i["action"], p["remote_id"]) for i, p in closed),
+                             [("Send money for the medicine refills and cab costs", "p4"),
+                              ("Send ₹950 for the mattress topper", "p3")])
+            self.assertEqual([i["action"] for i in st.open_items()], ["Bring the charger"])
+            self.assertEqual(sms.match(st), [])  # idempotent
+            # You said it's not done: a later import never re-closes it.
+            st.resolve(pid, ids[1], "them", "open", "you")
+            st.conn.execute("DELETE FROM resolution WHERE decided_by = 'sms'")
+            closed = sms.match(st)
+            self.assertNotIn("Send ₹950 for the mattress topper", [i["action"] for i, _ in closed])
+            st.close()
+
+
 IOS_EXPORT = (
     "\u200e[28/10/2026, 19:02:11] Sam Okafor: \u200eMessages and calls are end-to-end encrypted.\n"
     "[28/10/2026, 19:02:11] Sam Okafor: Good seeing you at the dinner\n"

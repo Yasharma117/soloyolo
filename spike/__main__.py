@@ -1,4 +1,4 @@
-"""python -m spike {demo,ingest,extract,show,serve}. See spike/README.md."""
+"""python -m spike {demo,ingest,import-*,extract,close,show,serve}. See spike/README.md."""
 from __future__ import annotations
 
 import argparse
@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import chatdb, fixture, json_import, whatsapp_export
+from . import chatdb, fixture, json_import, sms, whatsapp_export
 from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor
 from .store import Store
 
@@ -57,6 +57,11 @@ def extract(store: Store, kind: str, window: int, only: int | None = None, top: 
     return failed
 
 
+def close_with_sms(store: Store) -> None:
+    for item, pay in sms.match(store):
+        print(f"closed: {item['name']}: {item['action']}  <- {sms.describe(pay)}")
+
+
 def show(store: Store) -> None:
     for p in store.people():
         last = datetime.fromtimestamp(p["last"]).strftime("%b %d")
@@ -101,6 +106,12 @@ def main(argv: list[str] | None = None) -> int:
     j = sub.add_parser("import-json", help="import conversations from a JSON file (format in spike/json_import.py)")
     j.add_argument("file", type=Path)
 
+    m = sub.add_parser("import-sms", help="read bank alerts from an Android 'SMS Backup & Restore' XML; "
+                                          "they close money items. Other texts are never stored")
+    m.add_argument("file", type=Path)
+
+    c = sub.add_parser("close", help="close open items using evidence (bank SMS; no network)")
+
     e = sub.add_parser("extract", help="find promises and asks in each thread")
     e.add_argument("--extractor", choices=EXTRACTORS, default="heuristic",
                    help="heuristic: offline regexes. claude-code: Claude via your Claude Code login (no API key). "
@@ -144,6 +155,13 @@ def main(argv: list[str] | None = None) -> int:
         elif a.cmd == "import-json":
             source, rows, names = json_import.load(a.file)
             print(f"{store.add_messages(source, rows, names)} new messages from {len(names)} people ({source})")
+        elif a.cmd == "import-sms":
+            pays, read = sms.load_backup(a.file)
+            added = store.add_evidence("sms", pays)
+            print(f"read {read} texts: kept {len(pays)} bank payment alerts ({added} new), discarded the rest")
+            close_with_sms(store)
+        elif a.cmd == "close":
+            close_with_sms(store)
         elif a.cmd == "extract":
             return 1 if extract(store, a.extractor, a.window, a.person, a.top) else 0
         elif a.cmd == "show":

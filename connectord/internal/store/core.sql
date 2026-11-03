@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS resolution (
   until REAL,                      -- snoozed until (epoch seconds)
   decided_by TEXT NOT NULL,        -- 'you' | 'sms' | 'closure'
   evidence TEXT,                   -- shown to you: what closed it
+  evidence_id INTEGER,             -- the evidence row that closed it, if one did
   at REAL NOT NULL,
   PRIMARY KEY (person_id, source_message_id, owner)
 );
