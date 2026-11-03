@@ -213,31 +213,35 @@ class ClaudeCodeExtractor:
         self.cmd = [path]
         self.name = f"{model} (claude code)"
         self.model, self.effort, self.timeout = model, effort, timeout
-        self.schema = json.dumps(Extraction.model_json_schema())
 
     def extract(self, thread: Sequence) -> Extraction:
-        prompt = f"Today is {_today()}. List the promises and asks in the thread on stdin."
+        result = self.ask(SYSTEM, f"Today is {_today()}. List the promises and asks in the thread on stdin.",
+                          f"<thread>\n{render(thread)}\n</thread>", Extraction)
+        return _checked(result, thread)
+
+    def ask(self, system: str, prompt: str, stdin: str, schema: type[BaseModel]) -> BaseModel:
+        """One structured call. The private text goes on stdin; the prompt in argv carries none."""
         args = self.cmd + [
             "-p", prompt,
-            "--system-prompt", SYSTEM,
+            "--system-prompt", system,
             "--tools", "",
             "--strict-mcp-config",
             "--no-session-persistence",
-            "--json-schema", self.schema,
+            "--json-schema", json.dumps(schema.model_json_schema()),
             "--output-format", "json",
             "--model", self.model,
             "--effort", self.effort,
         ]
         with tempfile.TemporaryDirectory() as empty:
-            proc = subprocess.run(args, input=f"<thread>\n{render(thread)}\n</thread>", capture_output=True,
+            proc = subprocess.run(args, input=stdin, capture_output=True,
                                   text=True, timeout=self.timeout, cwd=empty, env={**os.environ, "NO_COLOR": "1"})
         try:
             out = json.loads(proc.stdout)
         except json.JSONDecodeError:
             raise RuntimeError(f"claude -p failed (exit {proc.returncode}): {proc.stderr.strip()[:300]}") from None
         if out.get("is_error") or out.get("structured_output") is None:
-            raise RuntimeError(f"no extraction: {out.get('subtype')} {out.get('stop_reason')} {str(out.get('result'))[:200]}")
-        return _checked(Extraction.model_validate(out["structured_output"]), thread)
+            raise RuntimeError(f"no result: {out.get('subtype')} {out.get('stop_reason')} {str(out.get('result'))[:200]}")
+        return schema.model_validate(out["structured_output"])
 
 
 class ClaudeExtractor:
@@ -253,17 +257,21 @@ class ClaudeExtractor:
         self.effort = effort
 
     def extract(self, thread: Sequence) -> Extraction:
+        result = self.ask(SYSTEM, f"Today is {_today()}.", f"<thread>\n{render(thread)}\n</thread>", Extraction)
+        return _checked(result, thread)
+
+    def ask(self, system: str, prompt: str, stdin: str, schema: type[BaseModel]) -> BaseModel:
         response = self.client.beta.messages.parse(
             model=self.name,
             max_tokens=16000,
-            system=SYSTEM,
-            messages=[{"role": "user", "content": f"Today is {_today()}.\n\n<thread>\n{render(thread)}\n</thread>"}],
-            output_format=Extraction,
+            system=system,
+            messages=[{"role": "user", "content": f"{prompt}\n\n{stdin}"}],
+            output_format=schema,
             output_config={"effort": self.effort},
             # On a safety decline, re-run on a fallback model chosen by refusal category.
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
         )
         if response.stop_reason == "refusal" or response.parsed_output is None:
-            raise RuntimeError(f"no extraction (stop_reason={response.stop_reason}, request={response._request_id})")
-        return _checked(response.parsed_output, thread)
+            raise RuntimeError(f"no result (stop_reason={response.stop_reason}, request={response._request_id})")
+        return response.parsed_output

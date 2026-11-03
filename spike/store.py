@@ -26,6 +26,15 @@ class Store:
 
     def _migrate(self) -> None:
         """Bring stores made by older versions up to the schema. CREATE IF NOT EXISTS won't add columns."""
+        # resolution's state CHECK gained 'suggested': SQLite can't alter a CHECK, so rebuild the table.
+        sql = self.conn.execute("SELECT sql FROM sqlite_master WHERE name = 'resolution'").fetchone()
+        if sql and "'suggested'" not in sql[0]:
+            with self.conn:
+                self.conn.execute("ALTER TABLE resolution RENAME TO resolution_old")
+                self.conn.executescript(SCHEMA)
+                cols = ", ".join(r[1] for r in self.conn.execute("PRAGMA table_info(resolution_old)"))
+                self.conn.execute(f"INSERT INTO resolution({cols}) SELECT {cols} FROM resolution_old")
+                self.conn.execute("DROP TABLE resolution_old")
         cols = {r[1] for r in self.conn.execute("PRAGMA table_info(commitment)")}
         if "kind" not in cols:
             with self.conn:
@@ -89,12 +98,13 @@ class Store:
             )
 
     # --- resolutions: what happened to an item after extraction -----------------------------
-    STATES = ("done", "dismissed", "snoozed", "open")
+    STATES = ("done", "dismissed", "snoozed", "open", "suggested")
+    RANK = {"closure": 0, "sms": 1, "you": 2}  # who may overwrite whom: you > a bank SMS > a guess
 
     def resolve(self, person_id: int, source_message_id: int, owner: str, state: str, decided_by: str,
                 evidence: str | None = None, until: float | None = None, evidence_id: int | None = None) -> bool:
-        """Record what happened to an item. A signal (sms, closure) never overrides your own call.
-        Returns whether the row was written."""
+        """Record what happened to an item. A signal never overrides your own call, and a guess (closure)
+        never overrides a bank SMS. Returns whether the row was written."""
         if state not in self.STATES:
             raise ValueError(f"unknown state {state!r}")
         with self.conn:
@@ -102,7 +112,7 @@ class Store:
                 row = self.conn.execute(
                     "SELECT decided_by FROM resolution WHERE person_id = ? AND source_message_id = ? AND owner = ?",
                     (person_id, source_message_id, owner)).fetchone()
-                if row and row[0] == "you":
+                if row and self.RANK.get(row[0], 2) > self.RANK.get(decided_by, 0):
                     return False
             self.conn.execute(
                 "INSERT OR REPLACE INTO resolution(person_id, source_message_id, owner, state, until, decided_by,"
@@ -192,7 +202,8 @@ class Store:
             d = dict(c)
             pid = d.pop("person_id")
             r = resolutions.get((pid, d["source_message_id"], d["owner"]))
-            d.update(resolved_by=None, evidence=None, snoozed=False, snoozed_until=None, dismissed=False)
+            d.update(resolved_by=None, evidence=None, snoozed=False, snoozed_until=None, dismissed=False,
+                     suggestion=None)
             if r:
                 if r["state"] == "dismissed":
                     hidden[pid] = hidden.get(pid, 0) + 1
@@ -201,7 +212,10 @@ class Store:
                     d.update(snoozed=True, snoozed_until=r["until"])
                 elif r["state"] in ("done", "open"):
                     d["status"] = r["state"]
-                d.update(resolved_by=r["decided_by"], evidence=r["evidence"])
+                if r["state"] == "suggested":
+                    d["suggestion"] = r["evidence"]  # still open: only you can close it
+                else:
+                    d.update(resolved_by=r["decided_by"], evidence=r["evidence"])
             commitments.setdefault(pid, []).append(d)
         for items in commitments.values():  # open first, snoozed after open, newest first within each
             items.sort(key=lambda d: (d["dismissed"], d["status"] != "open", d["snoozed"]))

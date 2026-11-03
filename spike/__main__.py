@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import chatdb, fixture, json_import, sms, whatsapp_export
+from . import chatdb, closure, fixture, json_import, sms, whatsapp_export
 from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor
 from .store import Store
 
@@ -75,7 +75,8 @@ def show(store: Store) -> None:
             due = f"  due {c['due']}" if c["due"] and c["status"] == "open" else ""
             why = f"  [closed by {c['resolved_by']}: {c['evidence']}]" if c["resolved_by"] not in (None, "you") \
                 and c["status"] == "done" else ""
-            print(f"  {mark} {who}{asked}: {c['action']}{due}{why}")
+            maybe = f"  [maybe settled? {c['suggestion']}]" if c["suggestion"] and c["status"] == "open" else ""
+            print(f"  {mark} {who}{asked}: {c['action']}{due}{why}{maybe}")
         if p["hidden"]:
             print(f"  ({p['hidden']} marked not real)")
 
@@ -110,7 +111,13 @@ def main(argv: list[str] | None = None) -> int:
                                           "they close money items. Other texts are never stored")
     m.add_argument("file", type=Path)
 
-    c = sub.add_parser("close", help="close open items using evidence (bank SMS; no network)")
+    c = sub.add_parser("close", help="close open items using evidence: bank SMS (local), and with --extractor, "
+                                      "later messages in your other chats and groups (sent to Claude)")
+    c.add_argument("--extractor", choices=["claude-code", "api"],
+                   help="also run the cross-chat closure pass; sends open items and candidate messages off this machine")
+    c.add_argument("--person", type=int, help="only this person's items")
+    c.add_argument("--other-chats", action="store_true",
+                   help="also look in your other 1:1 chats (off by default: on real data its guesses were wrong)")
 
     e = sub.add_parser("extract", help="find promises and asks in each thread")
     e.add_argument("--extractor", choices=EXTRACTORS, default="heuristic",
@@ -150,8 +157,12 @@ def main(argv: list[str] | None = None) -> int:
                 rows, names, notes = whatsapp_export.load(a.files, a.me, a.tz, a.date_order)
             except ValueError as err:
                 ap.error(str(err))
-            print("\n".join(notes))
+            groups, group_notes = whatsapp_export.load_groups(a.files, a.me, a.tz, a.date_order)
+            print("\n".join(n for n in notes if "load_groups" not in n))
+            print("\n".join(group_notes))
             print(f"{store.add_messages('whatsapp', rows, names)} new messages from {len(names)} chats")
+            for name, lines in groups.items():
+                store.add_evidence(f"whatsapp-group:{name}", lines)
         elif a.cmd == "import-json":
             source, rows, names = json_import.load(a.file)
             print(f"{store.add_messages(source, rows, names)} new messages from {len(names)} people ({source})")
@@ -162,6 +173,11 @@ def main(argv: list[str] | None = None) -> int:
             close_with_sms(store)
         elif a.cmd == "close":
             close_with_sms(store)
+            if a.extractor:
+                for item, line, reason in closure.run(store, EXTRACTORS[a.extractor](), a.person,
+                                                      other_chats=a.other_chats):
+                    print(f"maybe settled: {item['name']}: {item['action']}  <- {line['chat']}: {line['text'][:70]!r}"
+                          f" ({reason})")
         elif a.cmd == "extract":
             return 1 if extract(store, a.extractor, a.window, a.person, a.top) else 0
         elif a.cmd == "show":

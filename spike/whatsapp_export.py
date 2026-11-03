@@ -79,6 +79,15 @@ class Message:
     text: str
 
 
+@dataclass(frozen=True)
+class GroupLine:
+    """A group-chat line. Kept as evidence that something got done; never a source of new items."""
+    remote_id: str
+    ts: float
+    sender: str  # 'me' for you
+    text: str
+
+
 @dataclass
 class Chat:
     source: str
@@ -95,7 +104,18 @@ def _read_texts(path: Path) -> list[tuple[str, str]]:
         with zipfile.ZipFile(path) as z:
             return [(f"{path.name}:{n}", z.read(n).decode("utf-8-sig", "replace"))
                     for n in z.namelist() if n.lower().endswith(".txt")]
-    return [(path.name, path.read_text("utf-8-sig", errors="replace"))]
+    # "Family from WhatsApp/chat.txt" (some exporters): the folder is the chat's name.
+    name = f"{path.parent.name}/{path.name}" if path.stem.lower().lstrip("_") == "chat" else path.name
+    return [(name, path.read_text("utf-8-sig", errors="replace"))]
+
+
+def chat_name(source: str) -> str:
+    """'WhatsApp Chat with Family.txt' / 'Family from WhatsApp/chat.txt' / 'x.zip:_chat.txt' -> 'Family'."""
+    parts = [p for p in re.split(r"[/:]", source) if p]
+    stem = next((p for p in reversed(parts) if Path(p).stem.lower().lstrip("_") != "chat"), parts[-1])
+    stem = Path(stem).stem if stem.lower().endswith((".txt", ".zip")) else stem
+    stem = re.sub(r"^WhatsApp Chat (?:with|-)\s*", "", stem, flags=re.I)
+    return re.sub(r"\s+from WhatsApp$", "", stem, flags=re.I).strip() or source
 
 
 def parse(source: str, text: str) -> Chat:
@@ -182,7 +202,7 @@ def load(paths: list[Path], me: str | None = None, tz: str | None = None,
             notes.append(f"{chat.source}: skipped, '{me}' never speaks in it")
             continue
         if len(others) != 1:
-            notes.append(f"{chat.source}: skipped, {len(others)} other people (groups aren't supported yet)")
+            notes.append(f"{chat.source}: group ({len(others)} others), read by load_groups as evidence only")
             continue
         other = others[0]
         handle = f"export:{other}"
@@ -204,3 +224,34 @@ def load(paths: list[Path], me: str | None = None, tz: str | None = None,
             kept += 1
         notes.append(f"{chat.source}: {other}, {kept} messages")
     return out, names, notes
+
+
+def load_groups(paths: list[Path], me: str | None = None, tz: str | None = None,
+                order: str | None = None) -> tuple[dict[str, list[GroupLine]], list[str]]:
+    """Group chats as evidence: {group name: lines}, notes. 1:1 chats are left to load()."""
+    chats = [parse(src, text) for p in paths for src, text in _read_texts(Path(p))]
+    me = me or infer_me(chats)
+    if not me:
+        raise ValueError("can't tell which sender is you: pass --me \"Your Name\" exactly as it appears in the export")
+    zone = ZoneInfo(tz) if tz else None
+    fallback = date_order(chats) or "dmy"
+    groups: dict[str, list[GroupLine]] = {}
+    notes: list[str] = []
+    for chat in chats:
+        if len([s for s in chat.senders if s != me]) < 2:
+            continue
+        name = chat_name(chat.source)
+        chat_order = order or date_order([chat]) or fallback
+        seen: Counter = Counter()
+        out = groups.setdefault(name, [])
+        for d, t, sender, body in chat.lines:
+            body = _media(FORWARDED.sub("", EDITED.sub("", body).strip())).strip()
+            if not body or not sender or SKIP_TEXT.match(body):
+                continue  # calls in a group say nothing about who talked to whom
+            key = f"group:{name}|{d}|{t}|{sender}|{body}"
+            seen[key] += 1
+            out.append(GroupLine(hashlib.sha256(f"{key}|{seen[key]}".encode()).hexdigest()[:40],
+                                 _timestamp(d, t, chat_order, zone), "me" if sender == me else sender, body))
+        notes.append(f"{chat.source}: group '{name}', {len(out)} lines kept as evidence (closes items, never creates them)")
+    return groups, notes
+

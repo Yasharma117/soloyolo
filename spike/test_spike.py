@@ -156,7 +156,7 @@ class ClaudeCodeExtractorTest(unittest.TestCase):
 
     def test_cli_error_raises(self):
         with mock.patch.dict("os.environ", {"FAKE_CLAUDE_MODE": "error"}):
-            with self.assertRaisesRegex(RuntimeError, "no extraction"):
+            with self.assertRaisesRegex(RuntimeError, "no result"):
                 self.ex.extract(self.thread)
 
     def test_missing_cli_explains(self):
@@ -537,6 +537,96 @@ class SmsTest(unittest.TestCase):
             st.close()
 
 
+class ClosureTest(unittest.TestCase):
+    """The cross-chat pass suggests; it never closes, never re-asks, and only sends what it must."""
+
+    def setUp(self):
+        from spike.whatsapp_export import GroupLine
+        self.tmp = tempfile.TemporaryDirectory()
+        self.st = Store(Path(self.tmp.name) / "s.db")
+        M = type("M", (), {})
+        t0 = 1_760_000_000.0
+        rows = []
+        for i, (h, me, text) in enumerate([("papa", 0, "Talk to Mama and finalise the flight"), ("papa", 1, "Ok"),
+                                           ("mum", 1, "secret-1to1-zq: I booked the 9:30 one")]):
+            m = M(); m.guid, m.handle, m.ts, m.from_me, m.text = f"g{i}", h, t0 + i * 3600, bool(me), text
+            rows.append(m)
+        self.st.add_messages("whatsapp", rows, {"papa": "PAPA", "mum": "Mum"})
+        self.papa = next(p["id"] for p in self.st.people() if p["name"] == "PAPA")
+        self.src = self.st.thread(self.papa)[1]["id"]
+        self.st.replace_extraction(self.papa, [dict(kind="promise", owner="me", action="Talk to Mama and say which flight",
+                                                    due=None, status="open", source_message_id=self.src,
+                                                    done_message_id=None)], [], "test")
+        self.st.add_evidence("whatsapp-group:Family", [
+            GroupLine("e1", t0 - 86400, "Mum", "old line before the item"),
+            GroupLine("e2", t0 + 7200, "Mum", "Done, 9:30 flight booked for Yash")])
+
+    def tearDown(self):
+        self.st.close()
+        self.tmp.cleanup()
+
+    class Fake:
+        name = "fake-model"
+        def __init__(self, closures):
+            self.closures, self.sent = closures, []
+        def ask(self, system, prompt, stdin, schema):
+            self.sent.append(stdin)
+            return schema.model_validate({"closures": self.closures})
+
+    def test_suggests_and_keeps_it_open(self):
+        from spike import closure
+        lines = closure.candidates(self.st, self.papa, self.st.open_items())
+        booked = next(l["id"] for l in lines if "booked" in l["text"])
+        ex = self.Fake([{"item": 1, "evidence": booked, "reason": "Mum booked it"},
+                        {"item": 7, "evidence": booked, "reason": "no such item"},
+                        {"item": 1, "evidence": 99, "reason": "no such line"}])
+        out = closure.run(self.st, ex)
+        self.assertEqual(len(out), 1)
+        item = self.st.people()[0]["commitments"] if self.st.people()[0]["id"] == self.papa else None
+        item = next(c for p in self.st.people() if p["id"] == self.papa for c in p["commitments"])
+        self.assertEqual(item["status"], "open")
+        self.assertIn("9:30 flight booked", item["suggestion"])
+        self.assertNotIn("old line", ex.sent[0])          # before the item: never a candidate
+        self.assertNotIn("secret-1to1-zq", ex.sent[0])    # other 1:1 chats are opt-in
+        self.assertEqual(self.st.disclosures(), ["fake-model"])
+        # Asked once: the next run sends nothing for it.
+        again = self.Fake([])
+        closure.run(self.st, again)
+        self.assertEqual(again.sent, [])
+
+    def test_your_answer_stands_and_sms_beats_a_guess(self):
+        from spike import closure
+        self.st.resolve(self.papa, self.src, "me", "open", "you")
+        ex = self.Fake([{"item": 1, "evidence": 1, "reason": "x"}])
+        closure.run(self.st, ex)
+        self.assertEqual(ex.sent, [])  # you already said: not sent at all
+        self.st.unresolve(self.papa, self.src, "me")
+        self.st.resolve(self.papa, self.src, "me", "done", "sms", evidence="₹950 credited")
+        self.assertFalse(self.st.resolve(self.papa, self.src, "me", "suggested", "closure", evidence="guess"))
+
+    def test_other_chats_when_asked(self):
+        from spike import closure
+        ex = self.Fake([])
+        closure.run(self.st, ex, other_chats=True)
+        self.assertIn("secret-1to1-zq", ex.sent[0])
+        self.assertEqual(sorted(self.st.disclosures()), ["fake-model"])
+
+    def test_old_resolution_table_migrates(self):
+        import sqlite3
+        path = Path(self.tmp.name) / "old.db"
+        c = sqlite3.connect(path)
+        c.executescript("""CREATE TABLE resolution (person_id INTEGER NOT NULL, source_message_id INTEGER NOT NULL,
+            owner TEXT NOT NULL, state TEXT NOT NULL CHECK (state IN ('done', 'dismissed', 'snoozed', 'open')),
+            until REAL, decided_by TEXT NOT NULL, evidence TEXT, evidence_id INTEGER, at REAL NOT NULL,
+            PRIMARY KEY (person_id, source_message_id, owner));
+            INSERT INTO resolution VALUES (1, 1, 'me', 'done', NULL, 'you', NULL, NULL, 0);""")
+        c.commit(); c.close()
+        st = Store(path)
+        st.conn.execute("INSERT INTO resolution VALUES (1, 2, 'me', 'suggested', NULL, 'closure', 'x', NULL, 0)")
+        self.assertEqual(st.conn.execute("SELECT count(*) FROM resolution").fetchone()[0], 2)
+        st.close()
+
+
 IOS_EXPORT = (
     "\u200e[28/10/2026, 19:02:11] Sam Okafor: \u200eMessages and calls are end-to-end encrypted.\n"
     "[28/10/2026, 19:02:11] Sam Okafor: Good seeing you at the dinner\n"
@@ -581,7 +671,13 @@ class WhatsAppExportTest(unittest.TestCase):
         from spike import whatsapp_export as wa
         rows, names, notes = wa.load(self.files, tz="Asia/Kolkata")
         self.assertEqual(sorted(names.values()), ["Ana Torres", "Sam Okafor"])
-        self.assertTrue(any("groups aren't supported" in n for n in notes))
+        self.assertTrue(any("evidence only" in n for n in notes))
+        groups, gnotes = wa.load_groups(self.files, tz="Asia/Kolkata")
+        self.assertEqual(list(groups), ["group"])
+        self.assertEqual([g.sender for g in groups["group"]], ["me", "Sam Okafor", "Priya Nair"])
+        self.assertEqual(wa.chat_name("WhatsApp Chat with Family.txt"), "Family")
+        self.assertEqual(wa.chat_name("Family from WhatsApp/chat.txt"), "Family")
+        self.assertEqual(wa.chat_name("export.zip:_chat.txt"), "export")
         sam = [r for r in rows if r.handle == "export:Sam Okafor"]
         self.assertEqual([r.from_me for r in sam], [False, True, False, True, False])  # system line + image dropped
         self.assertEqual(sam[3].text, "I'll intro you to Priya\nshe built the design team at her last startup")

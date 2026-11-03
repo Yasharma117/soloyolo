@@ -68,6 +68,8 @@
   .c.later .dot { border-style: dashed; }
   .c.gone .what { text-decoration: line-through; text-decoration-color: var(--ink-3); }
   .why { font-size: 12px; color: var(--ok); margin-top: 2px; }
+  .why.maybe { color: var(--ink-2); }
+  .c.open:has(.maybe) .acts { opacity: 1; }
   details.hidden { margin-top: 4px; font-size: 12px; color: var(--ink-3); }
   details.hidden summary { cursor: pointer; padding: 4px 0; }
   #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
@@ -149,6 +151,7 @@ function actions(c) {
   const btn = (state, label, extra = "") => `<button class="act" data-state="${state}" ${extra}>${label}</button>`;
   if (c.dismissed) return btn("clear", "Restore");
   if (c.snoozed) return btn("clear", "Unsnooze");
+  if (c.status === "open" && c.suggestion) return btn("done", "Yes, done") + btn("open", "Still open");
   if (c.status === "open") {
     return btn("done", "Done") + btn("snoozed", "Snooze 3d", 'data-days="3"') + btn("dismissed", "Not real");
   }
@@ -162,7 +165,8 @@ function commitmentRow(c) {
     : c.snoozed ? { text: `snoozed to ${until}`, late: false }
     : c.status === "open" ? dueLabel(c.due) : { text: "done", late: false };
   const why = c.status === "done" && c.resolved_by && c.resolved_by !== "you"
-    ? `<div class="why">Closed by ${BY[c.resolved_by] || esc(c.resolved_by)}${c.evidence ? `: ${esc(c.evidence)}` : ""}</div>` : "";
+    ? `<div class="why">Closed by ${BY[c.resolved_by] || esc(c.resolved_by)}${c.evidence ? `: ${esc(c.evidence)}` : ""}</div>`
+    : c.status === "open" && c.suggestion ? `<div class="why maybe">Maybe settled? ${esc(c.suggestion)}</div>` : "";
   const cls = [c.dismissed ? "gone" : c.snoozed ? "later" : c.status, c.owner === "me" ? "mine" : ""].join(" ");
   return `<div class="c ${cls}" data-src="${c.source_message_id}" data-fin="${c.done_message_id ?? ""}" data-owner="${c.owner}">
     <span class="dot"></span>
@@ -214,7 +218,7 @@ async function refresh() {
   if (current !== null && people.some((p) => p.id === current)) await select(current, { keepScroll: true });
 }
 
-const SAID = { done: "Marked done", dismissed: "Marked not real", snoozed: "Snoozed for 3 days", open: "Reopened", clear: "Undone" };
+const SAID = { done: "Marked done", dismissed: "Marked not real", snoozed: "Snoozed for 3 days", open: "Kept open", clear: "Undone" };
 
 async function mark(row, state, days) {
   const body = { person_id: current, source_message_id: Number(row.dataset.src), owner: row.dataset.owner, state };

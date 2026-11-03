@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS resolution (
   person_id INTEGER NOT NULL REFERENCES person(id),
   source_message_id INTEGER NOT NULL REFERENCES message(id),
   owner TEXT NOT NULL CHECK (owner IN ('me', 'them')),
-  state TEXT NOT NULL CHECK (state IN ('done', 'dismissed', 'snoozed', 'open')),
+  -- suggested: a signal thinks it's settled; it stays open until you say so
+  state TEXT NOT NULL CHECK (state IN ('done', 'dismissed', 'snoozed', 'open', 'suggested')),
   until REAL,                      -- snoozed until (epoch seconds)
   decided_by TEXT NOT NULL,        -- 'you' | 'sms' | 'closure'
   evidence TEXT,                   -- shown to you: what closed it
