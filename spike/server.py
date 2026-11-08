@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from . import priority
 from .store import Store
 
 INDEX = Path(__file__).with_name("viewer.html")
@@ -46,6 +47,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/people":
                 return self._json(store.people())
+            if path == "/api/top":
+                return self._json(priority.rank(store))
             if path == "/api/disclosures":
                 return self._json(store.disclosures())
             m = re.fullmatch(r"/api/thread/(\d+)", path)

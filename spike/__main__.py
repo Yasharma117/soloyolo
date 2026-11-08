@@ -1,13 +1,14 @@
-"""python -m spike {demo,ingest,import-*,extract,close,show,serve}. See spike/README.md."""
+"""python -m spike {demo,ingest,import-*,extract,close,watch,show,top,serve}. See spike/README.md."""
 from __future__ import annotations
 
 import argparse
+import inspect
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
-from . import chatdb, closure, fixture, json_import, sms, whatsapp_export
+from . import chatdb, closure, fixture, json_import, priority, reconcile, sms, whatsapp_export
 from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor
 from .store import Store
 
@@ -55,18 +56,30 @@ def extract(store: Store, kind: str, window: int, only: int | None = None, top: 
             continue
         if getattr(ex, "remote", True):  # unknown extractors are assumed to send text
             store.record_disclosure(pid, ex.name)  # before sending, so a failed call is still on record
+        # A model re-reading a chat sees what it found last time, so the list doesn't flicker
+        # (spike/reconcile.py). The heuristic gives the same answer every time and just replaces.
+        prior = store.items(pid) if _takes_prior(ex) else []
         try:
-            result = ex.extract(thread)
+            result = ex.extract(thread, prior=prior) if prior else ex.extract(thread)
         except Exception as err:  # keep going; rerun with --person to retry one
             failed += 1
             print(f"person {pid}: failed, kept previous results ({str(err)[:160]})", file=sys.stderr)
             continue
-        store.replace_extraction(pid, [c.model_dump() for c in result.commitments], result.topics, ex.name,
-                                 last_message_id=max(m["id"] for m in thread))
-        print(f"person {pid}: {len(result.commitments)} commitments ({ex.name})")
+        m = reconcile.merge(prior, result, store.decided_by_you(pid))
+        for old, new in m.rekeys:
+            store.rekey(pid, old, new)
+        store.replace_extraction(pid, m.items, result.topics, ex.name, last_message_id=max(r["id"] for r in thread))
+        churn = f"; kept {m.kept}, carried {m.carried}, dropped {len(m.dropped)}, new {m.new}" if prior else ""
+        print(f"person {pid}: {len(m.items)} commitments ({ex.name}{churn})")
+        for old, why in m.dropped:
+            print(f"  dropped: {old['action']} ({why})")
     if failed:
         print(f"{failed} failed; rerun `extract --person <id>` for each", file=sys.stderr)
     return failed
+
+
+def _takes_prior(ex) -> bool:
+    return "prior" in inspect.signature(ex.extract).parameters
 
 
 def watch(store: Store, a) -> int:
@@ -119,6 +132,14 @@ def show(store: Store) -> None:
             print(f"  {mark} {who}{asked}: {c['action']}{due}{why}{maybe}")
         if p["hidden"]:
             print(f"  ({p['hidden']} marked not real)")
+
+
+def top(store: Store, n: int) -> None:
+    items = priority.rank(store)
+    print(f"{len(items)} open; the first {min(n, len(items))}:")
+    for k, c in enumerate(items[:n], start=1):
+        who = "you owe" if c["owner"] == "me" else "waiting on"
+        print(f"{k:>3}. {c['name']}: {who}: {c['action']}  ({', '.join(c['reasons'])})")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -181,6 +202,8 @@ def main(argv: list[str] | None = None) -> int:
     wt.add_argument("--once", action="store_true", help="one pass, then exit")
 
     sub.add_parser("show", help="print people and what each side owes")
+    t = sub.add_parser("top", help="every open item in one list, what to do first at the top, with why")
+    t.add_argument("-n", type=int, default=15)
     s = sub.add_parser("serve", help="open the local viewer")
     s.add_argument("--port", type=int, default=8765)
 
@@ -238,6 +261,8 @@ def main(argv: list[str] | None = None) -> int:
             return watch(store, a)
         elif a.cmd == "show":
             show(store)
+        elif a.cmd == "top":
+            top(store, a.n)
         elif a.cmd == "serve":
             from .server import serve
             serve(a.db, a.port)

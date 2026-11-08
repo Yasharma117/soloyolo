@@ -89,6 +89,12 @@
   .b.fin { outline: 2px solid var(--ok); outline-offset: 2px; }
   .b.flash { animation: flash 1.2s ease-out; }
   @keyframes flash { from { box-shadow: 0 0 0 8px var(--accent-soft); } to { box-shadow: 0 0 0 0 transparent; } }
+  .person.first .name { color: var(--accent-text); }
+  .who { font-weight: 600; margin-right: 6px; }
+  .reasons { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .reason { font-size: 11px; color: var(--ink-2); background: var(--bg); border-radius: 4px; padding: 0 6px; }
+  .reason.hot { color: var(--accent-text); background: var(--accent-soft); }
+  .more { font: inherit; font-size: 13px; color: var(--ink-2); background: none; border: 0; padding: 8px 0; cursor: pointer; text-decoration: underline; }
   .foot { padding: 10px 20px; border-top: 1px solid var(--line); font-size: 11px; color: var(--ink-3); }
   @media (max-width: 760px) {
     .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; }
@@ -131,13 +137,16 @@ const openMine = (p) => p.commitments.filter((c) => c.owner === "me" && live(c))
 const openTheirs = (p) => p.commitments.filter((c) => c.owner === "them" && live(c));
 const BY = { you: "you", sms: "a bank SMS", closure: "a message in another chat" };
 
-let people = [], current = null, cachedThread = { id: null, rows: [] }, toastTimer = null;
+let people = [], ranked = [], showAll = false, current = null, cachedThread = { id: null, rows: [] }, toastTimer = null;
 
 function renderList() {
   const owed = people.reduce((n, p) => n + openMine(p).length, 0);
   const waiting = people.reduce((n, p) => n + openTheirs(p).length, 0);
   $("#summary").textContent = `${people.length} people · you owe ${owed} · waiting on ${waiting}`;
-  $("#list").innerHTML = people.map((p) => {
+  const first = `<button class="person first" role="listitem" data-id="top" aria-current="${current === "top"}">
+      <div class="row1"><span class="name">Do first</span><span class="when">${ranked.length} open</span></div>
+      <div class="hint">${ranked.length ? esc(ranked[0].action) : "Nothing open."}</div></button>`;
+  $("#list").innerHTML = first + people.map((p) => {
     const mine = openMine(p)[0], theirs = openTheirs(p)[0];
     const hint = mine ? `<div class="hint owe">You owe: ${esc(mine.action)}</div>`
       : theirs ? `<div class="hint">Waiting on: ${esc(theirs.action)}</div>`
@@ -159,7 +168,7 @@ function actions(c) {
   return btn("open", "Not done");  // closed by the extractor or a signal; you can disagree
 }
 
-function commitmentRow(c) {
+function commitmentRow(c, ranked = false) {
   const until = c.snoozed ? new Date(c.snoozed_until * 1000).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "";
   const label = c.dismissed ? { text: "not real", late: false }
     : c.snoozed ? { text: `snoozed to ${until}`, late: false }
@@ -168,22 +177,42 @@ function commitmentRow(c) {
     ? `<div class="why">Closed by ${BY[c.resolved_by] || esc(c.resolved_by)}${c.evidence ? `: ${esc(c.evidence)}` : ""}</div>`
     : c.status === "open" && c.suggestion ? `<div class="why maybe">Maybe settled? ${esc(c.suggestion)}</div>` : "";
   const cls = [c.dismissed ? "gone" : c.snoozed ? "later" : c.status, c.owner === "me" ? "mine" : ""].join(" ");
-  return `<div class="c ${cls}" data-src="${c.source_message_id}" data-fin="${c.done_message_id ?? ""}" data-owner="${c.owner}">
+  const who = ranked ? `<span class="who">${esc(c.name)}</span>${c.owner === "me" ? "" : "owes you: "}` : "";
+  const reasons = ranked && c.reasons.length
+    ? `<div class="reasons">${c.reasons.map((r) => `<span class="reason ${HOT.test(r) ? "hot" : ""}">${esc(r)}</span>`).join("")}</div>` : "";
+  return `<div class="c ${cls}" data-src="${c.source_message_id}" data-fin="${c.done_message_id ?? ""}" data-owner="${c.owner}"${ranked ? ` data-pid="${c.person_id}"` : ""}>
     <span class="dot"></span>
-    <span class="what">${esc(c.action)}${c.kind === "ask" ? `<span class="kind" title="Asked, no yes or no yet">asked</span>` : ""}${why}</span>
-    <span class="due ${label.late ? "late" : ""}">${label.text}</span>
+    <span class="what">${who}${esc(c.action)}${c.kind === "ask" ? `<span class="kind" title="Asked, no yes or no yet">asked</span>` : ""}${why}${reasons}</span>
+    <span class="due ${label.late ? "late" : ""}">${ranked ? "" : label.text}</span>
     <span class="acts">${actions(c)}</span></div>`;
 }
 
 function section(title, items) {
   const shown = items.filter((c) => !c.dismissed), gone = items.filter((c) => c.dismissed);
-  return `<section><h3>${title}</h3>${shown.map(commitmentRow).join("") || `<div class="empty">Nothing.</div>`}
-    ${gone.length ? `<details class="hidden"><summary>${gone.length} marked not real</summary>${gone.map(commitmentRow).join("")}</details>` : ""}</section>`;
+  return `<section><h3>${title}</h3>${shown.map((c) => commitmentRow(c)).join("") || `<div class="empty">Nothing.</div>`}
+    ${gone.length ? `<details class="hidden"><summary>${gone.length} marked not real</summary>${gone.map((c) => commitmentRow(c)).join("")}</details>` : ""}</section>`;
 }
 
-async function select(id, { keepScroll = false } = {}) {
+const HOT = /^(overdue|due)/;
+
+function renderTop({ keepScroll = false } = {}) {
+  const scroll = $("main").scrollTop;
+  const shown = showAll ? ranked : ranked.slice(0, 15);
+  const n = new Set(ranked.map((c) => c.person_id)).size;
+  $("#detail").innerHTML = `
+    <h2>Do first</h2>
+    <div class="meta">${ranked.length} open across ${n} ${n === 1 ? "person" : "people"}. Sorted by what's due, how long it has waited,
+      money, whose move it is and how close you are. The reasons are on each.</div>
+    <section>${shown.map((c) => commitmentRow(c, true)).join("") || `<div class="empty">Nothing open.</div>`}
+    ${ranked.length > shown.length ? `<button class="more" id="all">Show all ${ranked.length}</button>` : ""}</section>`;
+  $("main").scrollTop = keepScroll ? scroll : 0;
+  const all = $("#all"); if (all) all.onclick = () => { showAll = true; renderTop({ keepScroll: true }); };
+}
+
+async function select(id, { keepScroll = false, focus = null } = {}) {
   current = id;
   renderList();
+  if (id === "top") return renderTop({ keepScroll });
   const p = people.find((x) => x.id === id);
   if (cachedThread.id !== id) {
     const rows = await (await fetch(`/api/thread/${id}`)).json();
@@ -210,12 +239,24 @@ async function select(id, { keepScroll = false } = {}) {
     ${section("Waiting on them", p.commitments.filter((c) => c.owner === "them"))}
     <section><h3>Thread</h3><div class="thread">${bubbles}</div></section>`;
   $("main").scrollTop = keepScroll ? scroll : 0;
+  if (focus) jump(focus);
+}
+
+function jump(msgId) {
+  const el = document.getElementById("m" + msgId);
+  if (!el) return;
+  el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+  el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+}
+
+async function load() {
+  [people, ranked] = await Promise.all([fetch("/api/people").then((r) => r.json()), fetch("/api/top").then((r) => r.json())]);
 }
 
 async function refresh() {
-  people = await (await fetch("/api/people")).json();
+  await load();
   renderList();
-  if (current !== null && people.some((p) => p.id === current)) await select(current, { keepScroll: true });
+  if (current === "top" || (current !== null && people.some((p) => p.id === current))) await select(current, { keepScroll: true });
 }
 
 const SAID = { done: "Marked done", dismissed: "Marked not real", snoozed: "Snoozed for 3 days", open: "Kept open", clear: "Undone" };
@@ -239,19 +280,22 @@ function toast(text, undo) {
   toastTimer = setTimeout(() => { t.hidden = true; }, 6000);
 }
 
-$("#list").addEventListener("click", (e) => { const b = e.target.closest(".person"); if (b) select(Number(b.dataset.id)); });
+$("#list").addEventListener("click", (e) => {
+  const b = e.target.closest(".person"); if (b) select(b.dataset.id === "top" ? "top" : Number(b.dataset.id));
+});
 $("#detail").addEventListener("click", (e) => {
   const act = e.target.closest(".act");
-  if (act) return mark(act.closest(".c"), act.dataset.state, act.dataset.days ? Number(act.dataset.days) : undefined);
+  if (act) {
+    const row = act.closest(".c");
+    return mark(row, act.dataset.state, act.dataset.days ? Number(act.dataset.days) : undefined,
+                row.dataset.pid ? Number(row.dataset.pid) : current);
+  }
   const c = e.target.closest(".c"); if (!c) return;
-  const el = document.getElementById("m" + (c.dataset.fin || c.dataset.src));
-  if (!el) return;
-  el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
-  el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  if (c.dataset.pid) return select(Number(c.dataset.pid), { focus: c.dataset.src });  // from Do first: open the chat at it
+  jump(c.dataset.fin || c.dataset.src);
 });
 
-fetch("/api/people").then((r) => r.json()).then((data) => {
-  people = data;
+load().then(() => {
   // From the disclosure log (written before any text is sent, never cleared), not from whichever
   // extractor ran last: a later local run must not hide that text was sent earlier.
   fetch("/api/disclosures").then((r) => r.json()).then((sentTo) => {
@@ -259,8 +303,7 @@ fetch("/api/people").then((r) => r.json()).then((data) => {
       ? `Served from 127.0.0.1 · thread text has been sent to ${sentTo.join(", ")} for extraction`
       : "Local only · 127.0.0.1 · no thread text has been sent anywhere from this store";
   });
-  renderList();
-  if (people.length) select(people[0].id); else $("#detail").innerHTML = `<p class="empty">No messages yet. Run <code>python -m spike ingest</code>.</p>`;
+  if (people.length) select("top"); else $("#detail").innerHTML = `<p class="empty">No messages yet. Run <code>python -m spike ingest</code>.</p>`;
 });
 </script>
 </body>

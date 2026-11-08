@@ -93,6 +93,28 @@ WhatsApp's terms don't cover third-party clients, so an account ban is possible.
 since soloyolo never sends anything. The device keys in `~/.soloyolo/accounts` can read your WhatsApp, so treat
 that folder like your phone.
 
+### What to do first
+
+```bash
+python -m spike top          # or open `serve`: "Do first" is the first screen
+```
+
+Every open item across every chat goes into one list, best first, and each item shows why it ranks where it
+does: *overdue 3d · money · they wrote last*. Ranking is local and adds up visible points: your move over
+theirs, due soon or just overdue, 3 to 21 days old (the ones that slip), money, an unanswered last message, and
+how close you are. Six weeks overdue counts for little, a "maybe settled" item sinks, and each item ranks a
+little lower for every item above it from the same chat. The weights and their reasons are at the top of
+`priority.py`. On the live store, 57 open items fit on one screen with the urgent ones on top.
+
+### A list that holds still
+
+A model reading the same chat twice gives two slightly different lists. When a chat changes and is read again,
+the earlier items go with it as `[P1]`, `[P2]`.... The model returns each one it still holds, and names any
+that were never real, with a reason. An item it forgets is carried over unchanged, because forgetting is not a
+reason. Your marks always stand and follow the item if it's re-cited from a different message.
+On six live chats read twice from the same input, the open list went from 76% the same to 97% the same
+(`eval/RESULTS.md`, run 5).
+
 ### Closing what the chats don't show
 
 In the first real test, 6 of 19 items were already done somewhere a chat can't show: a UPI app, a call, a group
@@ -164,10 +186,12 @@ items. Below that, the thesis is weak: ranking by message counts (what Mesh does
 - **iMessage, and WhatsApp exports only.** The spike reads `chat.db` and WhatsApp "Export chat" files; live
   WhatsApp sync goes through `connectord` (the Go daemon), which writes to the same model.
 - **No contact names** from Apple Contacts yet; people show as phone numbers or emails outside the demo.
-- **Reads the last 300 messages per person.** Older promises are out of scope.
+- **Reads the last 60 days per person, at most 1000 messages.** Older promises are out of scope, except items
+  already found, which are carried until they're done or dropped with a reason.
 - **Each thread is read alone for new items.** Family logistics often close in a group chat; `close` can
   suggest those, but only you can close them.
-- **Marks follow the message an item came from.** If a re-extraction cites a different message for the same
-  item (the request instead of the "On it"), your mark won't carry over to it.
+- **Marks follow the message an item came from, and one message can hold two items.** A re-read that cites a
+  new message for the same item takes your mark with it, but two items from one message share one mark.
 - **Asks are judged on text alone.** A reply in another app, or on a call, won't close one.
-- **Re-extraction replaces the person's commitments**, so manual edits wouldn't survive it. There are no manual edits yet.
+- **Ranking weights are a first guess**, set by eye on one person's data. They're written down to be argued
+  with, not tuned.

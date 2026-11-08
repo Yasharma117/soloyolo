@@ -101,6 +101,27 @@ class Store:
                 (person_id, extractor, time.time(), last_message_id),
             )
 
+    def items(self, person_id: int) -> list[dict]:
+        """This person's extracted items as stored (before resolutions), oldest first, with source time and text."""
+        return [dict(r) for r in self.conn.execute(
+            "SELECT c.kind, c.owner, c.action, c.due, c.status, c.source_message_id, c.done_message_id,"
+            " m.ts AS source_ts, m.text AS source_text FROM commitment c JOIN message m ON m.id = c.source_message_id"
+            " WHERE c.person_id = ? ORDER BY m.ts, c.id", (person_id,))]
+
+    def decided_by_you(self, person_id: int) -> set[tuple[int, str]]:
+        return {(r[0], r[1]) for r in self.conn.execute(
+            "SELECT source_message_id, owner FROM resolution WHERE person_id = ? AND decided_by = 'you'", (person_id,))}
+
+    def rekey(self, person_id: int, old: tuple[int, str], new: tuple[int, str]) -> None:
+        """A re-read cited a different message (or owner) for the same item: its marks follow it.
+        If the new key already has a mark, the older mark loses: one item, one decision."""
+        with self.conn:
+            self.conn.execute(
+                "UPDATE OR IGNORE resolution SET source_message_id = ?, owner = ?"
+                " WHERE person_id = ? AND source_message_id = ? AND owner = ?", (*new, person_id, *old))
+            self.conn.execute("DELETE FROM resolution WHERE person_id = ? AND source_message_id = ? AND owner = ?",
+                              (person_id, *old))
+
     # --- resolutions: what happened to an item after extraction -----------------------------
     STATES = ("done", "dismissed", "snoozed", "open", "suggested")
     RANK = {"closure": 0, "sms": 1, "you": 2}  # who may overwrite whom: you > a bank SMS > a guess

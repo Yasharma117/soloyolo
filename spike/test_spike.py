@@ -841,3 +841,143 @@ class JsonImportTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StabilityTest(unittest.TestCase):
+    """A re-read sees the earlier items; an item leaves only for a stated reason, and marks follow it."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.st = Store(Path(self.tmp.name) / "s.db")
+        Msg = type("M", (), {})
+        rows = []
+        now = time.time()
+        for i, (me, text) in enumerate([(0, "Can you send the lease and the deposit receipt?"), (1, "Sure, both tonight"),
+                                         (0, "Also call the plumber"), (1, "Will do")]):
+            m = Msg(); m.guid, m.handle, m.ts, m.from_me, m.text = f"g{i}", "sam", now - 86400 * (4 - i), bool(me), text
+            rows.append(m)
+        self.st.add_messages("x", rows, {"sam": "Sam"})
+        self.pid = self.st.person_ids()[0]
+        self.ids = [m["id"] for m in self.st.thread(self.pid)]
+
+    def tearDown(self):
+        self.st.close()
+        self.tmp.cleanup()
+
+    def c(self, action, src, previous=None, status="open", done=None):
+        return Commitment(kind="promise", owner="me", action=action, due=None, status=status,
+                          source_message_id=src, done_message_id=done, previous=previous)
+
+    def run_with(self, *results):
+        from spike.__main__ import extract
+        seen = []
+
+        class Fake(HeuristicExtractor):
+            remote = False
+
+            def extract(self, thread, prior=None):
+                seen.append(prior)
+                return results[len(seen) - 1]
+        ex = Fake()
+        for _ in results:
+            with mock.patch("sys.stdout"):
+                extract(self.st, "heuristic", 1000, only=self.pid, ex=ex)
+        return seen
+
+    def actions(self):
+        return sorted(c["action"] for c in self.st.people()[0]["commitments"])
+
+    def test_forgotten_item_is_carried_and_two_items_from_one_message_both_stay(self):
+        lease, receipt, plumber = (self.c("Send the lease", self.ids[1]), self.c("Send the deposit receipt", self.ids[1]),
+                                   self.c("Call the plumber", self.ids[3]))
+        seen = self.run_with(Extraction(commitments=[lease, receipt, plumber], topics=[]),
+                             Extraction(commitments=[self.c("Send the lease", self.ids[1], "P1")], topics=[]))
+        self.assertIsNone(seen[0])
+        self.assertEqual([p["action"] for p in seen[1]], ["Send the lease", "Send the deposit receipt", "Call the plumber"])
+        self.assertEqual(self.actions(), ["Call the plumber", "Send the deposit receipt", "Send the lease"])
+
+    def test_dropped_needs_a_reason_and_never_beats_your_mark(self):
+        from spike.extract import Dropped
+        first = Extraction(commitments=[self.c("Send the lease", self.ids[1]), self.c("Call the plumber", self.ids[3])],
+                           topics=[])
+        self.run_with(first)
+        self.st.resolve(self.pid, self.ids[3], "me", "open", "you")  # you said: still open
+        drop_both = Extraction(commitments=[], topics=[], dropped=[Dropped(previous="P1", reason="a joke"),
+                                                                   Dropped(previous="P2", reason="a joke")])
+        self.run_with(drop_both)
+        self.assertEqual(self.actions(), ["Call the plumber"])
+
+    def test_your_mark_follows_an_item_to_a_new_source(self):
+        self.run_with(Extraction(commitments=[self.c("Call the plumber", self.ids[3])], topics=[]))
+        self.st.resolve(self.pid, self.ids[3], "me", "done", "you")
+        self.run_with(Extraction(commitments=[self.c("Call the plumber", self.ids[2], "P1")], topics=[]))
+        item = self.st.people()[0]["commitments"][0]
+        self.assertEqual((item["source_message_id"], item["status"], item["resolved_by"]), (self.ids[2], "done", "you"))
+
+    def test_checked_keeps_an_aged_out_source_only_for_a_known_earlier_item(self):
+        from spike.extract import _checked
+        thread = [dict(id=self.ids[3])]
+        prior = [dict(owner="me", action="Send the lease", status="done", source_message_id=self.ids[1],
+                      done_message_id=self.ids[2])]
+        out = _checked(Extraction(commitments=[self.c("Send the lease", self.ids[1], "P1", "done", self.ids[2]),
+                                               self.c("Invented", self.ids[0], "P9")], topics=[]), thread, prior)
+        self.assertEqual([(c.action, c.status, c.previous) for c in out.commitments], [("Send the lease", "done", "P1")])
+
+    def test_prompt_shows_earlier_items_with_ids(self):
+        from spike.extract import _stdin
+        prior = [dict(owner="me", kind="promise", action="Send the lease", status="open", due=None,
+                      source_message_id=7, source_ts=time.time(), source_text="Sure, both tonight")]
+        text = _stdin([dict(id=7, ts=time.time(), from_me=1, text="Sure, both tonight")], prior)
+        self.assertIn("[P1] owner=me promise: Send the lease", text)
+        self.assertLess(text.index("<earlier_items>"), text.index("<thread>"))
+
+
+class PriorityTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.st = Store(Path(self.tmp.name) / "s.db")
+        self.now = time.time()
+        Msg = type("M", (), {})
+        rows = []
+        for who, n in (("dad", 12), ("ravi", 12), ("shop", 2)):
+            for i in range(n):
+                m = Msg(); m.guid, m.handle, m.ts, m.from_me, m.text = f"{who}{i}", who, self.now - 86400 * (n - i), i % 2 == 0, f"{who} {i}"
+                rows.append(m)
+        self.st.add_messages("x", rows, {"dad": "Dad", "ravi": "Ravi", "shop": "Shop"})
+        self.pids = {p["name"]: p["id"] for p in self.st.people()}
+
+    def tearDown(self):
+        self.st.close()
+        self.tmp.cleanup()
+
+    def put(self, name, *items):
+        thread = self.st.thread(self.pids[name])
+        self.st.replace_extraction(self.pids[name], [
+            dict(kind="promise", owner=o, action=a, due=due, status="open", source_message_id=thread[k]["id"])
+            for o, a, due, k in items], [], "heuristic")
+
+    def test_due_and_your_move_first_with_reasons(self):
+        from datetime import date, timedelta
+        from spike import priority
+        tomorrow = (date.today() + timedelta(days=1)).isoformat()
+        long_ago = (date.today() - timedelta(days=40)).isoformat()
+        self.put("Dad", ("me", "Send Dad ₹950", None, 3), ("them", "Book the cab", None, 5))
+        self.put("Ravi", ("me", "Send Ravi the deck", tomorrow, 10), ("me", "Wish Ravi happy birthday", long_ago, 0))
+        self.put("Shop", ("them", "Deliver the sofa", None, 0))
+        ranked = priority.rank(self.st, self.now)
+        self.assertEqual(ranked[0]["action"], "Send Ravi the deck")
+        self.assertIn("due tomorrow", ranked[0]["reasons"])
+        self.assertIn("money", ranked[1]["reasons"])
+        order = [c["action"] for c in ranked]
+        self.assertLess(order.index("Send Dad ₹950"), order.index("Book the cab"))  # your move first
+        self.assertEqual(order[-1], "Deliver the sofa")  # theirs, old, a stranger
+
+    def test_maybe_settled_sinks_and_one_chat_cannot_fill_the_top(self):
+        from spike import priority
+        self.put("Dad", *[("me", f"Fix bug {n}", None, 6) for n in range(6)])
+        self.put("Ravi", ("me", "Send Ravi the deck", None, 6))
+        self.assertLess([c["action"] for c in priority.rank(self.st, self.now)].index("Send Ravi the deck"), 3)
+        src = self.st.thread(self.pids["Ravi"])[6]["id"]
+        self.st.resolve(self.pids["Ravi"], src, "me", "suggested", "closure", evidence="group: done")
+        last = priority.rank(self.st, self.now)[-1]
+        self.assertEqual((last["action"], last["reasons"][-1]), ("Send Ravi the deck", "maybe settled"))

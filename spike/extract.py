@@ -36,11 +36,20 @@ class Commitment(BaseModel):
     status: Literal["open", "done"]
     source_message_id: int = Field(description="id of the message where it was promised or asked")
     done_message_id: Optional[int] = Field(description="id of the message showing it was done, else null")
+    previous: Optional[str] = Field(default=None,
+                                    description="the [P#] id when this is an item from earlier_items, else null")
+
+
+class Dropped(BaseModel):
+    previous: str = Field(description="the [P#] id of an earlier item that was never a real item")
+    reason: str = Field(description="why it isn't one, under 15 words")
 
 
 class Extraction(BaseModel):
     commitments: list[Commitment]
     topics: list[str] = Field(description="Up to 4 recurring subjects of this relationship, 1-3 words each")
+    dropped: list[Dropped] = Field(default_factory=list,
+                                   description="earlier items that were never real items; empty when none")
 
 
 CALL = "[call]"  # a logged call (spike.whatsapp_export): it happened, direction unknown
@@ -98,7 +107,7 @@ class HeuristicExtractor:
     name = "heuristic"
     remote = False  # never sends text anywhere
 
-    def extract(self, thread: Sequence) -> Extraction:
+    def extract(self, thread: Sequence) -> Extraction:  # deterministic: same thread, same answer; no prior
         out, accepted = self._asks(thread)
         for i, m in enumerate(thread):
             hit = _PROMISE.search(m["text"])
@@ -175,19 +184,51 @@ clearly implied (resolve relative dates against the message timestamp), and whet
 done. A promise is done when a later message shows it was delivered; "(a call between us)" lines are calls
 that happened, so a promised call is done by the next one. An ask is done when it was fulfilled or, if
 it asked for information or an update, answered. Cite message ids from the [id] prefixes. Also give up to 4
-recurring topics. Return an empty list when there is nothing."""
+recurring topics. Return an empty list when there is nothing.
+
+You may also get <earlier_items>: what an earlier read of this thread found, each with a [P#] id, its status then,
+and the message it came from (which may be older than the thread you now see). Return each earlier item that is
+still a real item, with its [P#] id in previous, keeping its source message unless it was clearly wrong; update its
+status if a message now shows it done, and change nothing else without a reason in the thread. Put an earlier item in
+dropped only if, by the rules above, it was never a real item. Age is not a reason: an old promise nobody kept is
+still owed. Items not in earlier_items are new: previous is null."""
+
+
+def render_prior(prior: Sequence[dict]) -> str:
+    """Earlier items as the model sees them: [P1].. in order, with the message each came from."""
+    out = ["<earlier_items>"]
+    for n, c in enumerate(prior, start=1):
+        when = datetime.fromtimestamp(c["source_ts"]).strftime("%Y-%m-%d") if c.get("source_ts") else "?"
+        status = f"done (by [{c['done_message_id']}])" if c["status"] == "done" and c.get("done_message_id") else c["status"]
+        due = f" due={c['due']}" if c.get("due") else ""
+        out.append(f"[P{n}] owner={c['owner']} {c.get('kind', 'promise')}: {c['action']}{due} | status: {status}"
+                   f" | from message [{c['source_message_id']}] on {when}: {(c.get('source_text') or '')[:200]}")
+    out.append("</earlier_items>")
+    return "\n".join(out)
+
+
+def _stdin(thread: Sequence, prior: Sequence[dict] | None) -> str:
+    return (render_prior(prior) + "\n" if prior else "") + f"<thread>\n{render(thread)}\n</thread>"
 
 
 def _today() -> str:
     return datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d")
 
 
-def _checked(result: Extraction, thread: Sequence) -> Extraction:
-    """Never trust a citation the thread doesn't contain."""
+def _checked(result: Extraction, thread: Sequence, prior: Sequence[dict] | None = None) -> Extraction:
+    """Never trust a citation the thread doesn't contain. An earlier item may keep a source that has
+    aged out of the thread: it was checked when it was found."""
     valid = {m["id"] for m in thread}
-    result.commitments = [c for c in result.commitments if c.source_message_id in valid]
+    labels = {f"P{n}": c for n, c in enumerate(prior or [], start=1)}
     for c in result.commitments:
-        if c.done_message_id not in valid:
+        if c.previous not in labels:
+            c.previous = None
+    result.commitments = [c for c in result.commitments if c.source_message_id in valid
+                          or (c.previous and c.source_message_id == labels[c.previous]["source_message_id"])]
+    result.dropped = [d for d in result.dropped if d.previous in labels]
+    for c in result.commitments:
+        kept = c.previous and c.done_message_id == labels[c.previous].get("done_message_id")
+        if c.done_message_id not in valid and not kept:
             c.done_message_id = None
         if c.done_message_id is None and c.status == "done":
             c.status = "open"  # "done" must point at the message that shows it
@@ -214,10 +255,10 @@ class ClaudeCodeExtractor:
         self.name = f"{model} (claude code)"
         self.model, self.effort, self.timeout = model, effort, timeout
 
-    def extract(self, thread: Sequence) -> Extraction:
+    def extract(self, thread: Sequence, prior: Sequence[dict] | None = None) -> Extraction:
         result = self.ask(SYSTEM, f"Today is {_today()}. List the promises and asks in the thread on stdin.",
-                          f"<thread>\n{render(thread)}\n</thread>", Extraction)
-        return _checked(result, thread)
+                          _stdin(thread, prior), Extraction)
+        return _checked(result, thread, prior)
 
     def ask(self, system: str, prompt: str, stdin: str, schema: type[BaseModel]) -> BaseModel:
         """One structured call. The private text goes on stdin; the prompt in argv carries none."""
@@ -256,9 +297,9 @@ class ClaudeExtractor:
         self.name = model
         self.effort = effort
 
-    def extract(self, thread: Sequence) -> Extraction:
-        result = self.ask(SYSTEM, f"Today is {_today()}.", f"<thread>\n{render(thread)}\n</thread>", Extraction)
-        return _checked(result, thread)
+    def extract(self, thread: Sequence, prior: Sequence[dict] | None = None) -> Extraction:
+        result = self.ask(SYSTEM, f"Today is {_today()}.", _stdin(thread, prior), Extraction)
+        return _checked(result, thread, prior)
 
     def ask(self, system: str, prompt: str, stdin: str, schema: type[BaseModel]) -> BaseModel:
         response = self.client.beta.messages.parse(

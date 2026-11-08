@@ -1,5 +1,24 @@
 # Extraction eval: results
 
+## Run 5 (2026-11-08): does the list hold still?
+
+On the live store (the user's own WhatsApp, linked), with the six chats that had the most items. Each was read
+twice from the same input the old way (fresh each time), and twice the new way (the second read sees the first
+read's items as `[P1]`... and must give a reason to drop one). Items are matched by source message and owner,
+then by wording.
+
+| | All items the same | Open items the same (what you see) | Open-vs-done flips |
+|---|---|---|---|
+| Old: two fresh reads | 84 / 99 (85%) | 25 / 33 (**76%**) | 2 |
+| New: re-read with earlier items | 109 / 109 (100%) | 33 / 34 (**97%**) | 1 |
+
+In the new reads, the model kept every earlier item it was shown, dropped one with a stated reason (a "Yes" that
+only acknowledged feedback), and forgot none: the carry-over safety net was never needed. Against the store's
+earlier read, made before the newest messages arrived, the new way kept 94% of the open list and a fresh read 68%.
+
+What it doesn't fix: a wrong item that got in stays in until you tap **Not real**. Stability makes the list
+trustworthy as a list. It doesn't make each item right. The 6 ❌ from run 3 still need your taps.
+
 ## Run 4 (2026-11-04): closing what chats don't show
 
 Built from run 3's six ❌, then checked against the same 19 items the user scored. The scores are kept
