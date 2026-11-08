@@ -1,5 +1,28 @@
 # Extraction eval: results
 
+## Run 6 (2026-11-08): the ranked list, scored by the user. Right items, wrong moment
+
+The top 15 of "Do first" on the live store, scored by the user against today's reality. The question this
+time was not "was it a real item?" but "is it still something to do?"
+
+| What the user said | Items | Age when shown |
+|---|---|---|
+| Real and still to do (due today; done that day) | 1 | 1 day |
+| Real, done since, off-chat (UPI, in person, never mentioned in chat) | 9 | 2–39 days |
+| Real, no longer needed (recovered, plan dropped, place not needed) | 3 | 14–39 days |
+| Real, ignored on purpose, or settled in another chat | 2 | 7–12 days |
+| Not relevant | 1 | 36 days |
+| **Misread: not a real item** | **0** | |
+
+(The user split the one item counted twice above, "was needed, now moot", across both rows. 15 in all.)
+
+**What it means.** Extraction is fine: no item was a misreading. Assuming an item stays open until a chat
+says it's done is wrong. Most real promises finish where the chat can't see: a UPI app, a visit, a call. Nobody
+writes "done" back, and the user said so plainly: "it was not necessary to update the chat". Even the
+2-to-9-day-old items were mostly done. The one useful item was 1 day old. So the useful window is days, not
+weeks, and a backlog of open items (57, 42 after these marks, 36 of them over two weeks old) is mostly a
+record of things already finished.
+
 ## Run 5 (2026-11-08): does the list hold still?
 
 On the live store (the user's own WhatsApp, linked), with the six chats that had the most items. Each was read
