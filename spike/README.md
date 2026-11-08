@@ -41,6 +41,16 @@ notices and stickers are dropped. Photos, videos, documents, voice notes and log
 because "send me the pic" is done by the photo and "I'll call you back" by the call. With 2+ chats it works out which sender is you; with one, add
 `--me "Your Name"`. Re-importing a newer export of the same chat only adds new messages.
 
+From LinkedIn (no API, no login: its own data export). On the desktop site, **Me → Settings & Privacy → Data
+privacy → Get a copy of your data → Download larger data archive**; the emailed zip arrives within a day:
+
+```bash
+python -m spike import-linkedin ~/Downloads/Complete_LinkedInDataExport_*.zip
+```
+
+1:1 threads become messages, group threads evidence, and connections people with company, position and email.
+Format notes and what's unverified: `docs/LINKEDIN.md`.
+
 Or from your own Messages history (macOS; give your terminal Full Disk Access first):
 
 ```bash

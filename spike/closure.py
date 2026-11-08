@@ -85,7 +85,7 @@ def candidates(store, person_id: int, items: list[dict], now: float | None = Non
     by_address = {a: n for a, n in store.conn.execute(
         "SELECT h.address, p.display_name FROM handle h JOIN person p ON p.id = h.person_id")}
     for r in store.conn.execute(
-            "SELECT id, source, ts, sender, text FROM evidence WHERE source LIKE 'whatsapp-group:%'"
+            "SELECT id, source, ts, sender, text FROM evidence WHERE source LIKE '%-group:%'"  # every network's groups
             " AND ts > ? AND ts <= ? ORDER BY ts", (since, until)):
         lines.append(dict(ts=r["ts"], chat=r["source"].split(":", 1)[1] + " (group)",
                           speaker=by_address.get(r["sender"], r["sender"]),

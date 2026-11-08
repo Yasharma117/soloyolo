@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import chatdb, closure, fixture, json_import, nudge, priority, reconcile, sms, whatsapp_export
+from . import chatdb, closure, fixture, json_import, linkedin_export, nudge, priority, reconcile, sms, whatsapp_export
 from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor
 from .store import Store
 
@@ -173,6 +173,10 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--tz", help="the phone's time zone, e.g. Asia/Kolkata (default: this machine's)")
     w.add_argument("--date-order", choices=["dmy", "mdy", "ymd"], help="override date order detection")
 
+    li = sub.add_parser("import-linkedin", help="import a LinkedIn data export (.zip or unzipped folder)")
+    li.add_argument("paths", nargs="+", type=Path, help="the export; pass both parts of a two-part export")
+    li.add_argument("--me", help="your profile URL, when it can't be inferred")
+
     j = sub.add_parser("import-json", help="import conversations from a JSON file (format in spike/json_import.py)")
     j.add_argument("file", type=Path)
 
@@ -254,6 +258,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{store.add_messages('whatsapp', rows, names)} new messages from {len(names)} chats")
             for name, lines in groups.items():
                 store.add_evidence(f"whatsapp-group:{name}", lines)
+        elif a.cmd == "import-linkedin":
+            try:
+                res = linkedin_export.load(a.paths, a.me)
+            except ValueError as err:
+                ap.error(str(err))
+            print("\n".join(res.notes))
+            print(linkedin_export.save(store, res))
         elif a.cmd == "import-json":
             source, rows, names = json_import.load(a.file)
             print(f"{store.add_messages(source, rows, names)} new messages from {len(names)} people ({source})")
