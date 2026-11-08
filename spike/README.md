@@ -62,6 +62,13 @@ python -m spike serve              # http://127.0.0.1:8765
 Every open item has **Done**, **Snooze 3d** and **Not real**. Your marks are kept across re-extraction, and no
 signal overrides them. That matters because some things only you know, like a call where it got sorted.
 
+From Instagram and X, read each network's own data export rather than logging in. Instagram's cookie clients
+are the likeliest to get an account banned, and X's DM API needs a paid tier. Request the export: Instagram's
+**Accounts Center → Download your information** (Messages, JSON), or X's **Settings → Your account → Download
+an archive of your data**. Then run `python -m spike import-instagram ~/Downloads/instagram-*.zip` or
+`python -m spike import-x ~/Downloads/twitter-*.zip`. 1:1 threads become messages and groups become evidence.
+Steps, format notes and what's unverified: `docs/INSTAGRAM-X.md`.
+
 ### Live WhatsApp (no exports)
 
 `connectord` links to WhatsApp as a companion device, like WhatsApp Web, and writes into a store the spike

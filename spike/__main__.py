@@ -8,7 +8,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import chatdb, closure, fixture, json_import, nudge, priority, reconcile, sms, whatsapp_export
+from . import (chatdb, closure, fixture, instagram_export, json_import, nudge, priority, reconcile, sms,
+               whatsapp_export, x_export)
 from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor
 from .store import Store
 
@@ -173,6 +174,13 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--tz", help="the phone's time zone, e.g. Asia/Kolkata (default: this machine's)")
     w.add_argument("--date-order", choices=["dmy", "mdy", "ymd"], help="override date order detection")
 
+    for cmd, what in (("import-instagram", "an Instagram 'Download your information' export (JSON)"),
+                      ("import-x", "an X archive ('Download an archive of your data')")):
+        so = sub.add_parser(cmd, help=f"import {what}: .zip(s) or unzipped folder")
+        so.add_argument("paths", nargs="+", type=Path)
+        so.add_argument("--me", help="who you are, when it can't be inferred: your Instagram name as threads "
+                                     "show it, or your X user id")
+
     j = sub.add_parser("import-json", help="import conversations from a JSON file (format in spike/json_import.py)")
     j.add_argument("file", type=Path)
 
@@ -254,6 +262,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{store.add_messages('whatsapp', rows, names)} new messages from {len(names)} chats")
             for name, lines in groups.items():
                 store.add_evidence(f"whatsapp-group:{name}", lines)
+        elif a.cmd in ("import-instagram", "import-x"):
+            mod = instagram_export if a.cmd == "import-instagram" else x_export
+            try:
+                res = mod.load(a.paths, a.me)
+            except ValueError as err:
+                ap.error(str(err))
+            print("\n".join(res.notes))
+            print(mod.save(store, res))
         elif a.cmd == "import-json":
             source, rows, names = json_import.load(a.file)
             print(f"{store.add_messages(source, rows, names)} new messages from {len(names)} people ({source})")
