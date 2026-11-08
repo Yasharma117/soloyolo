@@ -21,7 +21,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -r spike/requirements.txt
       # Offline: the Claude extractors are tested with a fake CLI and a mock client.
-      - run: python -m unittest spike.test_spike -v
+      - run: python -m unittest discover -s spike -p 'test_*.py' -t . -v
       - run: python mini_mesh.py --demo
 
   connectord:
