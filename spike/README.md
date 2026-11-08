@@ -93,6 +93,9 @@ WhatsApp's terms don't cover third-party clients, so an account ban is possible.
 since soloyolo never sends anything. The device keys in `~/.soloyolo/accounts` can read your WhatsApp, so treat
 that folder like your phone.
 
+To keep it running on your Mac (sync always on, a pass every 30 minutes, a morning digest), see
+`docs/RUNNING-DAILY.md` and `scripts/install-mac.sh`. `python -m spike digest` prints the morning message.
+
 ### Today: one to three things, then silence
 
 ```bash
