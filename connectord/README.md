@@ -37,7 +37,7 @@ printf '%s\n' \
 
 | Method | Params | Result |
 |---|---|---|
-| `networks.list` | none | `["imessage","whatsapp"]` |
+| `networks.list` | none | `["imessage","slack","whatsapp"]` |
 | `accounts.add` | `network` | `{id, network}` |
 | `accounts.list` | none | accounts, with `remote_user` once linked |
 | `accounts.login` | `account`, optional `value` | a `LoginStep`: `qr` (render the payload as a QR code), `code`, `permission`, or `done`. Call again until `done` |

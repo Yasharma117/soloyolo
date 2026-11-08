@@ -122,3 +122,22 @@ func TestGroupsCallsAndNames(t *testing.T) {
 		t.Fatalf("saved name: %q", name())
 	}
 }
+
+func TestContactEmailBecomesAHandle(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(filepath.Join(t.TempDir(), "s.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	// The email joins this Slack person to anything else that knows them by email.
+	s.AddEvent(ctx, adapter.Event{Kind: adapter.EventContact, Network: "slack", ChatID: "T1:U1", Name: "Sam Lee", Email: "Sam@Example.com"})
+	// A second account claiming the same email does not steal it: merging is the user's call.
+	s.AddEvent(ctx, adapter.Event{Kind: adapter.EventContact, Network: "slack", ChatID: "T2:U9", Name: "Sam L", Email: "sam@example.com"})
+	var pid, emailPID int64
+	s.db.QueryRow(`SELECT person_id FROM handle WHERE network = 'slack' AND address = 'T1:U1'`).Scan(&pid)
+	s.db.QueryRow(`SELECT person_id FROM handle WHERE network = 'email' AND address = 'sam@example.com'`).Scan(&emailPID)
+	if pid == 0 || emailPID != pid {
+		t.Fatalf("email handle on person %d, slack handle on %d", emailPID, pid)
+	}
+}
