@@ -180,6 +180,10 @@ def main(argv: list[str] | None = None) -> int:
     j = sub.add_parser("import-json", help="import conversations from a JSON file (format in spike/json_import.py)")
     j.add_argument("file", type=Path)
 
+    n = sub.add_parser("import-notifications", help="import a batch of message notifications from the Android "
+                                                    "listener (format in spike/notify_ingest.py)")
+    n.add_argument("file", type=Path)
+
     m = sub.add_parser("import-sms", help="read bank alerts from an Android 'SMS Backup & Restore' XML; "
                                           "they close money items. Other texts are never stored")
     m.add_argument("file", type=Path)
@@ -268,6 +272,13 @@ def main(argv: list[str] | None = None) -> int:
         elif a.cmd == "import-json":
             source, rows, names = json_import.load(a.file)
             print(f"{store.add_messages(source, rows, names)} new messages from {len(names)} people ({source})")
+        elif a.cmd == "import-notifications":
+            from . import notify_ingest
+            batch = notify_ingest.load(a.file)
+            out = notify_ingest.ingest(store, batch)
+            skipped = ", ".join(f"{n} {why}" for why, n in batch.skipped.items())
+            print(f"{out['messages']} new messages, {out['group_lines']} new group lines, "
+                  f"{out['already_synced']} already synced" + (f"; skipped {skipped}" if skipped else ""))
         elif a.cmd == "import-sms":
             pays, read = sms.load_backup(a.file)
             added = store.add_evidence("sms", pays)
