@@ -137,15 +137,15 @@ const openMine = (p) => p.commitments.filter((c) => c.owner === "me" && live(c))
 const openTheirs = (p) => p.commitments.filter((c) => c.owner === "them" && live(c));
 const BY = { you: "you", sms: "a bank SMS", closure: "a message in another chat" };
 
-let people = [], ranked = [], showAll = false, current = null, cachedThread = { id: null, rows: [] }, toastTimer = null;
+let people = [], ranked = [], today = { today: [], quiet: 0, open: 0 }, showAll = false, current = null, cachedThread = { id: null, rows: [] }, toastTimer = null;
 
 function renderList() {
   const owed = people.reduce((n, p) => n + openMine(p).length, 0);
   const waiting = people.reduce((n, p) => n + openTheirs(p).length, 0);
   $("#summary").textContent = `${people.length} people · you owe ${owed} · waiting on ${waiting}`;
-  const first = `<button class="person first" role="listitem" data-id="top" aria-current="${current === "top"}">
-      <div class="row1"><span class="name">Do first</span><span class="when">${ranked.length} open</span></div>
-      <div class="hint">${ranked.length ? esc(ranked[0].action) : "Nothing open."}</div></button>`;
+  const first = `<button class="person first" role="listitem" data-id="today" aria-current="${current === "today" || current === "top"}">
+      <div class="row1"><span class="name">Today</span><span class="when">${today.today.length || "nothing"}</span></div>
+      <div class="hint">${today.today.length ? esc(today.today[0].action) : "Nothing needs you now."}</div></button>`;
   $("#list").innerHTML = first + people.map((p) => {
     const mine = openMine(p)[0], theirs = openTheirs(p)[0];
     const hint = mine ? `<div class="hint owe">You owe: ${esc(mine.action)}</div>`
@@ -193,25 +193,42 @@ function section(title, items) {
     ${gone.length ? `<details class="hidden"><summary>${gone.length} marked not real</summary>${gone.map((c) => commitmentRow(c)).join("")}</details>` : ""}</section>`;
 }
 
-const HOT = /^(overdue|due)/;
+const HOT = /^(overdue|due|they chased|they asked again)/;
+
+// Today: the 1-3 things that matter now (spike/nudge.py). Quiet items are assumed done, not deleted.
+function renderToday() {
+  const t = today.today;
+  $("#detail").innerHTML = `
+    <h2>Today</h2>
+    <div class="meta">${t.length ? `${t.length === 1 ? "The one thing" : `The ${t.length} things`} worth doing now.` : "Nothing needs you now."}
+      ${today.quiet} of ${today.open} open ${today.quiet === 1 ? "item is" : "items are"} quiet: no chaser, no due date near, so probably done.
+      One comes back if they ask again or its due date gets close.</div>
+    <section>${t.map((c) => commitmentRow(c, true)).join("")}
+    <button class="more" id="all">All ${ranked.length} open, ranked</button></section>`;
+  $("main").scrollTop = 0;
+  $("#all").onclick = () => select("top");
+}
 
 function renderTop({ keepScroll = false } = {}) {
   const scroll = $("main").scrollTop;
   const shown = showAll ? ranked : ranked.slice(0, 15);
   const n = new Set(ranked.map((c) => c.person_id)).size;
   $("#detail").innerHTML = `
-    <h2>Do first</h2>
+    <button class="more" id="back">← Today</button>
+    <h2>All open, ranked</h2>
     <div class="meta">${ranked.length} open across ${n} ${n === 1 ? "person" : "people"}. Sorted by what's due, how long it has waited,
       money, whose move it is and how close you are. The reasons are on each.</div>
     <section>${shown.map((c) => commitmentRow(c, true)).join("") || `<div class="empty">Nothing open.</div>`}
     ${ranked.length > shown.length ? `<button class="more" id="all">Show all ${ranked.length}</button>` : ""}</section>`;
   $("main").scrollTop = keepScroll ? scroll : 0;
+  $("#back").onclick = () => select("today");
   const all = $("#all"); if (all) all.onclick = () => { showAll = true; renderTop({ keepScroll: true }); };
 }
 
 async function select(id, { keepScroll = false, focus = null } = {}) {
   current = id;
   renderList();
+  if (id === "today") return renderToday();
   if (id === "top") return renderTop({ keepScroll });
   const p = people.find((x) => x.id === id);
   if (cachedThread.id !== id) {
@@ -250,13 +267,14 @@ function jump(msgId) {
 }
 
 async function load() {
-  [people, ranked] = await Promise.all([fetch("/api/people").then((r) => r.json()), fetch("/api/top").then((r) => r.json())]);
+  [people, ranked, today] = await Promise.all([fetch("/api/people").then((r) => r.json()), fetch("/api/top").then((r) => r.json()),
+    fetch("/api/today").then((r) => r.json())]);
 }
 
 async function refresh() {
   await load();
   renderList();
-  if (current === "top" || (current !== null && people.some((p) => p.id === current))) await select(current, { keepScroll: true });
+  if (current === "today" || current === "top" || (current !== null && people.some((p) => p.id === current))) await select(current, { keepScroll: true });
 }
 
 const SAID = { done: "Marked done", dismissed: "Marked not real", snoozed: "Snoozed for 3 days", open: "Kept open", clear: "Undone" };
@@ -281,7 +299,7 @@ function toast(text, undo) {
 }
 
 $("#list").addEventListener("click", (e) => {
-  const b = e.target.closest(".person"); if (b) select(b.dataset.id === "top" ? "top" : Number(b.dataset.id));
+  const b = e.target.closest(".person"); if (b) select(b.dataset.id === "today" ? "today" : Number(b.dataset.id));
 });
 $("#detail").addEventListener("click", (e) => {
   const act = e.target.closest(".act");
@@ -291,7 +309,7 @@ $("#detail").addEventListener("click", (e) => {
                 row.dataset.pid ? Number(row.dataset.pid) : current);
   }
   const c = e.target.closest(".c"); if (!c) return;
-  if (c.dataset.pid) return select(Number(c.dataset.pid), { focus: c.dataset.src });  // from Do first: open the chat at it
+  if (c.dataset.pid) return select(Number(c.dataset.pid), { focus: c.dataset.src });  // from Today or the list: open the chat at it
   jump(c.dataset.fin || c.dataset.src);
 });
 
@@ -303,7 +321,7 @@ load().then(() => {
       ? `Served from 127.0.0.1 · thread text has been sent to ${sentTo.join(", ")} for extraction`
       : "Local only · 127.0.0.1 · no thread text has been sent anywhere from this store";
   });
-  if (people.length) select("top"); else $("#detail").innerHTML = `<p class="empty">No messages yet. Run <code>python -m spike ingest</code>.</p>`;
+  if (people.length) select("today"); else $("#detail").innerHTML = `<p class="empty">No messages yet. Run <code>python -m spike ingest</code>.</p>`;
 });
 </script>
 </body>

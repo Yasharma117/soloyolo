@@ -1,4 +1,4 @@
-"""python -m spike {demo,ingest,import-*,extract,close,watch,show,top,serve}. See spike/README.md."""
+"""python -m spike {demo,ingest,import-*,extract,close,watch,show,today,top,serve}. See spike/README.md."""
 from __future__ import annotations
 
 import argparse
@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import chatdb, closure, fixture, json_import, priority, reconcile, sms, whatsapp_export
+from . import chatdb, closure, fixture, json_import, nudge, priority, reconcile, sms, whatsapp_export
 from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor
 from .store import Store
 
@@ -142,6 +142,14 @@ def top(store: Store, n: int) -> None:
         print(f"{k:>3}. {c['name']}: {who}: {c['action']}  ({', '.join(c['reasons'])})")
 
 
+def today(store: Store) -> None:
+    s = nudge.summary(store)
+    print(f"Today: {len(s['today']) or 'nothing'}. {s['quiet']} of {s['open']} open are quiet (assumed done); `top` lists all")
+    for k, c in enumerate(s["today"], start=1):
+        who = "you owe" if c["owner"] == "me" else "waiting on"
+        print(f"{k:>3}. {c['name']}: {who}: {c['action']}  ({', '.join(c['reasons']) or 'new'})")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m spike")
     ap.add_argument("--db", default=DEFAULT_DB, help="soloyolo store (default: %(default)s)")
@@ -202,6 +210,7 @@ def main(argv: list[str] | None = None) -> int:
     wt.add_argument("--once", action="store_true", help="one pass, then exit")
 
     sub.add_parser("show", help="print people and what each side owes")
+    sub.add_parser("today", help="the 1-3 things that matter now; quiet items are assumed done (spike/nudge.py)")
     t = sub.add_parser("top", help="every open item in one list, what to do first at the top, with why")
     t.add_argument("-n", type=int, default=15)
     s = sub.add_parser("serve", help="open the local viewer")
@@ -261,6 +270,8 @@ def main(argv: list[str] | None = None) -> int:
             return watch(store, a)
         elif a.cmd == "show":
             show(store)
+        elif a.cmd == "today":
+            today(store)
         elif a.cmd == "top":
             top(store, a.n)
         elif a.cmd == "serve":

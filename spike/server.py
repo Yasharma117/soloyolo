@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import priority
+from . import nudge, priority
 from .store import Store
 
 INDEX = Path(__file__).with_name("viewer.html")
@@ -47,6 +47,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/people":
                 return self._json(store.people())
+            if path == "/api/today":
+                return self._json(nudge.summary(store))
             if path == "/api/top":
                 return self._json(priority.rank(store))
             if path == "/api/disclosures":
