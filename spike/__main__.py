@@ -24,14 +24,19 @@ def ingest(store: Store, source: Path, days: int, names: dict[str, str] | None =
 EXTRACTORS = {"heuristic": HeuristicExtractor, "claude-code": ClaudeCodeExtractor, "api": ClaudeExtractor}
 
 
+WINDOW_DAYS = 60
+
+
 def extract(store: Store, kind: str, window: int, only: int | None = None, top: int | None = None,
-            changed: bool = False, min_messages: int = 1, ex=None) -> int:
+            changed: bool = False, min_messages: int = 1, ex=None, days: float = WINDOW_DAYS) -> int:
     """Returns how many people failed. One failure (a refusal, a timeout) never stops the rest.
 
     `top` limits the run to the N most active people (the viewer's ranking), so a first pass with
     a Claude extractor costs a few dozen calls, not one per person you've ever texted.
     `changed` skips anyone with no new messages since they were last read: a live store only
     pays for chats that moved. `min_messages` skips one-line threads (a stray "hi", a business).
+    Each thread is read by time (the last `days`), capped at `window` messages: on a live store a
+    count alone covered three weeks of a busy chat once calls and photos came through.
     """
     ex = ex or EXTRACTORS[kind]()
     failed = 0
@@ -44,8 +49,9 @@ def extract(store: Store, kind: str, window: int, only: int | None = None, top: 
         if top:
             ids = sorted(ids, key=lambda i: -people[i]["score"])[:top]
     for pid in ids:
-        thread = [dict(r) for r in store.thread(pid, limit=window)]
+        thread = [dict(r) for r in store.thread(pid, limit=window, since=time.time() - days * 86400)]
         if not thread:
+            store.mark_read(pid)  # all older than the window: nothing to read, and not "changed" again
             continue
         if getattr(ex, "remote", True):  # unknown extractors are assumed to send text
             store.record_disclosure(pid, ex.name)  # before sending, so a failed call is still on record
@@ -72,7 +78,8 @@ def watch(store: Store, a) -> int:
         changed = store.changed_ids()
         if changed:
             print(f"[{stamp}] {len(changed)} chats changed; reading up to {a.top}")
-            extract(store, a.extractor, a.window, top=a.top, changed=True, min_messages=a.min_messages, ex=ex)
+            extract(store, a.extractor, a.window, top=a.top, changed=True, min_messages=a.min_messages, ex=ex,
+                    days=a.days)
             close_with_sms(store)
             for c in store.open_items():
                 key = (c["person_id"], c["source_message_id"], c["owner"])
@@ -156,7 +163,8 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--extractor", choices=EXTRACTORS, default="heuristic",
                    help="heuristic: offline regexes. claude-code: Claude via your Claude Code login (no API key). "
                         "api: Anthropic API key. Both Claude options send each thread's text off this machine")
-    e.add_argument("--window", type=int, default=300, help="most recent N messages per person")
+    e.add_argument("--window", type=int, default=1000, help="at most this many recent messages per person")
+    e.add_argument("--days", type=float, default=WINDOW_DAYS, help="read this many days back (default %(default)s)")
     e.add_argument("--person", type=int, help="only this person id")
     e.add_argument("--top", type=int, help="only the N most active people (start here: --top 25)")
     e.add_argument("--changed", action="store_true", help="only people with new messages since they were last read")
@@ -168,7 +176,8 @@ def main(argv: list[str] | None = None) -> int:
     wt.add_argument("--every", type=float, default=10, help="minutes between passes (default %(default)s)")
     wt.add_argument("--top", type=int, default=30, help="at most this many changed people per pass")
     wt.add_argument("--min-messages", type=int, default=4, help="skip threads shorter than this")
-    wt.add_argument("--window", type=int, default=300)
+    wt.add_argument("--window", type=int, default=1000)
+    wt.add_argument("--days", type=float, default=WINDOW_DAYS)
     wt.add_argument("--once", action="store_true", help="one pass, then exit")
 
     sub.add_parser("show", help="print people and what each side owes")
@@ -223,7 +232,8 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"maybe settled: {item['name']}: {item['action']}  <- {line['chat']}: {line['text'][:70]!r}"
                           f" ({reason})")
         elif a.cmd == "extract":
-            return 1 if extract(store, a.extractor, a.window, a.person, a.top, a.changed, a.min_messages) else 0
+            return 1 if extract(store, a.extractor, a.window, a.person, a.top, a.changed, a.min_messages,
+                                days=a.days) else 0
         elif a.cmd == "watch":
             return watch(store, a)
         elif a.cmd == "show":

@@ -559,17 +559,21 @@ class LiveStoreTest(unittest.TestCase):
             def add(guid, handle, ts, me, text):
                 m = M(); m.guid, m.handle, m.ts, m.from_me, m.text = guid, handle, ts, me, text
                 st.add_messages("whatsapp", [m], {handle: handle.title()})
+            now = time.time() - 86400
             for i in range(4):
-                add(f"a{i}", "papa", 1_760_000_000 + i, i % 2 == 1, "I'll send the PG address tonight" if i == 3 else "hi")
-            add("b0", "sonu", 1_760_000_000, False, "yo")
-            self.assertEqual(len(st.changed_ids()), 2)
+                add(f"a{i}", "papa", now + i, i % 2 == 1, "I'll send the PG address tonight" if i == 3 else "hi")
+            add("b0", "sonu", now, False, "yo")
+            add("c0", "old", now - 400 * 86400, False, "from last year")
+            add("c1", "old", now - 399 * 86400, True, "I'll send it")
+            self.assertEqual(len(st.changed_ids()), 3)
             extract(st, "heuristic", 300, changed=True, min_messages=2)
-            self.assertEqual(len(st.changed_ids()), 1)  # papa read; sonu too short to read
+            # papa read; "old" had nothing in the last 60 days, so it's marked read; sonu is too short
+            self.assertEqual(len(st.changed_ids()), 1)
             # History sync delivers an *older* message later: it still counts as new.
             add("a-old", "papa", 1_700_000_000, False, "old one")
             self.assertIn(st.person_ids()[0], st.changed_ids())
             out = io.StringIO()
-            args = SimpleNamespace(extractor="heuristic", every=0, top=30, min_messages=2, window=300, once=True)
+            args = SimpleNamespace(extractor="heuristic", every=0, top=30, min_messages=2, window=300, days=60, once=True)
             with redirect_stdout(out):
                 watch(st, args)
             self.assertIn("chats changed", out.getvalue())
@@ -660,6 +664,18 @@ class ClosureTest(unittest.TestCase):
         closure.run(self.st, ex, other_chats=True)
         self.assertIn("secret-1to1-zq", ex.sent[0])
         self.assertEqual(sorted(self.st.disclosures()), ["fake-model"])
+
+    def test_bare_answer_keeps_its_context_when_lines_are_cut(self):
+        from spike import closure
+        t0 = 1_760_000_000.0
+        item = {"action": "Talk to Mama and say which flight to finalise", "source_text": "which flight?", "source_ts": t0}
+        noise = [dict(ts=t0 + 9 * 86400 + n, chat="Cricket (group)", speaker="x", text=f"score {n}") for n in range(600)]
+        talk = [dict(ts=t0 + 3600, chat="V3 (group)", speaker="Mumma", text="Kaunsi flight book karein?"),
+                dict(ts=t0 + 3700, chat="V3 (group)", speaker="Papa", text="9:30"),
+                dict(ts=t0 + 3800, chat="V3 (group)", speaker="me", text="Ok ji 9:30")]
+        kept = closure._relevant(talk + noise, [item])
+        self.assertLessEqual(len(kept), closure.MAX_EVIDENCE * 2)
+        self.assertTrue(all(line in kept for line in talk))
 
     def test_old_resolution_table_migrates(self):
         import sqlite3

@@ -170,12 +170,24 @@ class Store:
         return [r[0] for r in self.conn.execute("SELECT DISTINCT recipient FROM disclosure ORDER BY recipient")]
 
     # --- reads -------------------------------------------------------------------------
-    def thread(self, person_id: int, limit: int | None = None) -> list[sqlite3.Row]:
+    def thread(self, person_id: int, limit: int | None = None, since: float | None = None) -> list[sqlite3.Row]:
+        """Oldest first: the newest `limit` messages, and none before `since`."""
         rows = self.conn.execute(
-            "SELECT id, ts, from_me, text FROM message WHERE person_id = ? ORDER BY ts DESC LIMIT ?",
-            (person_id, limit or -1),
+            "SELECT id, ts, from_me, text FROM message WHERE person_id = ? AND ts >= ? ORDER BY ts DESC LIMIT ?",
+            (person_id, since or 0, limit or -1),
         ).fetchall()
         return rows[::-1]
+
+    def mark_read(self, person_id: int) -> None:
+        """Nothing in the window to read (every message is older): don't count them as changed again."""
+        with self.conn:
+            self.conn.execute(
+                "UPDATE extraction_run SET last_message_id = (SELECT MAX(id) FROM message WHERE person_id = ?)"
+                " WHERE person_id = ?", (person_id, person_id))
+            self.conn.execute(
+                "INSERT OR IGNORE INTO extraction_run(person_id, extractor, ran_at, last_message_id)"
+                " SELECT ?, 'none: nothing recent', ?, MAX(id) FROM message WHERE person_id = ?",
+                (person_id, time.time(), person_id))
 
     def changed_ids(self) -> list[int]:
         """People with messages newer than their last extraction read (or never extracted).

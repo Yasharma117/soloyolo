@@ -26,6 +26,7 @@ from .sms import short_date
 
 WINDOW_DAYS = 45      # how long after an item a closing message can come
 MAX_EVIDENCE = 250    # lines sent per person; the most relevant win when there are more
+CONTEXT = 3           # lines either side of a relevant one, so "9:30" arrives with its question
 
 CLOSE_SYSTEM = """You check whether things a person owes, or is waiting on, were settled in a different chat.
 
@@ -80,18 +81,42 @@ def candidates(store, person_id: int, items: list[dict], now: float | None = Non
         lines.append(dict(ts=r["ts"], chat=names.get(r["person_id"], "?"),
                           speaker="me" if r["from_me"] else names.get(r["person_id"], "them"),
                           text=r["text"], ref=("message", r["id"], r["person_id"])))
+    # Live sync stores a group sender as a WhatsApp id when history carried no name: show the person.
+    by_address = {a: n for a, n in store.conn.execute(
+        "SELECT h.address, p.display_name FROM handle h JOIN person p ON p.id = h.person_id")}
     for r in store.conn.execute(
             "SELECT id, source, ts, sender, text FROM evidence WHERE source LIKE 'whatsapp-group:%'"
             " AND ts > ? AND ts <= ? ORDER BY ts", (since, until)):
-        lines.append(dict(ts=r["ts"], chat=r["source"].split(":", 1)[1] + " (group)", speaker=r["sender"],
+        lines.append(dict(ts=r["ts"], chat=r["source"].split(":", 1)[1] + " (group)",
+                          speaker=by_address.get(r["sender"], r["sender"]),
                           text=r["text"], ref=("evidence", r["id"], None)))
     if len(lines) > MAX_EVIDENCE:
-        want = set().union(*(_words(i["action"] + " " + (i.get("source_text") or "")) for i in items))
-        lines.sort(key=lambda l: -len(want & _words(l["text"])))
-        lines = sorted(lines[:MAX_EVIDENCE], key=lambda l: l["ts"])
+        lines = _relevant(lines, items)
     for n, line in enumerate(lines, start=1):
         line["id"] = n
     return lines
+
+
+def _relevant(lines: list[dict], items: list[dict]) -> list[dict]:
+    """Too many lines: keep the likeliest, with the lines around each. Likely means sharing words
+    with an item, or coming soon after one. A bare "9:30" an hour after "which flight?" shares
+    no words, and without its neighbours means nothing."""
+    want = set().union(*(_words(i["action"] + " " + (i.get("source_text") or "")) for i in items))
+    starts = [i["source_ts"] for i in items]
+
+    def score(line: dict) -> int:
+        soon = any(0 < line["ts"] - s <= 2 * 86400 for s in starts)
+        return 2 * len(want & _words(line["text"])) + (1 if soon else 0)
+
+    order = sorted(range(len(lines)), key=lambda n: -score(lines[n]))
+    keep: set[int] = set()
+    for n in order:
+        if len(keep) >= MAX_EVIDENCE or score(lines[n]) == 0:
+            break
+        for k in range(n - CONTEXT, n + CONTEXT + 1):  # its neighbours in the same chat
+            if 0 <= k < len(lines) and lines[k]["chat"] == lines[n]["chat"]:
+                keep.add(k)
+    return [lines[n] for n in sorted(keep)][:MAX_EVIDENCE * 2]
 
 
 def _day(ts: float) -> str:
