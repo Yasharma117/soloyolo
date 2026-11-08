@@ -93,10 +93,27 @@ WhatsApp's terms don't cover third-party clients, so an account ban is possible.
 since soloyolo never sends anything. The device keys in `~/.soloyolo/accounts` can read your WhatsApp, so treat
 that folder like your phone.
 
-### What to do first
+### Today: one to three things, then silence
 
 ```bash
-python -m spike top          # or open `serve`: "Do first" is the first screen
+python -m spike today        # or open `serve`: "Today" is the first screen
+```
+
+Run 6 showed that an item left open in a chat is usually done, not forgotten: of 15 scored, one was still to
+do. So Today assumes silence means done. An item is shown for 3 days after it's said, or around its due date
+(2 days before to 1 day after), and comes back only when the other side chases ("any update?", "kya hua",
+"photos bhej do", the same ask again). Your marks still win. The rules and why are at the top of `nudge.py`.
+
+`python -m spike.replay --db soloyolo.db --tz Asia/Kolkata --out <private path>` shows what Today would have
+said each morning for the last 6 weeks, using only what was known then. It writes message text, so keep it
+out of the repo. On the live store: 2.5 items a morning out of ~43 open, and 14 of the 15 scored items were
+shown for 1 to 3 days after they appeared, then went quiet without any mark. The one still to do is the only
+one Today shows now with the marks taken away.
+
+### Everything open, ranked
+
+```bash
+python -m spike top          # in the viewer: "All open, ranked", one tap from Today
 ```
 
 Every open item across every chat goes into one list, best first, and each item shows why it ranks where it
