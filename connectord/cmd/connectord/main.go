@@ -23,6 +23,7 @@ import (
 	"github.com/yasharma117/soloyolo/connectord/internal/adapter"
 	"github.com/yasharma117/soloyolo/connectord/internal/daemon"
 	"github.com/yasharma117/soloyolo/connectord/internal/imessage"
+	"github.com/yasharma117/soloyolo/connectord/internal/slack"
 	"github.com/yasharma117/soloyolo/connectord/internal/store"
 	"github.com/yasharma117/soloyolo/connectord/internal/whatsapp"
 )
@@ -47,6 +48,7 @@ func main() {
 	reg := adapter.NewRegistry()
 	reg.Register(imessage.Network, imessage.New)
 	reg.Register(whatsapp.Network, whatsapp.New)
+	reg.Register(slack.Network, slack.New)
 	d := daemon.New(reg, st, *dataDir)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

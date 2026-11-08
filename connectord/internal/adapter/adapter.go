@@ -58,6 +58,7 @@ type Event struct {
 	Group     string `json:"group,omitempty"`      // the group's id; set only for group messages
 	GroupName string `json:"group_name,omitempty"` // its subject, when known
 	Saved     bool   `json:"saved,omitempty"`      // contact events: the name is from your address book
+	Email     string `json:"email,omitempty"`      // contact events: the person's email, an identity key across networks
 }
 
 // Outgoing is what the user wants to send. Text only for now.

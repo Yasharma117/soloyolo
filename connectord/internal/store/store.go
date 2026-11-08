@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"strings"
 
 	_ "modernc.org/sqlite" // pure Go, no cgo: registers driver "sqlite"
 
@@ -153,15 +154,27 @@ func (s *Store) rename(ctx context.Context, e adapter.Event) error {
 			GroupSource(e), e.Network+"-group:"+e.Group)
 		return err
 	}
-	if e.ChatID == "" || e.Name == "" {
+	if e.ChatID == "" || (e.Name == "" && e.Email == "") {
 		return nil
 	}
 	// Names often arrive before the first message (history sync sends them first), so a name for
 	// someone not seen yet creates them. A person with no messages never shows in the lists.
 	// A push name only fills in the placeholder (the raw address); PersonFor does exactly that.
 	id, err := s.PersonFor(ctx, e.Network, e.ChatID, e.Name)
-	if err != nil || !e.Saved {
+	if err != nil {
 		return err
+	}
+	if e.Email != "" {
+		// The email becomes a second handle on the same person, so another network that knows
+		// them by email (mail, calendar) lands on this card. An email already taken by someone
+		// else is left alone: merging people is the user's call.
+		if _, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO handle(network, address, person_id) VALUES ('email', ?, ?)`,
+			strings.ToLower(strings.TrimSpace(e.Email)), id); err != nil {
+			return err
+		}
+	}
+	if !e.Saved || e.Name == "" {
+		return nil
 	}
 	// A saved address-book name replaces whatever is there: it's what you call them.
 	_, err = s.db.ExecContext(ctx, `UPDATE person SET display_name = ? WHERE id = ?`, e.Name, id)
