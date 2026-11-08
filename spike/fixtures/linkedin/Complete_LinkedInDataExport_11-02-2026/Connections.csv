@@ -1,0 +1,9 @@
+Notes:
+"When exporting your connection data, you may notice that some of the email addresses are missing. You will only see email addresses for connections who have chosen to allow their connections to see or download their email address using this setting https://www.linkedin.com/psettings/privacy/email. You can learn more here https://www.linkedin.com/help/linkedin/answer/261"
+
+First Name,Last Name,URL,Email Address,Company,Position,Connected On
+Priya,Natarajan,https://in.linkedin.com/in/priya-natarajan-synth02/,,Fabrikam,Head of Partnerships,14 Mar 2024
+Sam,Okafor,https://www.linkedin.com/in/sam-okafor-synth04,Sam.Okafor@example.com,"Contoso, Inc.",Engineering Manager,02 Nov 2026
+Mei,Chen,https://www.linkedin.com/in/mei-chen-synth05,,,,09 Jan 2025
+Lee,Park,,,Tailspin Toys,Designer,21 Jun 2023
+JosÃ©,MartÃ­n,https://www.linkedin.com/in/jos%C3%A9-mart%C3%ADn-synth06,,Woodgrove Bank,Analyst,30 Sep 2026
