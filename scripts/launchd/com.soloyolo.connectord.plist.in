@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template: scripts/install-mac.sh fills in the placeholders and writes it to ~/Library/LaunchAgents. -->
+<plist version="1.0">
+<dict>
+	<key>Label</key><string>com.soloyolo.connectord</string>
+	<!-- Always on: start at login, restart whenever it exits. launchd has no exponential backoff;
+	     ThrottleInterval is the floor between restarts, so a crash loop costs one try a minute. -->
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>@JOB@</string>
+		<string>sync</string>
+	</array>
+	<key>RunAtLoad</key><true/>
+	<key>KeepAlive</key><true/>
+	<key>ThrottleInterval</key><integer>60</integer>
+	<key>StandardOutPath</key><string>@DATA@/logs/launchd.log</string>
+	<key>StandardErrorPath</key><string>@DATA@/logs/launchd.log</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key><string>@PATH@</string>
+		<key>LANG</key><string>en_US.UTF-8</string>
+		<key>SOLOYOLO_DATA</key><string>@DATA@</string>
+		<key>SOLOYOLO_CONNECTORD</key><string>@CONNECTORD@</string>
+	</dict>
+	<key>WorkingDirectory</key><string>@DATA@</string>
+	<key>Umask</key><integer>63</integer><!-- 077: files it creates are yours only -->
+</dict>
+</plist>

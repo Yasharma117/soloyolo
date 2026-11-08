@@ -1,4 +1,4 @@
-"""python -m spike {demo,ingest,import-*,extract,close,watch,show,top,serve}. See spike/README.md."""
+"""python -m spike {demo,ingest,import-*,extract,close,watch,show,top,digest,serve}. See spike/README.md."""
 from __future__ import annotations
 
 import argparse
@@ -204,6 +204,12 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("show", help="print people and what each side owes")
     t = sub.add_parser("top", help="every open item in one list, what to do first at the top, with why")
     t.add_argument("-n", type=int, default=15)
+    g = sub.add_parser("digest", help="the morning message: the 1-3 things for today, and a line if sync or "
+                                      "extraction stopped. Prints it; sends nothing")
+    g.add_argument("--format", choices=["text", "telegram"], default="text",
+                   help="telegram: the Bot API sendMessage body (JSON, no chat_id), with Done / Not needed buttons")
+    g.add_argument("--out", type=Path, help="also write it to this file (mode 600)")
+    g.add_argument("--stale-hours", type=float, default=12, help="warn when the newest live message is older")
     s = sub.add_parser("serve", help="open the local viewer")
     s.add_argument("--port", type=int, default=8765)
 
@@ -263,6 +269,12 @@ def main(argv: list[str] | None = None) -> int:
             show(store)
         elif a.cmd == "top":
             top(store, a.n)
+        elif a.cmd == "digest":
+            from . import daily
+            text = daily.digest(store, a.format, stale_hours=a.stale_hours)
+            print(text)
+            if a.out:
+                daily.write_private(a.out, text)
         elif a.cmd == "serve":
             from .server import serve
             serve(a.db, a.port)
