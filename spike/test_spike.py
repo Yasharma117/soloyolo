@@ -545,6 +545,40 @@ class SmsTest(unittest.TestCase):
             st.close()
 
 
+class LiveStoreTest(unittest.TestCase):
+    """A synced store grows all the time: only chats with new rows are read again."""
+
+    def test_changed_only_and_watch(self):
+        import io
+        from contextlib import redirect_stdout
+        from types import SimpleNamespace
+        from spike.__main__ import extract, watch
+        with tempfile.TemporaryDirectory() as d:
+            st = Store(Path(d) / "s.db")
+            M = type("M", (), {})
+            def add(guid, handle, ts, me, text):
+                m = M(); m.guid, m.handle, m.ts, m.from_me, m.text = guid, handle, ts, me, text
+                st.add_messages("whatsapp", [m], {handle: handle.title()})
+            for i in range(4):
+                add(f"a{i}", "papa", 1_760_000_000 + i, i % 2 == 1, "I'll send the PG address tonight" if i == 3 else "hi")
+            add("b0", "sonu", 1_760_000_000, False, "yo")
+            self.assertEqual(len(st.changed_ids()), 2)
+            extract(st, "heuristic", 300, changed=True, min_messages=2)
+            self.assertEqual(len(st.changed_ids()), 1)  # papa read; sonu too short to read
+            # History sync delivers an *older* message later: it still counts as new.
+            add("a-old", "papa", 1_700_000_000, False, "old one")
+            self.assertIn(st.person_ids()[0], st.changed_ids())
+            out = io.StringIO()
+            args = SimpleNamespace(extractor="heuristic", every=0, top=30, min_messages=2, window=300, once=True)
+            with redirect_stdout(out):
+                watch(st, args)
+            self.assertIn("chats changed", out.getvalue())
+            with redirect_stdout(io.StringIO()) as again:
+                watch(st, args)
+            self.assertNotIn("new:", again.getvalue())  # nothing re-announced
+            st.close()
+
+
 class ClosureTest(unittest.TestCase):
     """The cross-chat pass suggests; it never closes, never re-asks, and only sends what it must."""
 

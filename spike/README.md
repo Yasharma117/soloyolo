@@ -62,6 +62,37 @@ python -m spike serve              # http://127.0.0.1:8765
 Every open item has **Done**, **Snooze 3d** and **Not real**. Your marks are kept across re-extraction, and no
 signal overrides them. That matters because some things only you know, like a call where it got sorted.
 
+### Live WhatsApp (no exports)
+
+`connectord` links to WhatsApp as a companion device, like WhatsApp Web, and writes into a store the spike
+reads directly:
+
+```bash
+(cd connectord && go build -o connectord ./cmd/connectord)
+```
+
+```bash
+./connectord/connectord link --phone 919800000000   # prints an 8-character code
+```
+
+On the phone: **WhatsApp → Linked devices → Link a device → Link with phone number instead**, then type the
+code. The phone sends about 90 days of history, and new messages follow as they arrive. Group chats are kept
+as evidence only, and calls and photos as markers, the same as the export importer. Leave it running, or run
+`./connectord/connectord sync` later.
+
+```bash
+python -m spike --db ~/.soloyolo/soloyolo.db watch --extractor claude-code
+```
+
+Every 10 minutes this reads only the chats that changed, at most 30 per pass and none shorter than 4 messages.
+It prints new items, and `serve` shows them. To stop, remove the device on the phone (**Linked devices** → the
+device → **Log out**) and delete `~/.soloyolo`.
+
+**Risk:** this uses an unofficial client (whatsmeow). Reading as a linked device is ordinary personal use, but
+WhatsApp's terms don't cover third-party clients, so an account ban is possible. It's unlikely at this volume,
+since soloyolo never sends anything. The device keys in `~/.soloyolo/accounts` can read your WhatsApp, so treat
+that folder like your phone.
+
 ### Closing what the chats don't show
 
 In the first real test, 6 of 19 items were already done somewhere a chat can't show: a UPI app, a call, a group

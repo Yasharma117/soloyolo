@@ -35,7 +35,12 @@ const (
 	EventReaction EventKind = "reaction"
 	EventRead     EventKind = "read"
 	EventLogout   EventKind = "logged_out" // the session was revoked remotely: relink needed
+	EventCall     EventKind = "call"       // a call happened in a 1:1 chat; Text is "[call]"
+	EventContact  EventKind = "contact"    // a name for ChatID (address book or the person's own push name)
 )
+
+// CallText is what a call is stored as: the spike reads it as "(a call between us)".
+const CallText = "[call]"
 
 // Event is one protocol-neutral thing that happened.
 type Event struct {
@@ -49,6 +54,10 @@ type Event struct {
 	Text     string    `json:"text,omitempty"`
 	Name     string    `json:"name,omitempty"` // display name if the network offers one
 	History  bool      `json:"history,omitempty"`
+	// Group chats are kept as evidence that something got done, never as a source of new items.
+	Group     string `json:"group,omitempty"`      // the group's id; set only for group messages
+	GroupName string `json:"group_name,omitempty"` // its subject, when known
+	Saved     bool   `json:"saved,omitempty"`      // contact events: the name is from your address book
 }
 
 // Outgoing is what the user wants to send. Text only for now.
@@ -63,6 +72,7 @@ type Cursor string
 type Contact struct {
 	Address string `json:"address"`
 	Name    string `json:"name"`
+	Saved   bool   `json:"saved,omitempty"` // the name is from your address book, not the person's own
 }
 
 // Adapter is one logged-in account on one network.

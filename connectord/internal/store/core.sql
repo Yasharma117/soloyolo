@@ -71,7 +71,8 @@ CREATE INDEX IF NOT EXISTS evidence_ts ON evidence(ts);
 CREATE TABLE IF NOT EXISTS extraction_run (
   person_id INTEGER PRIMARY KEY REFERENCES person(id),
   extractor TEXT NOT NULL,         -- who read this thread last: 'heuristic' | model id
-  ran_at REAL NOT NULL             -- recorded even when nothing was found, so "did text leave?" is answerable
+  ran_at REAL NOT NULL,            -- recorded even when nothing was found, so "did text leave?" is answerable
+  last_message_id INTEGER          -- the newest message it read: anything above it is new since
 );
 CREATE TABLE IF NOT EXISTS disclosure (
   id INTEGER PRIMARY KEY,

@@ -36,6 +36,9 @@ class Store:
             self.conn.executescript(
                 f"BEGIN; ALTER TABLE resolution RENAME TO resolution_old; {ddl}"
                 f" INSERT INTO resolution({cols}) SELECT {cols} FROM resolution_old; DROP TABLE resolution_old; COMMIT;")
+        if "last_message_id" not in {r[1] for r in self.conn.execute("PRAGMA table_info(extraction_run)")}:
+            with self.conn:
+                self.conn.execute("ALTER TABLE extraction_run ADD COLUMN last_message_id INTEGER")
         cols = {r[1] for r in self.conn.execute("PRAGMA table_info(commitment)")}
         if "kind" not in cols:
             with self.conn:
@@ -78,7 +81,7 @@ class Store:
 
     # --- extraction results -------------------------------------------------------------
     def replace_extraction(self, person_id: int, commitments: list[dict], topics: list[str],
-                           extractor: str) -> None:
+                           extractor: str, last_message_id: int | None = None) -> None:
         with self.conn:
             self.conn.execute("DELETE FROM commitment WHERE person_id = ?", (person_id,))
             self.conn.execute("DELETE FROM topic WHERE person_id = ?", (person_id,))
@@ -94,8 +97,8 @@ class Store:
                 [(person_id, t) for t in topics],
             )
             self.conn.execute(
-                "INSERT OR REPLACE INTO extraction_run(person_id, extractor, ran_at) VALUES (?, ?, ?)",
-                (person_id, extractor, time.time()),
+                "INSERT OR REPLACE INTO extraction_run(person_id, extractor, ran_at, last_message_id) VALUES (?, ?, ?, ?)",
+                (person_id, extractor, time.time(), last_message_id),
             )
 
     # --- resolutions: what happened to an item after extraction -----------------------------
@@ -173,6 +176,13 @@ class Store:
             (person_id, limit or -1),
         ).fetchall()
         return rows[::-1]
+
+    def changed_ids(self) -> list[int]:
+        """People with messages newer than their last extraction read (or never extracted).
+        By row id, not timestamp: history sync delivers old messages after the fact."""
+        return [r[0] for r in self.conn.execute(
+            "SELECT m.person_id FROM message m LEFT JOIN extraction_run r ON r.person_id = m.person_id"
+            " GROUP BY m.person_id HAVING r.last_message_id IS NULL OR MAX(m.id) > r.last_message_id")]
 
     def person_ids(self) -> list[int]:
         return [r[0] for r in self.conn.execute("SELECT id FROM person ORDER BY id")]

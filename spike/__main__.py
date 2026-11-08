@@ -24,20 +24,25 @@ def ingest(store: Store, source: Path, days: int, names: dict[str, str] | None =
 EXTRACTORS = {"heuristic": HeuristicExtractor, "claude-code": ClaudeCodeExtractor, "api": ClaudeExtractor}
 
 
-def extract(store: Store, kind: str, window: int, only: int | None = None, top: int | None = None) -> int:
+def extract(store: Store, kind: str, window: int, only: int | None = None, top: int | None = None,
+            changed: bool = False, min_messages: int = 1, ex=None) -> int:
     """Returns how many people failed. One failure (a refusal, a timeout) never stops the rest.
 
     `top` limits the run to the N most active people (the viewer's ranking), so a first pass with
     a Claude extractor costs a few dozen calls, not one per person you've ever texted.
+    `changed` skips anyone with no new messages since they were last read: a live store only
+    pays for chats that moved. `min_messages` skips one-line threads (a stray "hi", a business).
     """
-    ex = EXTRACTORS[kind]()
+    ex = ex or EXTRACTORS[kind]()
     failed = 0
+    people = {p["id"]: p for p in store.people()}
     if only:
         ids = [only]
-    elif top:
-        ids = [p["id"] for p in sorted(store.people(), key=lambda p: -p["score"])[:top]]
     else:
-        ids = store.person_ids()
+        ids = store.changed_ids() if changed else store.person_ids()
+        ids = [i for i in ids if i in people and people[i]["count"] >= min_messages]
+        if top:
+            ids = sorted(ids, key=lambda i: -people[i]["score"])[:top]
     for pid in ids:
         thread = [dict(r) for r in store.thread(pid, limit=window)]
         if not thread:
@@ -50,11 +55,39 @@ def extract(store: Store, kind: str, window: int, only: int | None = None, top: 
             failed += 1
             print(f"person {pid}: failed, kept previous results ({str(err)[:160]})", file=sys.stderr)
             continue
-        store.replace_extraction(pid, [c.model_dump() for c in result.commitments], result.topics, ex.name)
+        store.replace_extraction(pid, [c.model_dump() for c in result.commitments], result.topics, ex.name,
+                                 last_message_id=max(m["id"] for m in thread))
         print(f"person {pid}: {len(result.commitments)} commitments ({ex.name})")
     if failed:
         print(f"{failed} failed; rerun `extract --person <id>` for each", file=sys.stderr)
     return failed
+
+
+def watch(store: Store, a) -> int:
+    """Passes until Ctrl-C. Each reads only the chats that changed, so a quiet hour costs nothing."""
+    ex = EXTRACTORS[a.extractor]()
+    seen = {(c["person_id"], c["source_message_id"], c["owner"]) for c in store.open_items()}
+    while True:
+        stamp = datetime.now().strftime("%H:%M")
+        changed = store.changed_ids()
+        if changed:
+            print(f"[{stamp}] {len(changed)} chats changed; reading up to {a.top}")
+            extract(store, a.extractor, a.window, top=a.top, changed=True, min_messages=a.min_messages, ex=ex)
+            close_with_sms(store)
+            for c in store.open_items():
+                key = (c["person_id"], c["source_message_id"], c["owner"])
+                if key not in seen:
+                    seen.add(key)
+                    who = "you owe" if c["owner"] == "me" else "waiting on"
+                    print(f"  new: {c['name']}: {who}: {c['action']}")
+        else:
+            print(f"[{stamp}] nothing new")
+        if a.once:
+            return 0
+        try:
+            time.sleep(a.every * 60)
+        except KeyboardInterrupt:
+            return 0
 
 
 def close_with_sms(store: Store) -> None:
@@ -126,6 +159,17 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--window", type=int, default=300, help="most recent N messages per person")
     e.add_argument("--person", type=int, help="only this person id")
     e.add_argument("--top", type=int, help="only the N most active people (start here: --top 25)")
+    e.add_argument("--changed", action="store_true", help="only people with new messages since they were last read")
+    e.add_argument("--min-messages", type=int, default=1, help="skip threads shorter than this")
+
+    wt = sub.add_parser("watch", help="keep a live store's lists current: every few minutes, read the chats "
+                                      "that changed, then close what bank SMS settles")
+    wt.add_argument("--extractor", choices=EXTRACTORS, default="heuristic")
+    wt.add_argument("--every", type=float, default=10, help="minutes between passes (default %(default)s)")
+    wt.add_argument("--top", type=int, default=30, help="at most this many changed people per pass")
+    wt.add_argument("--min-messages", type=int, default=4, help="skip threads shorter than this")
+    wt.add_argument("--window", type=int, default=300)
+    wt.add_argument("--once", action="store_true", help="one pass, then exit")
 
     sub.add_parser("show", help="print people and what each side owes")
     s = sub.add_parser("serve", help="open the local viewer")
@@ -179,7 +223,9 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"maybe settled: {item['name']}: {item['action']}  <- {line['chat']}: {line['text'][:70]!r}"
                           f" ({reason})")
         elif a.cmd == "extract":
-            return 1 if extract(store, a.extractor, a.window, a.person, a.top) else 0
+            return 1 if extract(store, a.extractor, a.window, a.person, a.top, a.changed, a.min_messages) else 0
+        elif a.cmd == "watch":
+            return watch(store, a)
         elif a.cmd == "show":
             show(store)
         elif a.cmd == "serve":
