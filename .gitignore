@@ -17,3 +17,4 @@ rea-out/
 
 # Go build output
 connectord/bin/
+.claude/worktrees/
