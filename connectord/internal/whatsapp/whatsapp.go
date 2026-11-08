@@ -164,7 +164,7 @@ func (a *Adapter) Login(ctx context.Context, in adapter.LoginInput) (adapter.Log
 		case <-ctx.Done():
 			return adapter.LoginStep{}, ctx.Err()
 		}
-		code, err := cli.PairPhone(ctx, phone, true, whatsmeow.PairClientChrome, "Chrome (soloyolo)")
+		code, err := cli.PairPhone(ctx, phone, true, whatsmeow.PairClientChrome, "Chrome (Linux)") // only real browser/OS names are accepted
 		if err != nil {
 			return adapter.LoginStep{}, err
 		}
