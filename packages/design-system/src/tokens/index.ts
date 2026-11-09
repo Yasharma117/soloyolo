@@ -11,6 +11,7 @@ export const palette = {
   marigold: { 50: '#fbf1dc', 100: '#fbeccb', 300: '#f2b33d', 500: '#e8a317', 700: '#a35c00', 900: '#3a2b10', 950: '#ffc35a' },
   leaf: { 500: '#2fa864', 600: '#35c272', 700: '#2e7d5b', 400: '#5cc08e' },
   violet: { 500: '#6a5acd', 400: '#8b7dff' },
+  amber: { 200: '#fdd086', 400: '#fbad41' }, // the warm gradient on the one action that matters (from the Atoms redesign)
   stone: { 500: '#8a857a', 600: '#6a665d' },
   ember: { 100: '#fbe3e1', 500: '#d64545', 400: '#ff6b6b', 700: '#a32a2a', 900: '#3d1715' },
   sky: { 100: '#e1effa', 400: '#7cb8f2', 500: '#2f7fd1', 700: '#1f5f9e', 900: '#122a3d' },
@@ -22,6 +23,9 @@ export const palette = {
 const light = {
   background: palette.paper[50], // warm paper, never pure white as a page
   wash: palette.marigold[50], // the warm tint at the top of a screen, fading into the paper (Markon's wash)
+  warmFrom: palette.amber[200], // warm button, top
+  warmTo: palette.amber[400], // warm button, bottom
+  onWarm: palette.paper[900], // text on the warm button: dark in both themes
   surface: palette.paper[0], // cards sit on the paper
   surfaceRaised: palette.paper[100], // chips, search fields, pressed rows
   surfaceFloating: 'rgba(255,255,255,0.92)', // the tab bar over content
@@ -56,6 +60,9 @@ export type ColorTokens = { [K in keyof typeof light]: string }
 const dark: ColorTokens = {
   background: palette.night[0],
   wash: palette.night[100],
+  warmFrom: palette.amber[200],
+  warmTo: palette.amber[400],
+  onWarm: palette.paper[900],
   surface: palette.night[50],
   surfaceRaised: palette.night[100],
   surfaceFloating: 'rgba(32,30,26,0.94)',

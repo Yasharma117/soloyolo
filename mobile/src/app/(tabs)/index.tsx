@@ -1,4 +1,4 @@
-import { Banner, CardSkeleton, Chip, EmptyState, Icon, InlineError, PromiseCard, TopBar, Wash, useScrollChrome, QuietPile, Row, SectionLabel, Text, TodayHeader, formatRelative, useTheme } from '@soloyolo/design-system'
+import { Banner, CardSkeleton, CheckInCard, Chip, EmptyState, Icon, InlineError, PromiseCard, TopBar, Wash, useScrollChrome, QuietPile, Row, SectionLabel, Text, TodayHeader, formatRelative, useTheme } from '@soloyolo/design-system'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { RefreshControl, View } from 'react-native'
@@ -27,6 +27,10 @@ export default function Today() {
   const [openedAt] = useState(() => Date.now() / 1000) // the clock is read once, when Today opens
   const stale = wa && openedAt - wa.last > 12 * 3600
   const quiet = (all.data ?? []).filter((x) => !x.live)
+  // the Still on? deck: quiet ones asked about one at a time; Skip just moves on (it stays quiet, so assumed done)
+  const [seen, setSeen] = useState<string[]>([])
+  const deck = quiet.filter((x) => !x.suggestion && !seen.includes(keyOf(x)))
+  const next = (it: Item) => setSeen((s) => [...s, keyOf(it)])
   const n = s.data?.today.length ?? 0
   const open = (it: Item) => router.push({ pathname: '/person/[id]', params: { id: String(it.person_id), focus: String(it.source_message_id) } })
   return (
@@ -56,6 +60,14 @@ export default function Today() {
         <EmptyState title="Nothing you said you’d do needs you today." body="Older things are assumed done, unless someone chases you about them." />
       ) : null}
       {n ? <Text variant="small" tone="tertiary" style={{ paddingHorizontal: t.space.xl }}>Swipe left when it’s done, right if it’s not needed.</Text> : null}
+      {deck.length && s.data ? (
+        <>
+          <SectionLabel>{`Still on? · ${deck.length}`}</SectionLabel>
+          <CheckInCard item={deck[0]!} waiting={deck.length - 1} onSkip={() => next(deck[0]!)}
+                       yes={{ label: 'Still on', onPress: () => { void marks.keep(deck[0]!); next(deck[0]!) } }}
+                       no={{ label: 'It’s done', onPress: () => { void marks.done(deck[0]!); next(deck[0]!) } }} />
+        </>
+      ) : null}
       {quiet.length && s.data ? (
         <>
           <SectionLabel>Quiet · assumed done</SectionLabel>
