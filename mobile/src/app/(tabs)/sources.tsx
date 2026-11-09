@@ -1,4 +1,4 @@
-import { Button, PageTitle, SectionLabel, SourceRow, Surface, Text, useTheme, type IconName } from '@soloyolo/design-system'
+import { Button, PageTitle, SectionLabel, SourceRow, StatRow, StatTile, Surface, Text, formatCompact, useTheme, type IconName } from '@soloyolo/design-system'
 import { useRouter } from 'expo-router'
 import { ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -45,6 +45,15 @@ export default function Sources() {
   return (
     <ScrollView style={{ backgroundColor: t.color.background }} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}>
       <PageTitle title="Sources" subtitle={mode === 'live' ? `Where soloyolo reads from. Connected to your Mac (${serverUrl}).` : 'Where soloyolo reads from. Showing the demo: your Mac isn’t reachable.'} />
+      {s ? (
+        <View style={{ marginTop: t.space.md }}>
+          <StatRow>
+            <StatTile label="Messages read" value={formatCompact(s.networks.reduce((a, n) => a + n.messages, 0))} />
+            <StatTile label="Sources on" value={String(s.networks.length)} hint={`of ${messages.length}`} />
+            <StatTile label="Last read" value={s.last_read ? `${ago(s.last_read)} ago` : 'never'} tone={s.last_read ? 'primary' : 'danger'} />
+          </StatRow>
+        </View>
+      ) : null}
       <SectionLabel>Messages</SectionLabel>
       {group(messages)}
       <SectionLabel>Every morning</SectionLabel>

@@ -38,8 +38,17 @@ export function useMarks() {
       toast.show(FAILED)
     }
   }
+  const snooze = async (item: Item, days: number) => {
+    try {
+      await mark(item, 'snoozed', undefined, days)
+      toast.show(days === 1 ? 'Snoozed until tomorrow' : `Snoozed for ${days} days`, () => mark(item, 'clear'))
+    } catch {
+      toast.show(FAILED)
+    }
+  }
   return {
     done: (i: Item) => act(i, 'done'),
+    snooze,
     dismiss,
     keep: (i: Item) => act(i, 'open'),
     undo: (i: Item) => act(i, i.status === 'done' && i.resolved_by && i.resolved_by !== 'you' ? 'open' : 'clear'),

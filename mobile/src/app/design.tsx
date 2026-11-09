@@ -1,7 +1,7 @@
 // The design system's catalog: every token, component and block, live, in either theme.
 // Like a Storybook that runs on the phone. Open it from Sources → Design system.
 import {
-  AVATAR_SIZE, Avatar, Badge, Banner, BottomSheet, ConfirmDialog, ReasonSheet, CountUp, FadeIn, KeyValueList, Loader, NavList, SectionCard, Stagger, StatusScreen, StepHeader,
+  AVATAR_SIZE, Avatar, Badge, Banner, BottomSheet, ChipGroup, ConfirmDialog, InlineError, NetworkIcon, OptionList, ReasonSheet, ReviewStrip, STATUS, StatRow, StatTile, StatusBadge, type Status, CountUp, FadeIn, KeyValueList, Loader, NavList, SectionCard, Stagger, StatusScreen, StepHeader,
   formatCompact, formatDate, formatINR, formatRelative, Button, Chip, Divider, EmptyState, Facepile, Icon, IconButton, ListRow, PageTitle, PersonHeader,
   PersonRow, PromiseCard, PromiseRow, QuietPile, ReasonChips, Row, SearchField, SectionLabel, Skeleton, SourceRow, Stack, Surface, Tabs,
   Text, ThemeProvider, TimelineEvent, TodayHeader, colors, radius, space, type, useTheme, type PromiseItem, type Scheme, type TypeVariant,
@@ -50,6 +50,8 @@ function Catalog() {
   const [sheet, setSheet] = useState(false)
   const [dialog, setDialog] = useState(false)
   const [why, setWhy] = useState(false)
+  const [chip, setChip] = useState<'all' | 'me' | 'them' | 'money'>('all')
+  const [opt, setOpt] = useState<'1' | '3' | '7'>('3')
   const [replay, setReplay] = useState(0)
   const swatches = Object.keys(colors.light) as (keyof typeof colors.light)[]
   return (
@@ -129,6 +131,37 @@ function Catalog() {
         </BottomSheet>
         <ConfirmDialog open={dialog} destructive title="Unlink WhatsApp?" body="soloyolo stops reading your chats. Promises already found stay on your list."
                        confirmLabel="Unlink WhatsApp" onCancel={() => setDialog(false)} onConfirm={() => setDialog(false)} />
+      </Section>
+      <Section title="Status and choices" note="StatusBadge is the only place a state gets its word and colour. ChipGroup filters a list; OptionList is a choice that needs explaining, with soloyolo’s pick marked. ReviewStrip asks you to confirm what a signal suggests.">
+        <Stack gap="lg">
+          <Row gap="md" padX="xl" style={{ flexWrap: 'wrap' }}>
+            {(Object.keys(STATUS) as Status[]).map((k) => <StatusBadge key={k} status={k} />)}
+          </Row>
+          <ChipGroup scroll label="Show" value={chip} onChange={setChip}
+                     options={[{ value: 'all', label: 'All', count: 9 }, { value: 'me', label: 'You owe', count: 6 }, { value: 'them', label: 'Owed to you', count: 3 }, { value: 'money', label: 'Money', count: 1 }]} />
+          <View style={{ paddingHorizontal: t.space.lg }}>
+            <OptionList label="Snooze until" value={opt} onChange={setOpt} options={[
+              { value: '1', label: 'Tomorrow', description: 'Back on Today first thing.', trailing: 'Tue 10 Nov' },
+              { value: '3', label: 'In 3 days', trailing: 'Thu 12 Nov', suggested: 'The nudge looks again after three quiet days.' },
+              { value: '7', label: 'Next week', trailing: 'Mon 16 Nov' },
+            ]} />
+          </View>
+          <View style={{ paddingHorizontal: t.space.lg }}>
+            <ReviewStrip message="Bank SMS: ₹14,500 sent to landlord@ybl on Nov 4" actionLabel="Mark done" onAction={() => {}} />
+          </View>
+          <StatRow>
+            <StatTile label="You owe" value="2" tone="accent" />
+            <StatTile label="Rohan owes" value="0" />
+            <StatTile label="Closed" value="5" tone="success" hint="this month" />
+          </StatRow>
+          <InlineError title="We couldn’t load your promises." body="soloyolo on your Mac didn’t answer. Check it’s running, then try again." onRetry={() => {}} />
+          <SectionCard title="NavRow with lead, description, trailing">
+            <NavList rows={[
+              { lead: <NetworkIcon network="whatsapp" size="md" />, label: 'WhatsApp', description: '+91 98xxx xx41', trailing: <StatusBadge status="today" />, onPress: () => {} },
+              { lead: <Avatar name="Priya Nair" size="sm" />, label: 'Priya Nair', description: 'Design Lead, Northwind Labs', onPress: () => {} },
+            ]} />
+          </SectionCard>
+        </Stack>
       </Section>
       <Section title="Layout" note="SectionCard groups rows on the paper; KeyValueList and NavList are what goes inside. StepHeader for short setups.">
         <Stack gap="lg">

@@ -46,11 +46,12 @@ async function post(path: string, body: object): Promise<void> {
   if (!r.ok) throw new Error(await r.text())
 }
 
-export async function mark(c: Item, state: Mark, reason?: ReasonKey): Promise<void> {
+/** `reason` only after Not needed; `days` only for a snooze (1 to 60, default 3). */
+export async function mark(c: Item, state: Mark, reason?: ReasonKey, days = 3): Promise<void> {
   await ready
   if (mode === 'live') {
     const body: Record<string, unknown> = { person_id: c.person_id, source_message_id: c.source_message_id, owner: c.owner, state }
-    if (state === 'snoozed') body.days = 3
+    if (state === 'snoozed') body.days = days
     if (reason) body.reason = reason
     await post('/api/mark', body)
   } else {

@@ -80,7 +80,8 @@ src/
   components/  the parts: Text, Stack/Row, Surface, Divider, Icon, Button/IconButton, Chip (tones)/ReasonChips,
                Badge, Avatar/Facepile, SearchField, Tabs, SectionLabel, ListRow, EmptyState, Skeleton, DotGrid,
                Toast (provider + useToast), SwipeRow, Banner, BottomSheet, ConfirmDialog,
-               SectionCard/KeyValueList/NavRow/NavList, StepHeader, Motion (FadeIn, Stagger, CountUp, Loader)
+               SectionCard/KeyValueList/NavRow/NavList, StepHeader, Motion (FadeIn, Stagger, CountUp, Loader),
+               StatusBadge (STATUS, statusOf), ChipGroup, OptionList, StatTile/StatRow, ReviewStrip, InlineError
   blocks/      whole patterns, imported as they are: Screen (Header, Body, Footer), StatusScreen, ReasonSheet, TodayHeader,
                PromiseCard, PromiseRow, PromiseSentence, PersonRow, QuietPile, PageTitle, PersonHeader,
                TimelineEvent, SourceRow, FloatingTabBar
@@ -93,6 +94,18 @@ card, a row or a tab bar is a bug.
 
 New full screens start from `Screen` (header with back and title, scrolling body, footer with one primary action).
 Result screens (imported, failed, waiting, not set up) are `StatusScreen`, never a hand-built centred icon.
+**States have one vocabulary.** A promise's state is `statusOf(item)` and its words and colour come from `STATUS` via
+`StatusBadge`. A screen never maps states to labels itself; a new state is added to `STATUS` and nowhere else.
+
+**soloyolo suggests, you decide.** When a bank SMS or a group chat says something is settled, show it with
+`ReviewStrip` and one action (Mark done). Never close it for the person.
+
+**Pick the right chooser.** `ChipGroup` filters a list (a few short words). `OptionList` is a choice that needs a
+line of explanation, and marks soloyolo's own pick with why. `ReasonSheet` asks why after an action.
+
+**A failed section is an `InlineError`**, naming what failed and the next step, with Try again. The rest of the
+screen keeps working. A whole screen that can't load is a `StatusScreen`.
+
 After an action that closes something without proof (Not needed), ask why with `ReasonSheet`: save first, ask
 second, Skip always there. Never put a reason in front of the action.
 

@@ -10,7 +10,7 @@ export const ICONS = [
   'reader-outline', 'color-palette-outline', 'logo-whatsapp', 'logo-linkedin', 'logo-instagram', 'logo-x', 'logo-slack',
   'chatbubble', 'chatbox', 'paper-plane', 'chatbubble-ellipses',
   'information-circle', 'warning', 'checkmark-circle', 'alert-circle', 'chevron-back', 'settings-outline', 'time-outline', 'link-outline', 'cloud-upload-outline',
-  'remove-circle-outline', 'hand-left-outline',
+  'remove-circle-outline', 'hand-left-outline', 'sparkles',
 ] as const
 export type IconName = (typeof ICONS)[number]
 

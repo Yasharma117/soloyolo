@@ -23,7 +23,7 @@ export function SectionCard({ title, action, children }: { title?: string; actio
 }
 
 /** Label and value pairs inside a SectionCard: "Messages 5,602", "Last sync 4 min ago". */
-export function KeyValueList({ items }: { items: { label: string; value: string; tone?: 'primary' | 'accent' | 'success' | 'danger' }[] }) {
+export function KeyValueList({ items }: { items: { label: string; value: string; tone?: 'primary' | 'accent' | 'success' | 'danger'; emphasis?: boolean }[] }) {
   const t = useTheme()
   return (
     <View>
@@ -31,29 +31,47 @@ export function KeyValueList({ items }: { items: { label: string; value: string;
         <View key={it.label} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: t.space.md, paddingHorizontal: t.space.lg, paddingVertical: t.space.md,
                                       borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderTopColor: t.color.border }}>
           <Text variant="body" tone="secondary">{it.label}</Text>
-          <Text variant="bodyStrong" tone={it.tone ?? 'primary'} style={{ flexShrink: 1, textAlign: 'right' }}>{it.value}</Text>
+          <Text variant={it.emphasis ? 'bodyStrong' : 'body'} tone={it.tone ?? 'primary'} style={{ flexShrink: 1, textAlign: 'right', fontWeight: it.emphasis ? undefined : '500' }}>{it.value}</Text>
         </View>
       ))}
     </View>
   )
 }
 
-/** A row that goes somewhere: icon, label, optional value, chevron. */
-export function NavRow({ icon, label, value, onPress, first }: { icon?: IconName; label: string; value?: string; onPress?: () => void; first?: boolean }) {
+export type NavRowProps = {
+  icon?: IconName
+  /** Any leading element instead of the icon: an Avatar, a NetworkIcon. */
+  lead?: ReactNode
+  label: string
+  /** A second line under the label. */
+  description?: string
+  value?: string
+  /** Any trailing element before the chevron: a StatusBadge, a count. */
+  trailing?: ReactNode
+  onPress?: () => void
+  first?: boolean
+}
+
+/** A row that goes somewhere: icon or lead, label and description, a value, chevron when tappable. */
+export function NavRow({ icon, lead, label, description, value, trailing, onPress, first }: NavRowProps) {
   const t = useTheme()
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} disabled={!onPress}
+    <Pressable accessibilityRole={onPress ? 'button' : undefined} onPress={onPress} disabled={!onPress}
                style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingHorizontal: t.space.lg, paddingVertical: t.space.md + 1,
                                           backgroundColor: pressed ? t.color.surfaceRaised : 'transparent',
                                           borderTopWidth: first ? 0 : StyleSheet.hairlineWidth, borderTopColor: t.color.border })}>
-      {icon ? <Icon name={icon} size="lg" tone="secondary" /> : null}
-      <Text variant="body" style={{ flex: 1 }}>{label}</Text>
+      {lead ?? (icon ? <Icon name={icon} size="lg" tone="secondary" /> : null)}
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text variant="body" numberOfLines={1}>{label}</Text>
+        {description ? <Text variant="small" tone="tertiary" numberOfLines={2}>{description}</Text> : null}
+      </View>
       {value ? <Text variant="body" tone="tertiary">{value}</Text> : null}
+      {trailing}
       {onPress ? <Icon name="chevron-forward" size="md" tone="tertiary" /> : null}
     </Pressable>
   )
 }
 
-export function NavList({ rows }: { rows: { icon?: IconName; label: string; value?: string; onPress?: () => void }[] }) {
-  return <View>{rows.map((r, i) => <NavRow key={r.label} {...r} first={i === 0} />)}</View>
+export function NavList({ rows }: { rows: (Omit<NavRowProps, 'first'> & { key?: string })[] }) {
+  return <View>{rows.map((r, i) => <NavRow {...r} key={r.key ?? r.label} first={i === 0} />)}</View>
 }

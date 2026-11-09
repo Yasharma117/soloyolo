@@ -1,4 +1,4 @@
-import { Banner, Chip, EmptyState, Icon, PromiseCard, QuietPile, Row, SectionLabel, Text, TodayHeader, formatRelative, useTheme } from '@soloyolo/design-system'
+import { Banner, Chip, EmptyState, Icon, InlineError, PromiseCard, QuietPile, Row, SectionLabel, Text, TodayHeader, formatRelative, useTheme } from '@soloyolo/design-system'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { RefreshControl, ScrollView, View } from 'react-native'
@@ -38,9 +38,9 @@ export default function Today() {
                   action={{ label: 'Open sources', onPress: () => router.navigate('/sources') }} />
         </View>
       ) : null}
-      {s.error ? <Text variant="small" tone="secondary" style={{ paddingHorizontal: t.space.xl }}>Couldn’t load: {s.error}</Text> : null}
+      {s.error ? <InlineError title="We couldn’t load today’s list." body="soloyolo on your Mac didn’t answer. Check it’s running, then try again." onRetry={refresh} /> : null}
       {s.data?.today.map((it) => (
-        <PromiseCard key={keyOf(it)} item={it} onPress={() => open(it)} onDone={() => marks.done(it)} onDismiss={() => marks.dismiss(it)} />
+        <PromiseCard key={keyOf(it)} item={it} onPress={() => open(it)} onDone={() => marks.done(it)} onDismiss={() => marks.dismiss(it)} onSettle={() => marks.done(it)} />
       ))}
       {s.data && !n ? (
         <EmptyState title="Nothing you said you’d do needs you today." body="Older things are assumed done, unless someone chases you about them." />

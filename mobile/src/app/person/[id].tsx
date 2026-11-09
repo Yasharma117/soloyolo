@@ -1,19 +1,26 @@
 // A person, Mesh-style: a sheet with their name and orb, a strip of actions, and three views.
-import { ConfirmDialog, IconButton, ListRow, PersonHeader, PromiseRow, SectionLabel, Tabs, Text, TimelineEvent, useTheme, useToast, NETWORK_NAME, NetworkIcon, Row, type PromiseState } from '@soloyolo/design-system'
+import {
+  BottomSheet, Button, ConfirmDialog, IconButton, InlineError, KeyValueList, NavList, NETWORK_NAME, NetworkIcon, OptionList, PersonHeader,
+  PromiseRow, SectionCard, SectionLabel, StatRow, StatTile, Tabs, Text, TimelineEvent, statusOf, useTheme, useToast, type Option,
+} from '@soloyolo/design-system'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Linking, ScrollView, View } from 'react-native'
-import { mute, useData } from '../../lib/api'
+import { mute, refresh, useData } from '../../lib/api'
 import { useMarks } from '../../lib/marks'
 import { ago, isOpen, keyOf, type Item, type Message, type Person } from '../../lib/types'
 
 type View_ = 'promises' | 'timeline' | 'about'
+type Days = '1' | '3' | '7' | '30'
 
-function stateOf(i: Item): PromiseState {
-  if (i.dismissed) return 'not needed'
-  if (i.snoozed) return 'later'
-  if (i.status === 'done') return 'done'
-  return i.live ? 'today' : 'quiet'
+const day = (n: number) => new Date(Date.now() + n * 86400e3).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+
+// A promise with a due date is better snoozed past it; one without comes back in three days, like the nudge.
+function snoozeOptions(it: Item): Option<Days>[] {
+  const pick: Days = it.due ? '7' : '3'
+  const why = it.due ? `It’s due ${it.due}, so a week clears it.` : 'The nudge looks again after three quiet days.'
+  return ([['1', 'Tomorrow', 'Back on Today first thing.'], ['3', 'In 3 days', undefined], ['7', 'Next week', undefined], ['30', 'In a month', 'For things that can wait.']] as const)
+    .map(([value, label, description]) => ({ value, label, description, trailing: day(Number(value)), suggested: value === pick ? why : undefined }))
 }
 
 export default function PersonScreen() {
@@ -24,19 +31,35 @@ export default function PersonScreen() {
   const { id, focus } = useLocalSearchParams<{ id: string; focus?: string }>()
   const [view, setView] = useState<View_>('promises')
   const [asking, setAsking] = useState(false)
+  const [snoozing, setSnoozing] = useState<{ item: Item; days: Days } | null>(null)
   const p = useData<Person>(`/api/person/${id}`)
   const thread = useData<Message[]>(`/api/thread/${id}`)
   const person = p.data
-  if (!person) return <View style={{ flex: 1, backgroundColor: t.color.background }} />
+  const close = <View style={{ paddingHorizontal: t.space.lg, paddingTop: t.space.md + 2 }}>
+    <IconButton icon="chevron-down" label="Close" onPress={() => (router.canGoBack() ? router.back() : router.replace('/people'))} />
+  </View>
+  if (!person) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.color.background, gap: t.space.xl }}>
+        {close}
+        {p.error ? <InlineError title="We couldn’t load this person." body="soloyolo on your Mac didn’t answer. Check it’s running, then try again." onRetry={refresh} /> : null}
+      </View>
+    )
+  }
   const items: Item[] = person.commitments.map((x) => ({ ...x, person_id: person.id, name: person.name, networks: person.networks }))
   const first = person.name.split(' ')[0]!
   const sources = new Set(items.map((x) => x.source_message_id))
   const phone = person.handles.find((h) => h.network === 'whatsapp')?.address.split('@')[0]?.replace(/\D/g, '')
+  const youOwe = items.filter((x) => x.owner === 'me' && isOpen(x)).length
+  const theyOwe = items.filter((x) => x.owner === 'them' && isOpen(x)).length
+  const closed = items.filter((x) => x.status === 'done' || x.dismissed).length
   const row = (it: Item) => {
-    const st = stateOf(it)
+    const st = statusOf(it)
     const open = isOpen(it)
     return (
       <PromiseRow key={keyOf(it)} item={it} state={st} showPerson={false} highlighted={String(it.source_message_id) === focus}
+                  onPress={open ? () => setSnoozing({ item: it, days: it.due ? '7' : '3' }) : undefined}
+                  onSettle={() => marks.done(it)}
                   trailing={!open ? { label: 'Undo', icon: 'arrow-undo', tone: 'neutralAction', onAction: () => marks.undo(it) }
                     : st === 'quiet' ? { label: 'Still on', icon: 'refresh', tone: 'later', onAction: () => marks.keep(it) }
                     : { label: 'Done', icon: 'checkmark', tone: 'success', onAction: () => marks.done(it) }}
@@ -44,11 +67,10 @@ export default function PersonScreen() {
     )
   }
   const none = <Text variant="small" tone="tertiary" style={{ paddingHorizontal: t.space.xl }}>Nothing.</Text>
+  const messages = (thread.data ?? []).slice(-60).reverse()
   return (
     <ScrollView style={{ backgroundColor: t.color.background }} contentContainerStyle={{ paddingBottom: 60 }}>
-      <View style={{ paddingHorizontal: t.space.lg, paddingTop: t.space.md + 2 }}>
-        <IconButton icon="chevron-down" label="Close" onPress={() => (router.canGoBack() ? router.back() : router.replace('/people'))} />
-      </View>
+      {close}
       <PersonHeader
         name={person.name} network={person.networks[0]} subtitle={`last talked ${ago(person.last)} ago${person.muted ? ' · muted' : ''}`}
         actions={[
@@ -64,6 +86,14 @@ export default function PersonScreen() {
                      body={`${first}’s promises leave Today and soloyolo stops reading this chat. You can unmute it anytime.`}
                      confirmLabel="Mute chat" onCancel={() => setAsking(false)}
                      onConfirm={async () => { setAsking(false); await mute(person.id, true); toast.show('Chat muted') }} />
+      <BottomSheet open={!!snoozing} onClose={() => setSnoozing(null)} title="Snooze until" subtitle={snoozing?.item.action}
+                   footer={<Button label="Snooze" variant="primary" onPress={() => {
+                     if (snoozing) void marks.snooze(snoozing.item, Number(snoozing.days))
+                     setSnoozing(null)
+                   }} />}>
+        {snoozing ? <OptionList label="Snooze until" options={snoozeOptions(snoozing.item)} value={snoozing.days}
+                                onChange={(days) => setSnoozing({ ...snoozing, days })} /> : null}
+      </BottomSheet>
       <View style={{ marginTop: t.space.md + 2 }}>
         <Tabs value={view} onChange={setView} items={[{ key: 'promises', label: 'Promises' }, { key: 'timeline', label: 'Timeline' }, { key: 'about', label: 'About' }]} />
       </View>
@@ -75,33 +105,41 @@ export default function PersonScreen() {
           <SectionLabel>{`${first} owes you`}</SectionLabel>
           {items.filter((x) => x.owner === 'them').map(row)}
           {!items.some((x) => x.owner === 'them') && none}
+          <Text variant="caption" tone="tertiary" style={{ paddingHorizontal: t.space.xl, paddingTop: t.space.lg }}>
+            Tap an open one to snooze it. Swipe left when it’s done, right if it’s not needed.
+          </Text>
         </>
       )}
       {view === 'timeline' && (
-        <View style={{ paddingTop: t.space.sm }}>
-          {(thread.data ?? []).slice(-60).reverse().map((m) => (
-            <TimelineEvent key={m.id} who={first} text={m.text} ts={m.ts} fromMe={!!m.from_me} call={m.text === '[call]'} isSource={sources.has(m.id)} />
+        <View style={{ paddingTop: t.space.lg }}>
+          {thread.error ? <InlineError title="We couldn’t load the chat." body="soloyolo on your Mac didn’t answer. Check it’s running, then try again." onRetry={refresh} /> : null}
+          {messages.map((m, i) => (
+            <TimelineEvent key={m.id} who={first} text={m.text} ts={m.ts} fromMe={!!m.from_me} call={m.text === '[call]'} isSource={sources.has(m.id)}
+                           last={i === messages.length - 1} />
           ))}
-          {!thread.data?.length && <Text variant="small" tone="tertiary" style={{ padding: t.space.xl }}>No messages loaded.</Text>}
+          {!thread.error && !messages.length && <Text variant="small" tone="tertiary" style={{ padding: t.space.xl }}>No messages loaded.</Text>}
         </View>
       )}
       {view === 'about' && (
-        <>
-          <SectionLabel>Summary</SectionLabel>
-          <Text variant="body" style={{ paddingHorizontal: t.space.xl }}>
+        <View style={{ gap: t.space.lg, paddingTop: t.space.lg }}>
+          <StatRow>
+            <StatTile label="You owe" value={String(youOwe)} tone={youOwe ? 'accent' : 'primary'} />
+            <StatTile label={`${first} owes`} value={String(theyOwe)} />
+            <StatTile label="Closed" value={String(closed)} tone={closed ? 'success' : 'primary'} />
+          </StatRow>
+          <Text variant="body" tone="secondary" style={{ paddingHorizontal: t.space.xl }}>
             You last talked {ago(person.last)} ago{person.networks[0] ? ` on ${NETWORK_NAME[person.networks[0]] ?? person.networks[0]}` : ''}.
-            You owe {first} {items.filter((x) => x.owner === 'me' && isOpen(x)).length || 'nothing'}, and {first} owes you {items.filter((x) => x.owner === 'them' && isOpen(x)).length || 'nothing'}.
           </Text>
-          {person.attributes.length ? <SectionLabel>Properties</SectionLabel> : null}
-          {person.attributes.map((a) => (
-            <ListRow key={`${a.key}${a.value}`} title={<Text variant="label" tone="tertiary">{a.key}</Text>} trailing={<Text variant="body">{a.value}</Text>} />
-          ))}
-          <SectionLabel>Sources</SectionLabel>
-          {person.handles.map((h) => (
-            <ListRow key={`${h.network}${h.address}`} title={<Row gap="sm"><NetworkIcon network={h.network} size="sm" /><Text variant="body">{h.address}</Text></Row>}
-                     trailing={<Text variant="label" tone="tertiary">{NETWORK_NAME[h.network] ?? h.network}</Text>} />
-          ))}
-        </>
+          {person.attributes.length ? (
+            <SectionCard title="Properties">
+              <KeyValueList items={person.attributes.map((a) => ({ label: a.key[0]!.toUpperCase() + a.key.slice(1), value: a.value }))} />
+            </SectionCard>
+          ) : null}
+          <SectionCard title="Sources">
+            <NavList rows={person.handles.map((h) => ({ key: `${h.network}${h.address}`, lead: <NetworkIcon network={h.network} size="md" />,
+                                                         label: NETWORK_NAME[h.network] ?? h.network, description: h.address }))} />
+          </SectionCard>
+        </View>
       )}
     </ScrollView>
   )

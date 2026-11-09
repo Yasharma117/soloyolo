@@ -23,11 +23,11 @@ const PEOPLE: P[] = [
 
 let seq = 100
 function it(pid: number, owner: 'me' | 'them', action: string, src: string, agoS: number, live: boolean, reasons: string[],
-            kind: 'promise' | 'ask' = 'promise'): Item {
+            kind: 'promise' | 'ask' = 'promise', suggestion: string | null = null): Item {
   const p = PEOPLE.find((x) => x.id === pid)!
   return {
     person_id: pid, name: p.name, networks: p.networks, source_message_id: ++seq, owner, kind, action, due: null,
-    status: 'open', source_ts: now() - agoS, source_text: src, resolved_by: null, snoozed: false, dismissed: false, live, reasons,
+    status: 'open', source_ts: now() - agoS, source_text: src, resolved_by: null, snoozed: false, dismissed: false, live, reasons, suggestion,
   }
 }
 
@@ -37,11 +37,13 @@ function fresh(): Item[] {
     it(1, 'me', 'Send Rohan the rent agreement scan', 'Agreement ka scan bhej dena kal tak, broker maang raha hai', 2 * D, true, ['asked again 3h ago', 'due tomorrow']),
     it(2, 'me', 'Book Ma’s train ticket for the 21st', '21 ki ticket kara dena beta, Rajdhani mil jaye toh', D, true, ['said yesterday', 'close']),
     it(3, 'them', 'Share the hiring manager’s email', 'I’ll dig out Anand’s email and send it over this week', 3 * D, true, ['overdue 1d']),
-    it(4, 'me', 'Return Kabir’s tripod', 'Tripod Sunday tak wapas kar dena', 9 * D, false, ['9 days']),
+    it(4, 'me', 'Return Kabir’s tripod', 'Tripod Sunday tak wapas kar dena', 9 * D, false, ['9 days'], 'promise',
+       'In Weekend trek group, Kabir said “tripod mil gaya, thanks” 2 days ago'),
     it(5, 'me', 'Send Arjun your portfolio link', 'Would love to see your work, can you share a link?', 6 * D, false, ['6 days'], 'ask'),
     it(6, 'them', 'Send the list of cafes in Hauz Khas', 'will send you the list tonight!!', 4 * D, false, ['4 days']),
     it(7, 'me', 'Reply to Tanvi about the beta invite', 'any chance you could take a look at the beta this week?', 9 * D, false, ['9 days'], 'ask'),
-    it(8, 'me', 'Pay ₹14,500 rent for November', 'Rent 14,500 by 5th please', 12 * D, false, ['12 days', 'money']),
+    it(8, 'me', 'Pay ₹14,500 rent for November', 'Rent 14,500 by 5th please', 12 * D, false, ['12 days', 'money'], 'promise',
+       'Bank SMS: ₹14,500 sent to landlord@ybl on Nov 4'),
     it(2, 'me', 'Call Mausi about the wedding dates', 'Mausi ko phone kar lena, dates confirm karni hai', 16 * D, false, ['16 days', 'close']),
   ]
 }
@@ -103,6 +105,7 @@ export const demo = {
     if (!it) return
     if (state === 'clear') return void Object.assign(it, original.get(it.source_message_id))
     Object.assign(it, {
+      suggestion: null,
       resolved_by: 'you', status: state === 'done' ? 'done' : 'open', dismissed: state === 'dismissed', snoozed: state === 'snoozed',
       live: state === 'open' ? true : it.live,
       reasons: state === 'open' && !it.reasons?.includes('you kept it on') ? ['you kept it on', ...(it.reasons ?? [])] : it.reasons,

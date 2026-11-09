@@ -9,6 +9,8 @@ export type PromiseItem = {
   networks?: string[]
   reasons?: string[]
   due?: string | null
+  /** What a bank SMS or a group chat says about it being settled. Shown, never acted on without you. */
+  suggestion?: string | null
 }
 
 export function ago(ts: number, now = Date.now() / 1000): string {

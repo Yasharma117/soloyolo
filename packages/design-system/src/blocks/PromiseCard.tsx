@@ -2,6 +2,7 @@ import { View } from 'react-native'
 import { Avatar } from '../components/Avatar/Avatar'
 import { ReasonChips } from '../components/Chip/Chip'
 import { NetworkIcon } from '../components/Icon/Icon'
+import { ReviewStrip } from '../components/ReviewStrip/ReviewStrip'
 import { Row } from '../components/Stack/Stack'
 import { Surface } from '../components/Surface/Surface'
 import { SwipeRow, useSwipeTap } from '../components/SwipeRow/SwipeRow'
@@ -22,7 +23,7 @@ export function Quote({ text }: { text?: string | null }) {
 }
 
 /** Today's card. Swipe left: Done. Swipe right: Not needed. Tap: open the person. */
-export function PromiseCard({ item, onPress, onDone, onDismiss }: { item: PromiseItem; onPress?: () => void; onDone?: () => void; onDismiss?: () => void }) {
+export function PromiseCard({ item, onPress, onDone, onDismiss, onSettle }: { item: PromiseItem; onPress?: () => void; onDone?: () => void; onDismiss?: () => void; onSettle?: () => void }) {
   const t = useTheme()
   const swipe = useSwipeTap(onPress)
   return (
@@ -40,6 +41,7 @@ export function PromiseCard({ item, onPress, onDone, onDismiss }: { item: Promis
           <PromiseSentence item={item} />
           <Quote text={item.source_text?.slice(0, 160)} />
           <ReasonChips reasons={item.reasons} />
+          {item.suggestion ? <ReviewStrip message={item.suggestion} actionLabel={onSettle ? 'Mark done' : undefined} onAction={onSettle} /> : null}
         </Surface>
       </SwipeRow>
     </View>
