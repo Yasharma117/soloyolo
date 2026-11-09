@@ -20,7 +20,10 @@ def inline(m: re.Match) -> str:
     return '"data:%s;base64,%s"' % (mime[p.suffix], base64.b64encode(p.read_bytes()).decode())
 
 
-js = re.sub(r'"(/assets/[^"]+\.(?:ttf|png))"', inline, js).replace("</script", "<\\/script")
+js = re.sub(r'"(/assets/[^"]+\.(?:ttf|png))"', inline, js)
+# Inside an inline <script>, "<!--" followed later by "<script" makes the HTML parser keep reading past
+# "</script>", so the app never runs. \x3C is "<" in any JS string, template or regex.
+js = re.sub(r"<(?=!--|/?script)", r"\\x3C", js, flags=re.I)
 out.write_text('''<title>soloyolo app</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>

@@ -1,0 +1,5 @@
+{
+  "name": "soloyolo",
+  "private": true,
+  "workspaces": ["mobile", "packages/*"]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@soloyolo/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "soloyolo's design system: tokens, theme, components and blocks for React Native (iOS, Android, web).",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "check": "node scripts/check.mjs"
+  },
+  "peerDependencies": {
+    "@expo/vector-icons": "*",
+    "expo-haptics": "*",
+    "expo-linear-gradient": "*",
+    "react": "*",
+    "react-native": "*",
+    "react-native-gesture-handler": "*",
+    "react-native-reanimated": "*",
+    "react-native-safe-area-context": "*",
+    "react-native-svg": "*"
+  }
+}

@@ -62,11 +62,8 @@ jobs:
       - run: npm run build
 
   mobile:
-    name: mobile (Expo typecheck and iOS bundle)
+    name: mobile (design system gates, typecheck, lint, iOS bundle)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mobile
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,7 +72,12 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: mobile/package-lock.json
-      - run: npm ci
+          cache-dependency-path: package-lock.json
+      - run: npm ci # the workspace: mobile/ and packages/design-system
+      - run: npm run check -w @soloyolo/design-system
       - run: npx tsc --noEmit
+        working-directory: mobile
+      - run: npx expo lint
+        working-directory: mobile
       - run: npx expo export --platform ios --output-dir /tmp/expo-ios
+        working-directory: mobile

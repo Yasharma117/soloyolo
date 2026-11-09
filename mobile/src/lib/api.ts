@@ -86,7 +86,6 @@ export function useData<T>(path: string) {
   const [state, setState] = useState<{ data: T | null; error: string | null; loading: boolean }>({ data: null, error: null, loading: true })
   const load = useCallback(() => {
     let live = true
-    setState((s) => ({ ...s, loading: true }))
     get<T>(path)
       .then((data) => live && setState({ data, error: null, loading: false }))
       .catch((e: Error) => live && setState((s) => ({ ...s, error: e.message, loading: false })))
