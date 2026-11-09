@@ -1,0 +1,205 @@
+/* soloyolo Today on iOS, light. Grouped background, white cards, one warm
+   accent for what's urgent; Done is the system green. The phone is centered
+   and runs off the bottom; everything inside is in screen points. */
+
+.sy .ss-stage {
+  --sy-ink: #111;
+  --sy-ink-2: #6e6e73;
+  --sy-ink-3: #aeaeb2;
+  --sy-ground: #f2f2f7;
+  --sy-hot: #b26a00;
+  --sy-hot-soft: #fff1d6;
+  --sy-chip: #eeeef2;
+  --sy-done: #34c759;
+  overflow: hidden;
+  background: #e9e8e4;
+}
+
+.sy-phone {
+  position: absolute;
+  top: 36px;
+  left: 50%;
+  translate: -50% 0;
+}
+
+/* In the phone column the phone keeps its size and runs off the right edge */
+.sy-phone--compact {
+  left: 36px;
+  translate: none;
+}
+
+.sy-app {
+  min-height: 100%;
+  background: var(--sy-ground);
+  color: var(--sy-ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+}
+
+.sy-head {
+  padding: 10px 20px 4px;
+}
+
+.sy-title {
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 41px;
+  letter-spacing: 0.01em;
+}
+
+.sy-sub {
+  margin-top: 2px;
+  color: var(--sy-ink-2);
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.sy-list {
+  display: grid;
+  padding: 12px 20px 0;
+}
+
+/* Cards stack with a 12pt gap; the gap lives inside each cell so the
+   collapsing one takes its gap with it */
+.sy-cell {
+  position: relative;
+  padding-bottom: 12px;
+}
+
+.sy-action {
+  position: absolute;
+  inset: 0 0 12px 0;
+  border-radius: 16px;
+  background: var(--sy-done);
+  overflow: hidden;
+}
+
+.sy-action__mark {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 84px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sy-card {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 16px 16px 19px;
+  border-radius: 16px;
+  background: #fff;
+  will-change: transform;
+}
+
+.sy-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 28px;
+}
+
+.sy-name {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sy-app-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--sy-ink-2);
+  font-size: 13px;
+}
+
+.sy-app-tag svg { color: var(--sy-ink-3); }
+
+.sy-when {
+  margin-left: auto;
+  color: var(--sy-ink-3);
+  font-size: 13px;
+}
+
+.sy-what {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+}
+
+.sy-quote {
+  padding-left: 10px;
+  border-left: 2px solid #e5e5ea;
+  color: var(--sy-ink-2);
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.sy-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sy-chip {
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: var(--sy-chip);
+  color: var(--sy-ink-2);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.sy-chip[data-hot] {
+  background: var(--sy-hot-soft);
+  color: var(--sy-hot);
+  font-weight: 500;
+}
+
+.sy-fill {
+  display: flex;
+  align-items: center;
+  height: 22px;
+}
+
+/* Body lines start at the name's edge, not under the avatar (28pt + 8pt gap) */
+.sy-what, .sy-quote, .sy-chips, .sy-fill { margin-left: 36px; }
+
+.sy-section {
+  padding: 10px 20px 8px;
+  color: var(--sy-ink-2);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.sy-quiet {
+  margin: 0 20px;
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.sy-qrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.sy-qrow + .sy-qrow { border-top: 0.5px solid #e5e5ea; }
+
+.sy-qtext {
+  display: grid;
+  gap: 8px;
+}
