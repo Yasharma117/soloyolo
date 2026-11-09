@@ -1,9 +1,10 @@
-import { Button, PageTitle, SectionLabel, SourceRow, StatRow, StatTile, Surface, Text, TopBar, Wash, formatCompact, useScrollChrome, useTheme, type IconName } from '@soloyolo/design-system'
+import { Button, ChipGroup, PageTitle, SectionLabel, SourceRow, StatRow, StatTile, Surface, Text, TopBar, Wash, formatCompact, useScrollChrome, useTheme, type IconName } from '@soloyolo/design-system'
 import { useRouter } from 'expo-router'
 import { View } from 'react-native'
 import Animated from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { serverUrl, useData, useMode } from '../../lib/api'
+import { useAppearance, type Appearance } from '../../lib/appearance'
 import { ago, type Status } from '../../lib/types'
 
 type Src = { icon: IconName; name: string; state: string; tone: 'on' | 'off' | 'hold'; note: string }
@@ -14,6 +15,7 @@ export default function Sources() {
   const router = useRouter()
   const mode = useMode()
   const chrome = useScrollChrome()
+  const look = useAppearance()
   const { data: s } = useData<Status>('/api/status')
   const has = Object.fromEntries((s?.networks ?? []).map((n) => [n.network, n]))
   const groups = (s?.groups ?? []).reduce((a, g) => a + g.lines, 0)
@@ -62,6 +64,11 @@ export default function Sources() {
       {group(messages)}
       <SectionLabel>Every morning</SectionLabel>
       {group(daily)}
+      <SectionLabel>Appearance</SectionLabel>
+      <View style={{ paddingHorizontal: t.space.lg }}>
+        <ChipGroup<Appearance> label="Appearance" value={look.appearance} onChange={look.set}
+                               options={[{ value: 'system', label: 'Match phone' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
+      </View>
       <SectionLabel>Privacy</SectionLabel>
       <View style={{ marginHorizontal: t.space.lg }}>
         <Surface variant="outline" radius="xl">

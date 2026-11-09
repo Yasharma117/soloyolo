@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar'
 import { ScrollView } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { AppearanceProvider } from '../lib/appearance'
 import { ReasonProvider } from '../lib/reasons'
 
 function Navigation() {
@@ -22,7 +23,7 @@ function Navigation() {
           </Stack>
         </ReasonProvider>
       </ToastProvider>
-      <StatusBar style="auto" />
+      <StatusBar style={t.scheme === 'dark' ? 'light' : 'dark'} />
     </ThemeProvider>
   )
 }
@@ -31,9 +32,13 @@ export default function Root() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <DSTheme>
-          <Navigation />
-        </DSTheme>
+        <AppearanceProvider>
+          {(scheme) => (
+            <DSTheme scheme={scheme}>
+              <Navigation />
+            </DSTheme>
+          )}
+        </AppearanceProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   )
