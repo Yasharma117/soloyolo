@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { Tabs } from 'expo-router/js-tabs'
-import type { ColorValue } from 'react-native'
+import { Platform, type ColorValue } from 'react-native'
 import { useData } from '../../lib/api'
 import { usePalette } from '../../lib/theme'
 import type { TodaySummary } from '../../lib/types'
@@ -13,7 +13,7 @@ export default function TabsLayout() {
     ({ color, focused, size }: { color: ColorValue; focused: boolean; size: number }) => <Ionicons name={focused ? filled : name} size={size - 2} color={color as string} />
   return (
     <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: c.ink, tabBarInactiveTintColor: c.ink3,
-                           tabBarStyle: { backgroundColor: c.card, borderTopColor: c.line } }}>
+                           tabBarStyle: { backgroundColor: c.card, borderTopColor: c.line, ...(Platform.OS === 'web' ? { height: 58, paddingBottom: 8 } : null) } }}>
       <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: icon('sunny-outline', 'sunny'),
                                           tabBarBadge: n || undefined, tabBarBadgeStyle: { backgroundColor: c.accent, color: '#fff' } }} />
       <Tabs.Screen name="people" options={{ title: 'People', tabBarIcon: icon('people-outline', 'people') }} />
