@@ -6,6 +6,11 @@ const GROUPS: { title: string; rows: { label: string; href: Href; value?: string
   { title: 'Every day', rows: [
     { label: 'Today', href: '/' }, { label: 'People', href: '/people' }, { label: 'All open', href: '/all' }, { label: 'Sources', href: '/sources' },
   ] },
+  { title: 'States (?state=, from Markon’s page-state)', rows: [
+    { label: 'Today, loading', href: '/?state=loading' }, { label: 'Today, nothing owed', href: '/?state=empty' }, { label: 'Today, failed to load', href: '/?state=error' },
+    { label: 'All open, loading', href: '/all?state=loading' }, { label: 'All open, failed to load', href: '/all?state=error' },
+    { label: 'People, loading', href: '/people?state=loading' }, { label: 'People, failed to load', href: '/people?state=error' },
+  ] },
   { title: 'A person', rows: [
     { label: 'Person, promises', href: '/person/1', value: 'demo' }, { label: 'Person, with a promise in focus', href: '/person/1?focus=101', value: 'demo' },
     { label: 'Person, waiting on them', href: '/person/3', value: 'demo' },

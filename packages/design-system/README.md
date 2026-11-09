@@ -109,6 +109,11 @@ screen keeps working. A whole screen that can't load is a `StatusScreen`.
 After an action that closes something without proof (Not needed), ask why with `ReasonSheet`: save first, ask
 second, Skip always there. Never put a reason in front of the action.
 
+**Screen chrome.** Every tab and full screen scrolls in an `Animated.ScrollView` with `useScrollChrome()`, starts with
+`<Wash />`, and ends with `<TopBar>`: clear at rest, filled with the title once content runs under it. Close and
+back buttons live in the TopBar so they never scroll away. While data loads, show `CardSkeleton`/`RowSkeleton`
+at the size of what's coming, never a blank screen.
+
 Every screen and state is listed in the app at `/screens` (Sources → Every screen); add new routes there.
 
 ## Rules the build enforces

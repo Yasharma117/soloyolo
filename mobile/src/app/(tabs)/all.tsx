@@ -1,7 +1,8 @@
-import { ChipGroup, InlineError, PageTitle, PromiseRow, SectionLabel, Text, statusOf, useTheme, type ChipOption } from '@soloyolo/design-system'
-import { useRouter } from 'expo-router'
+import { ChipGroup, InlineError, PageTitle, PromiseRow, RowSkeleton, SectionLabel, Text, TopBar, Wash, statusOf, useScrollChrome, useTheme, type ChipOption } from '@soloyolo/design-system'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
-import { ScrollView, View } from 'react-native'
+import { View } from 'react-native'
+import Animated from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { refresh, useData } from '../../lib/api'
 import { useMarks } from '../../lib/marks'
@@ -24,7 +25,12 @@ export default function All() {
   const router = useRouter()
   const marks = useMarks()
   const [filter, setFilter] = useState<Filter>('all')
-  const { data, error } = useData<Item[]>('/api/all')
+  const chrome = useScrollChrome()
+  const { state: preview } = useLocalSearchParams<{ state?: 'empty' | 'error' | 'loading' }>()
+  const real = useData<Item[]>('/api/all')
+  const { data, error, loading } = preview === 'loading' ? { data: null, error: null, loading: true }
+    : preview === 'error' ? { data: null, error: 'preview', loading: false }
+    : preview === 'empty' ? { data: [] as Item[], error: null, loading: false } : real
   const every = data ?? []
   const options: ChipOption<Filter>[] = FILTERS.map((f) => ({ value: f.value, label: f.label, count: every.filter(f.test).length }))
     .filter((o) => o.value === 'all' || o.count > 0 || o.value === filter)
@@ -42,14 +48,21 @@ export default function All() {
     )
   }
   return (
-    <ScrollView style={{ backgroundColor: t.color.background }} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}>
+    <View style={{ flex: 1, backgroundColor: t.color.background }}>
+    <Animated.ScrollView onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}>
+      <Wash />
       <PageTitle title="All open" subtitle="Everything still open. Quiet ones are assumed done; swipe one left if it isn’t." />
       {error ? <InlineError title="We couldn’t load your promises." body="soloyolo on your Mac didn’t answer. Check it’s running, then try again." onRetry={refresh} /> : null}
       {every.length ? <View style={{ marginBottom: t.space.xs }}><ChipGroup scroll label="Show" options={options} value={filter} onChange={setFilter} /></View> : null}
+      {loading && !data && !error ? <View style={{ paddingTop: t.space.lg }}>{[0, 1, 2, 3, 4].map((i) => <RowSkeleton key={i} />)}</View> : null}
+      {data ? <>
       <SectionLabel>{`On today · ${live.length}`}</SectionLabel>
       {live.length ? live.map(row) : <Text variant="small" tone="tertiary" style={{ paddingHorizontal: t.space.xl }}>Nothing.</Text>}
       <SectionLabel>{`Quiet · ${quiet.length}`}</SectionLabel>
       {quiet.length ? quiet.map(row) : <Text variant="small" tone="tertiary" style={{ paddingHorizontal: t.space.xl }}>Nothing.</Text>}
-    </ScrollView>
+      </> : null}
+    </Animated.ScrollView>
+    <TopBar y={chrome.y} title="All open" at={70} />
+    </View>
   )
 }

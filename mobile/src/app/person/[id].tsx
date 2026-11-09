@@ -1,11 +1,12 @@
 // A person, Mesh-style: a sheet with their name and orb, a strip of actions, and three views.
 import {
   BottomSheet, Button, ConfirmDialog, IconButton, InlineError, KeyValueList, NavList, NETWORK_NAME, NetworkIcon, OptionList, PersonHeader,
-  PromiseRow, SectionCard, SectionLabel, StatRow, StatTile, Tabs, Text, TimelineEvent, statusOf, useTheme, useToast, type Option,
+  PromiseRow, RowSkeleton, SectionCard, SectionLabel, Skeleton, StatRow, StatTile, Tabs, Text, TimelineEvent, TopBar, Wash, statusOf, useScrollChrome, useTheme, useToast, type Option,
 } from '@soloyolo/design-system'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
-import { Linking, ScrollView, View } from 'react-native'
+import { Linking, View } from 'react-native'
+import Animated from 'react-native-reanimated'
 import { mute, refresh, useData } from '../../lib/api'
 import { useMarks } from '../../lib/marks'
 import { ago, isOpen, keyOf, type Item, type Message, type Person } from '../../lib/types'
@@ -35,14 +36,18 @@ export default function PersonScreen() {
   const p = useData<Person>(`/api/person/${id}`)
   const thread = useData<Message[]>(`/api/thread/${id}`)
   const person = p.data
-  const close = <View style={{ paddingHorizontal: t.space.lg, paddingTop: t.space.md + 2 }}>
-    <IconButton icon="chevron-down" label="Close" onPress={() => (router.canGoBack() ? router.back() : router.replace('/people'))} />
-  </View>
+  const chrome = useScrollChrome()
+  // pinned in the top bar, so it never scrolls away on a long timeline (Markon's inline header: back stays put)
+  const close = <IconButton icon="chevron-down" label="Close" onPress={() => (router.canGoBack() ? router.back() : router.replace('/people'))} />
   if (!person) {
     return (
-      <View style={{ flex: 1, backgroundColor: t.color.background, gap: t.space.xl }}>
-        {close}
-        {p.error ? <InlineError title="We couldn’t load this person." body="soloyolo on your Mac didn’t answer. Check it’s running, then try again." onRetry={refresh} /> : null}
+      <View style={{ flex: 1, backgroundColor: t.color.background }}>
+        <View style={{ paddingTop: 64, gap: t.space.xl }}>
+          {p.error ? <InlineError title="We couldn’t load this person." body="soloyolo on your Mac didn’t answer. Check it’s running, then try again." onRetry={refresh} />
+            : <View style={{ gap: t.space.md, paddingHorizontal: t.space.xl }}><Skeleton width="55%" height={28} /><Skeleton width="35%" height={12} />
+                <View style={{ marginHorizontal: -t.space.xl, marginTop: t.space.xl }}>{[0, 1, 2].map((i) => <RowSkeleton key={i} />)}</View></View>}
+        </View>
+        <TopBar y={chrome.y} leading={close} />
       </View>
     )
   }
@@ -69,8 +74,9 @@ export default function PersonScreen() {
   const none = <Text variant="small" tone="tertiary" style={{ paddingHorizontal: t.space.xl }}>Nothing.</Text>
   const messages = (thread.data ?? []).slice(-60).reverse()
   return (
-    <ScrollView style={{ backgroundColor: t.color.background }} contentContainerStyle={{ paddingBottom: 60 }}>
-      {close}
+    <View style={{ flex: 1, backgroundColor: t.color.background }}>
+    <Animated.ScrollView onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: 52, paddingBottom: 60 }}>
+      <Wash />
       <PersonHeader
         name={person.name} network={person.networks[0]} subtitle={`last talked ${ago(person.last)} ago${person.muted ? ' · muted' : ''}`}
         actions={[
@@ -141,6 +147,8 @@ export default function PersonScreen() {
           </SectionCard>
         </View>
       )}
-    </ScrollView>
+    </Animated.ScrollView>
+    <TopBar y={chrome.y} title={person.name} at={70} leading={close} />
+    </View>
   )
 }

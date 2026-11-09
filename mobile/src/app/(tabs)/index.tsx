@@ -1,7 +1,8 @@
-import { Banner, Chip, EmptyState, Icon, InlineError, PromiseCard, QuietPile, Row, SectionLabel, Text, TodayHeader, formatRelative, useTheme } from '@soloyolo/design-system'
-import { useRouter } from 'expo-router'
+import { Banner, CardSkeleton, Chip, EmptyState, Icon, InlineError, PromiseCard, TopBar, Wash, useScrollChrome, QuietPile, Row, SectionLabel, Text, TodayHeader, formatRelative, useTheme } from '@soloyolo/design-system'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
-import { RefreshControl, ScrollView, View } from 'react-native'
+import { RefreshControl, View } from 'react-native'
+import Animated from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { refresh, useData, useMode } from '../../lib/api'
 import { useMarks } from '../../lib/marks'
@@ -13,7 +14,13 @@ export default function Today() {
   const router = useRouter()
   const mode = useMode()
   const marks = useMarks()
-  const s = useData<TodaySummary>('/api/today')
+  const chrome = useScrollChrome()
+  // ?state=empty|error|loading shows that state on demand, for review (Markon's page-state; listed in /screens)
+  const { state: preview } = useLocalSearchParams<{ state?: 'empty' | 'error' | 'loading' }>()
+  const live = useData<TodaySummary>('/api/today')
+  const s = preview === 'loading' ? { data: null, error: null, loading: true }
+    : preview === 'error' ? { data: null, error: 'preview', loading: false }
+    : preview === 'empty' ? { data: { today: [], live: 0, quiet: 0, open: 0 }, error: null, loading: false } : live
   const all = useData<Item[]>('/api/all')
   const status = useData<Status>('/api/status')
   const wa = status.data?.networks.find((x) => x.network === 'whatsapp')
@@ -23,8 +30,10 @@ export default function Today() {
   const n = s.data?.today.length ?? 0
   const open = (it: Item) => router.push({ pathname: '/person/[id]', params: { id: String(it.person_id), focus: String(it.source_message_id) } })
   return (
-    <ScrollView style={{ backgroundColor: t.color.background }} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}
+    <View style={{ flex: 1, backgroundColor: t.color.background }}>
+    <Animated.ScrollView onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}
                 refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}>
+      <Wash />
       <TodayHeader count={s.data ? n : null} />
       {mode === 'demo' && (
         <Row padX="xl" style={{ marginBottom: t.space.md + 2 }}>
@@ -39,6 +48,7 @@ export default function Today() {
         </View>
       ) : null}
       {s.error ? <InlineError title="We couldn’t load today’s list." body="soloyolo on your Mac didn’t answer. Check it’s running, then try again." onRetry={refresh} /> : null}
+      {s.loading && !s.data && !s.error ? <><CardSkeleton /><CardSkeleton /><CardSkeleton /></> : null}
       {s.data?.today.map((it) => (
         <PromiseCard key={keyOf(it)} item={it} onPress={() => open(it)} onDone={() => marks.done(it)} onDismiss={() => marks.dismiss(it)} onSettle={() => marks.done(it)} />
       ))}
@@ -46,12 +56,14 @@ export default function Today() {
         <EmptyState title="Nothing you said you’d do needs you today." body="Older things are assumed done, unless someone chases you about them." />
       ) : null}
       {n ? <Text variant="small" tone="tertiary" style={{ paddingHorizontal: t.space.xl }}>Swipe left when it’s done, right if it’s not needed.</Text> : null}
-      {quiet.length ? (
+      {quiet.length && s.data ? (
         <>
           <SectionLabel>Quiet · assumed done</SectionLabel>
           <QuietPile names={quiet.map((q) => q.name)} onPress={() => router.navigate('/all')} />
         </>
       ) : null}
-    </ScrollView>
+    </Animated.ScrollView>
+    <TopBar y={chrome.y} title="Today" at={150} />
+    </View>
   )
 }

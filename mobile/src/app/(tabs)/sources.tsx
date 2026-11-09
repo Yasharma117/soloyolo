@@ -1,6 +1,7 @@
-import { Button, PageTitle, SectionLabel, SourceRow, StatRow, StatTile, Surface, Text, formatCompact, useTheme, type IconName } from '@soloyolo/design-system'
+import { Button, PageTitle, SectionLabel, SourceRow, StatRow, StatTile, Surface, Text, TopBar, Wash, formatCompact, useScrollChrome, useTheme, type IconName } from '@soloyolo/design-system'
 import { useRouter } from 'expo-router'
-import { ScrollView, View } from 'react-native'
+import { View } from 'react-native'
+import Animated from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { serverUrl, useData, useMode } from '../../lib/api'
 import { ago, type Status } from '../../lib/types'
@@ -12,6 +13,7 @@ export default function Sources() {
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const mode = useMode()
+  const chrome = useScrollChrome()
   const { data: s } = useData<Status>('/api/status')
   const has = Object.fromEntries((s?.networks ?? []).map((n) => [n.network, n]))
   const groups = (s?.groups ?? []).reduce((a, g) => a + g.lines, 0)
@@ -43,7 +45,9 @@ export default function Sources() {
     </View>
   )
   return (
-    <ScrollView style={{ backgroundColor: t.color.background }} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}>
+    <View style={{ flex: 1, backgroundColor: t.color.background }}>
+    <Animated.ScrollView onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}>
+      <Wash />
       <PageTitle title="Sources" subtitle={mode === 'live' ? `Where soloyolo reads from. Connected to your Mac (${serverUrl}).` : 'Where soloyolo reads from. Showing the demo: your Mac isn’t reachable.'} />
       {s ? (
         <View style={{ marginTop: t.space.md }}>
@@ -84,6 +88,8 @@ export default function Sources() {
         <View style={{ height: t.space.sm }} />
         <Button label="Every screen" icon="albums-outline" onPress={() => router.push('/screens')} />
       </View>
-    </ScrollView>
+    </Animated.ScrollView>
+    <TopBar y={chrome.y} title="Sources" at={60} />
+    </View>
   )
 }

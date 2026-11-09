@@ -8,7 +8,7 @@
 export const palette = {
   paper: { 0: '#ffffff', 50: '#f6f4ef', 100: '#ece9e2', 200: '#e6e2d9', 300: '#d9d4c8', 500: '#a8a399', 700: '#6b675e', 900: '#16150f' },
   night: { 0: '#0e0d0b', 50: '#1a1916', 100: '#26241f', 200: '#2c2a25', 300: '#24221d', 500: '#6a665d', 700: '#a19c91', 900: '#f2efe8' },
-  marigold: { 100: '#fbeccb', 300: '#f2b33d', 500: '#e8a317', 700: '#a35c00', 900: '#3a2b10', 950: '#ffc35a' },
+  marigold: { 50: '#fbf1dc', 100: '#fbeccb', 300: '#f2b33d', 500: '#e8a317', 700: '#a35c00', 900: '#3a2b10', 950: '#ffc35a' },
   leaf: { 500: '#2fa864', 600: '#35c272', 700: '#2e7d5b', 400: '#5cc08e' },
   violet: { 500: '#6a5acd', 400: '#8b7dff' },
   stone: { 500: '#8a857a', 600: '#6a665d' },
@@ -21,6 +21,7 @@ export const palette = {
 
 const light = {
   background: palette.paper[50], // warm paper, never pure white as a page
+  wash: palette.marigold[50], // the warm tint at the top of a screen, fading into the paper (Markon's wash)
   surface: palette.paper[0], // cards sit on the paper
   surfaceRaised: palette.paper[100], // chips, search fields, pressed rows
   surfaceFloating: 'rgba(255,255,255,0.92)', // the tab bar over content
@@ -54,6 +55,7 @@ export type ColorTokens = { [K in keyof typeof light]: string }
 
 const dark: ColorTokens = {
   background: palette.night[0],
+  wash: palette.night[100],
   surface: palette.night[50],
   surfaceRaised: palette.night[100],
   surfaceFloating: 'rgba(32,30,26,0.94)',

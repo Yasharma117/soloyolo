@@ -29,7 +29,9 @@ export function TodayHeader({ count, now = new Date() }: { count: number | null;
       </Row>
       <View style={{ paddingHorizontal: t.space.xl, marginBottom: t.space.xl + 2 }}>
         <Text variant="heading">{greeting(now)},</Text>
-        <Text variant="heading" tone="tertiary">you have <Text variant="heading">{what}</Text> {count ? 'to do today.' : 'owed today.'}</Text>
+        {count === null
+          ? <Text variant="heading" tone="tertiary">reading your promises...</Text>
+          : <Text variant="heading" tone="tertiary">you have <Text variant="heading">{what}</Text> {count ? 'to do today.' : 'owed today.'}</Text>}
       </View>
     </View>
   )
