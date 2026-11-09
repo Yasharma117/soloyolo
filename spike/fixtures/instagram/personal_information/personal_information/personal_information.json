@@ -1,0 +1,25 @@
+{
+  "profile_user": [
+    {
+      "title": "",
+      "media_map_data": {},
+      "string_map_data": {
+        "Email": {
+          "href": "",
+          "value": "anaya@example.invalid",
+          "timestamp": 0
+        },
+        "Name": {
+          "href": "",
+          "value": "Anaya Iyer",
+          "timestamp": 0
+        },
+        "Username": {
+          "href": "",
+          "value": "anaya.iyer",
+          "timestamp": 0
+        }
+      }
+    }
+  ]
+}

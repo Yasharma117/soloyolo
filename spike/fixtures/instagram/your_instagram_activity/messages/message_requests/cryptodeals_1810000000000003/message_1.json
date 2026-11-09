@@ -1,0 +1,21 @@
+{
+  "participants": [
+    {
+      "name": "Crypto Deals"
+    },
+    {
+      "name": "Anaya Iyer"
+    }
+  ],
+  "messages": [
+    {
+      "sender_name": "Crypto Deals",
+      "timestamp_ms": 1793000000000,
+      "content": "Earn 10x \u00f0\u009f\u009a\u0080 DM me"
+    }
+  ],
+  "title": "Crypto Deals",
+  "is_still_participant": true,
+  "thread_path": "message_requests/cryptodeals_1810000000000003",
+  "magic_words": []
+}

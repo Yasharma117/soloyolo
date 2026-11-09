@@ -1,0 +1,28 @@
+{
+  "participants": [
+    {
+      "name": "Kabir Sharma"
+    },
+    {
+      "name": "Anaya Iyer"
+    }
+  ],
+  "messages": [
+    {
+      "sender_name": "Anaya Iyer",
+      "timestamp_ms": 1793007200000,
+      "content": "Can you send me the Goa photos? \u00f0\u009f\u0093\u00b8",
+      "is_geoblocked_for_viewer": false
+    },
+    {
+      "sender_name": "Kabir Sharma",
+      "timestamp_ms": 1793003600000,
+      "content": "Caf\u00c3\u00a9 was great \u00f0\u009f\u0098\u0082",
+      "is_geoblocked_for_viewer": false
+    }
+  ],
+  "title": "Kabir Sharma",
+  "is_still_participant": true,
+  "thread_path": "inbox/kabirsharma_1784512345678901",
+  "magic_words": []
+}

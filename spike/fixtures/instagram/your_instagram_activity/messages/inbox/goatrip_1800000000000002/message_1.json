@@ -1,0 +1,38 @@
+{
+  "participants": [
+    {
+      "name": "Kabir Sharma"
+    },
+    {
+      "name": "Meera Jo\u00c5\u00a1i \u00e2\u009c\u00a8"
+    },
+    {
+      "name": "Anaya Iyer"
+    }
+  ],
+  "messages": [
+    {
+      "sender_name": "Kabir Sharma",
+      "timestamp_ms": 1793010800000,
+      "content": "Sent the photos to everyone \u00e2\u009c\u0085"
+    },
+    {
+      "sender_name": "Anaya Iyer",
+      "timestamp_ms": 1793007200000,
+      "content": "Anaya Iyer added Kabir Sharma to the group"
+    },
+    {
+      "sender_name": "Anaya Iyer",
+      "timestamp_ms": 1793003600000,
+      "content": "\u00e0\u00a4\u00ae\u00e0\u00a5\u0088\u00e0\u00a4\u0082 \u00e0\u00a4\u009f\u00e0\u00a4\u00bf\u00e0\u00a4\u0095\u00e0\u00a4\u009f \u00e0\u00a4\u00ac\u00e0\u00a5\u0081\u00e0\u00a4\u0095 \u00e0\u00a4\u0095\u00e0\u00a4\u00b0\u00e0\u00a5\u0082\u00e0\u00a4\u0081\u00e0\u00a4\u0097\u00e0\u00a5\u0080"
+    }
+  ],
+  "title": "Goa trip \u00f0\u009f\u008c\u00b4",
+  "is_still_participant": true,
+  "thread_path": "inbox/goatrip_1800000000000002",
+  "magic_words": [],
+  "joinable_mode": {
+    "mode": 1,
+    "link": ""
+  }
+}
