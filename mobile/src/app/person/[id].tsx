@@ -1,7 +1,7 @@
 // A person, Mesh-style: a sheet with their name and orb, a strip of actions, and three views.
 import {
   BottomSheet, Button, ConfirmDialog, IconButton, InlineError, KeyValueList, NavList, NETWORK_NAME, NetworkIcon, OptionList, PersonHeader,
-  PromiseRow, RowSkeleton, SectionCard, SectionLabel, Skeleton, StatRow, StatTile, Tabs, Text, TimelineEvent, TopBar, Wash, statusOf, useScrollChrome, useTheme, useToast, type Option,
+  PromiseParts, PromiseRow, RowSkeleton, SectionCard, SectionLabel, Skeleton, SplitBar, Surface, Tabs, Text, TimelineEvent, TopBar, Wash, statusOf, useScrollChrome, useTheme, useToast, type Option,
 } from '@soloyolo/design-system'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
@@ -58,6 +58,10 @@ export default function PersonScreen() {
   const youOwe = items.filter((x) => x.owner === 'me' && isOpen(x)).length
   const theyOwe = items.filter((x) => x.owner === 'them' && isOpen(x)).length
   const closed = items.filter((x) => x.status === 'done' || x.dismissed).length
+  const onToday = items.filter((x) => isOpen(x) && x.live).length
+  const quietCount = items.filter((x) => isOpen(x) && !x.live).length
+  // the one promise worth reading in full: the one you came here for, else the most pressing open one
+  const hero = items.find((x) => String(x.source_message_id) === focus && isOpen(x)) ?? items.find((x) => isOpen(x) && x.live) ?? items.find(isOpen)
   const row = (it: Item) => {
     const st = statusOf(it)
     const open = isOpen(it)
@@ -105,6 +109,11 @@ export default function PersonScreen() {
       </View>
       {view === 'promises' && (
         <>
+          {hero ? (
+            <View style={{ marginHorizontal: t.space.lg, marginTop: t.space.lg }}>
+              <Surface style={{ padding: t.space.lg }}><PromiseParts item={hero} /></Surface>
+            </View>
+          ) : null}
           <SectionLabel>You owe</SectionLabel>
           {items.filter((x) => x.owner === 'me').map(row)}
           {!items.some((x) => x.owner === 'me') && none}
@@ -128,13 +137,15 @@ export default function PersonScreen() {
       )}
       {view === 'about' && (
         <View style={{ gap: t.space.lg, paddingTop: t.space.lg }}>
-          <StatRow>
-            <StatTile label="You owe" value={String(youOwe)} tone={youOwe ? 'accent' : 'primary'} />
-            <StatTile label={`${first} owes`} value={String(theyOwe)} />
-            <StatTile label="Closed" value={String(closed)} tone={closed ? 'success' : 'primary'} />
-          </StatRow>
+          <SectionCard title={`So far with ${first}`}>
+            <View style={{ padding: t.space.md }}>
+              <SplitBar parts={[{ label: 'Closed', value: closed, color: 'series1' }, { label: 'On today', value: onToday, color: 'series2' },
+                                { label: 'Quiet, assumed done', value: quietCount, color: 'series3' }]} />
+            </View>
+          </SectionCard>
           <Text variant="body" tone="secondary" style={{ paddingHorizontal: t.space.xl }}>
-            You last talked {ago(person.last)} ago{person.networks[0] ? ` on ${NETWORK_NAME[person.networks[0]] ?? person.networks[0]}` : ''}.
+            You owe {first} {youOwe || 'nothing'} and {first} owes you {theyOwe || 'nothing'}. You last talked {ago(person.last)} ago
+            {person.networks[0] ? ` on ${NETWORK_NAME[person.networks[0]] ?? person.networks[0]}` : ''}.
           </Text>
           {person.attributes.length ? (
             <SectionCard title="Properties">

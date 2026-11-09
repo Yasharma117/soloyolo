@@ -12,6 +12,8 @@ export const palette = {
   leaf: { 500: '#2fa864', 600: '#35c272', 700: '#2e7d5b', 400: '#5cc08e' },
   violet: { 500: '#6a5acd', 400: '#8b7dff' },
   amber: { 200: '#fdd086', 400: '#fbad41' }, // the warm gradient on the one action that matters (from the Atoms redesign)
+  // the Atoms redesign's accents: sun, tangerine and orchid for counts; indigo to lilac for a headline worth stopping on
+  atoms: { sun: '#fbc157', tangerine: '#ff7b02', orchid: '#d15ff8', lilac: '#e299ff', indigo: '#4200ff', violet: '#d879fc', creamA: '#fff8ef', creamB: '#f3eadd' },
   stone: { 500: '#8a857a', 600: '#6a665d' },
   ember: { 100: '#fbe3e1', 500: '#d64545', 400: '#ff6b6b', 700: '#a32a2a', 900: '#3d1715' },
   sky: { 100: '#e1effa', 400: '#7cb8f2', 500: '#2f7fd1', 700: '#1f5f9e', 900: '#122a3d' },
@@ -26,6 +28,15 @@ const light = {
   warmFrom: palette.amber[200], // warm button, top
   warmTo: palette.amber[400], // warm button, bottom
   onWarm: palette.paper[900], // text on the warm button: dark in both themes
+  series1: palette.atoms.sun, // counts that belong together, in order (SplitBar, numbered parts)
+  series2: palette.atoms.tangerine,
+  series3: palette.atoms.orchid,
+  underlineFrom: palette.atoms.sun, // the gradient line under the parts of a promise
+  underlineTo: palette.atoms.lilac,
+  insightFrom: palette.atoms.indigo, // the insight headline
+  insightTo: palette.atoms.violet,
+  cardWarmFrom: palette.atoms.creamA, // the insight card
+  cardWarmTo: palette.atoms.creamB,
   surface: palette.paper[0], // cards sit on the paper
   surfaceRaised: palette.paper[100], // chips, search fields, pressed rows
   surfaceFloating: 'rgba(255,255,255,0.92)', // the tab bar over content
@@ -63,6 +74,15 @@ const dark: ColorTokens = {
   warmFrom: palette.amber[200],
   warmTo: palette.amber[400],
   onWarm: palette.paper[900],
+  series1: palette.atoms.sun,
+  series2: palette.atoms.tangerine,
+  series3: palette.atoms.orchid,
+  underlineFrom: palette.atoms.sun,
+  underlineTo: palette.atoms.lilac,
+  insightFrom: palette.violet[400],
+  insightTo: palette.atoms.lilac,
+  cardWarmFrom: palette.night[100],
+  cardWarmTo: palette.night[50],
   surface: palette.night[50],
   surfaceRaised: palette.night[100],
   surfaceFloating: 'rgba(32,30,26,0.94)',

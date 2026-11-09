@@ -18,6 +18,7 @@
     "react-native-reanimated": "*",
     "react-native-safe-area-context": "*",
     "react-native-svg": "*",
-    "expo-blur": "*"
+    "expo-blur": "*",
+    "@react-native-masked-view/masked-view": "*"
   }
 }

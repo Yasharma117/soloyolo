@@ -1,4 +1,4 @@
-import { Banner, CardSkeleton, CheckInCard, Chip, EmptyState, Icon, InlineError, PromiseCard, TopBar, Wash, useScrollChrome, QuietPile, Row, SectionLabel, Text, TodayHeader, formatRelative, useTheme } from '@soloyolo/design-system'
+import { Banner, CardSkeleton, CheckInCard, Chip, InsightCard, EmptyState, Icon, InlineError, PromiseCard, TopBar, Wash, useScrollChrome, QuietPile, Row, SectionLabel, Text, TodayHeader, formatRelative, useTheme } from '@soloyolo/design-system'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { RefreshControl, View } from 'react-native'
@@ -6,7 +6,8 @@ import Animated from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { refresh, useData, useMode } from '../../lib/api'
 import { useMarks } from '../../lib/marks'
-import { keyOf, type Item, type Status, type TodaySummary } from '../../lib/types'
+import { sayInsight } from '../../lib/insight'
+import { keyOf, type Insight, type Item, type Status, type TodaySummary } from '../../lib/types'
 
 export default function Today() {
   const t = useTheme()
@@ -23,6 +24,7 @@ export default function Today() {
     : preview === 'empty' ? { data: { today: [], live: 0, quiet: 0, open: 0 }, error: null, loading: false } : live
   const all = useData<Item[]>('/api/all')
   const status = useData<Status>('/api/status')
+  const insight = sayInsight(useData<Insight>('/api/insight').data)
   const wa = status.data?.networks.find((x) => x.network === 'whatsapp')
   const [openedAt] = useState(() => Date.now() / 1000) // the clock is read once, when Today opens
   const stale = wa && openedAt - wa.last > 12 * 3600
@@ -68,6 +70,7 @@ export default function Today() {
                        no={{ label: 'It’s done', onPress: () => { void marks.done(deck[0]!); next(deck[0]!) } }} />
         </>
       ) : null}
+      {insight && s.data ? <View style={{ marginTop: t.space.xl }}><InsightCard {...insight} /></View> : null}
       {quiet.length && s.data ? (
         <>
           <SectionLabel>Quiet · assumed done</SectionLabel>

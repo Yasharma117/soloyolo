@@ -1,6 +1,6 @@
 // Made-up people, shaped like the real store, for when no soloyolo is reachable
 // (Expo Go on a phone away from the Mac, or the web preview). Marks change it in memory.
-import type { Item, Mark, Message, Person, PersonSummary, Status, TodaySummary } from './types'
+import type { Insight, Item, Mark, Message, Person, PersonSummary, Status, TodaySummary } from './types'
 import { isOpen } from './types'
 
 const now = () => Date.now() / 1000
@@ -48,7 +48,9 @@ function fresh(): Item[] {
   ]
 }
 
-let items = fresh()
+// the demo's dated ones carry the date the way the store does, not only in their reasons
+const dated = (list: Item[]) => list.map((c) => (c.action.startsWith('Send Rohan') ? { ...c, due: 'tomorrow' } : c))
+let items = dated(fresh())
 const original = new Map(items.map((c) => [c.source_message_id, { ...c }]))
 
 const THREADS: Record<number, [number, boolean, string][]> = {
@@ -89,6 +91,8 @@ export const demo = {
         id: mine.find((c) => c.source_text === text)?.source_message_id ?? 9000 + i, ts: now() - a, from_me: me, text,
       })) satisfies Message[] as T
     }
+    if (path === '/api/insight')
+      return { days: 30, closed: { by_you: 9, by_signal: 3 }, why: { off_chat: 6, not_needed: 2, let_go: 1, misread: 0 } } satisfies Insight as T
     if (path === '/api/status')
       return {
         networks: [{ network: 'whatsapp', messages: 5602, last: now() - 240 }, { network: 'linkedin', messages: 312, last: now() - 2 * D }],

@@ -77,6 +77,21 @@ def status(store, telegram_config: Path) -> dict:
                 disclosures=store.disclosures(), muted=muted)
 
 
+def insight(store, now: float | None = None, days: int = 30) -> dict:
+    """What closed in the last `days`, and why, for Today's weekly insight. Numbers only; the app writes the words."""
+    since = (now or time.time()) - days * 86400
+    rows = store.conn.execute(
+        "SELECT state, decided_by, evidence FROM resolution WHERE at >= ? AND state IN ('done', 'dismissed')", (since,)).fetchall()
+    why = {k: 0 for k in REASONS}
+    labels = {f"you: {v}": k for k, v in REASONS.items()}
+    closed = {"by_you": 0, "by_signal": 0}
+    for state, by, evidence in rows:
+        closed["by_you" if by == "you" else "by_signal"] += 1
+        if evidence in labels:
+            why[labels[evidence]] += 1
+    return {"days": days, "closed": closed, "why": why}
+
+
 class Handler(BaseHTTPRequestHandler):
     def __init__(self, *args, db: str, port: int, **kwargs):
         self.db = db
@@ -117,6 +132,8 @@ class Handler(BaseHTTPRequestHandler):
                 items = nudge.assess(store)
                 return self._json(_tag(priority._spread([c for c in items if c["live"]])
                                        + priority._spread([c for c in items if not c["live"]]), nets))
+            if path == "/api/insight":
+                return self._json(insight(store))
             if path == "/api/status":
                 from .telegram import config_path
                 return self._json(status(store, config_path(self.db)))

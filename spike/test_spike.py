@@ -444,6 +444,9 @@ class MarkTest(unittest.TestCase):
             self.assertEqual(post({**good, "state": "dismissed", "reason": "misread"}), 200)
             row = self.st.conn.execute("SELECT state, evidence FROM resolution WHERE person_id = ?", (self.pid,)).fetchone()
             self.assertEqual(tuple(row), ("dismissed", "you: not a real promise"))
+            from spike.server import insight
+            got = insight(self.st)
+            self.assertEqual((got["closed"], got["why"]["misread"], got["why"]["off_chat"]), ({"by_you": 1, "by_signal": 0}, 1, 0))
         finally:
             httpd.shutdown()
             httpd.server_close()

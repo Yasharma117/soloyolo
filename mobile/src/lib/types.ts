@@ -50,6 +50,12 @@ export type Status = {
   muted: { id: number; name: string }[]
 }
 
+export type Insight = {
+  days: number
+  closed: { by_you: number; by_signal: number }
+  why: { off_chat: number; not_needed: number; let_go: number; misread: number }
+}
+
 export type Mark = 'done' | 'dismissed' | 'open' | 'snoozed' | 'clear'
 
 export const isOpen = (c: Item) => c.status === 'open' && !c.snoozed && !c.dismissed
