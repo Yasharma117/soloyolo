@@ -2,7 +2,7 @@ import { View } from 'react-native'
 import { Avatar } from '../components/Avatar/Avatar'
 import { ReasonChips } from '../components/Chip/Chip'
 import { ListRow } from '../components/ListRow/ListRow'
-import { SwipeRow, type SwipeAction } from '../components/SwipeRow/SwipeRow'
+import { SwipeRow, useSwipeTap, type SwipeAction } from '../components/SwipeRow/SwipeRow'
 import { Text } from '../components/Text/Text'
 import { useTheme } from '../theme'
 import { PromiseSentence } from './PromiseSentence'
@@ -16,11 +16,12 @@ export function PromiseRow({ item, state, showPerson = true, highlighted, onPres
   trailing?: SwipeAction; leading?: SwipeAction
 }) {
   const t = useTheme()
+  const swipe = useSwipeTap(onPress)
   const closed = state === 'done' || state === 'not needed' || state === 'later'
   const dot = <View style={{ width: 8, height: 8, borderRadius: 4, marginTop: 7, backgroundColor: closed ? t.color.textTertiary : state === 'quiet' ? t.color.border : t.color.accent }} />
   return (
-    <SwipeRow trailing={trailing} leading={leading}>
-      <ListRow lead={showPerson ? <Avatar name={item.name} size="md" /> : dot} onPress={onPress} highlighted={highlighted}
+    <SwipeRow trailing={trailing} leading={leading} onDragStart={swipe.dragStart}>
+      <ListRow lead={showPerson ? <Avatar name={item.name} size="md" /> : dot} onPress={swipe.tap} highlighted={highlighted}
                title={showPerson ? item.name : undefined}>
         <PromiseSentence item={item} size="small" struck={closed} />
         <Text variant="caption" tone="tertiary">{state} · said {ago(item.source_ts)} ago{item.due ? ` · due ${item.due}` : ''}</Text>

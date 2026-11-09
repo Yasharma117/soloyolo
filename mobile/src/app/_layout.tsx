@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar'
 import { ScrollView } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { ReasonProvider } from '../lib/reasons'
 
 function Navigation() {
   const t = useTheme()
@@ -11,11 +12,15 @@ function Navigation() {
   return (
     <ThemeProvider value={{ ...base, colors: { ...base.colors, background: t.color.background, card: t.color.background, primary: t.color.accent, text: t.color.textPrimary } }}>
       <ToastProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="person/[id]" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="design" options={{ presentation: 'modal' }} />
-        </Stack>
+        <ReasonProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="person/[id]" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="design" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="screens" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="status" />
+          </Stack>
+        </ReasonProvider>
       </ToastProvider>
       <StatusBar style="auto" />
     </ThemeProvider>

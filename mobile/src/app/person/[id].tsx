@@ -1,5 +1,5 @@
 // A person, Mesh-style: a sheet with their name and orb, a strip of actions, and three views.
-import { IconButton, ListRow, PersonHeader, PromiseRow, SectionLabel, Tabs, Text, TimelineEvent, useTheme, useToast, NETWORK_NAME, NetworkIcon, Row, type PromiseState } from '@soloyolo/design-system'
+import { ConfirmDialog, IconButton, ListRow, PersonHeader, PromiseRow, SectionLabel, Tabs, Text, TimelineEvent, useTheme, useToast, NETWORK_NAME, NetworkIcon, Row, type PromiseState } from '@soloyolo/design-system'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Linking, ScrollView, View } from 'react-native'
@@ -23,6 +23,7 @@ export default function PersonScreen() {
   const marks = useMarks()
   const { id, focus } = useLocalSearchParams<{ id: string; focus?: string }>()
   const [view, setView] = useState<View_>('promises')
+  const [asking, setAsking] = useState(false)
   const p = useData<Person>(`/api/person/${id}`)
   const thread = useData<Message[]>(`/api/thread/${id}`)
   const person = p.data
@@ -53,9 +54,16 @@ export default function PersonScreen() {
         actions={[
           { icon: 'chatbubble-outline', label: 'Open chat', disabled: !phone || phone.length < 8, onPress: () => phone && Linking.openURL(`https://wa.me/${phone}`) },
           { icon: person.muted ? 'notifications-outline' : 'notifications-off-outline', label: person.muted ? 'Unmute' : 'Mute',
-            onPress: async () => { await mute(person.id, !person.muted); toast.show(person.muted ? 'Unmuted' : 'Muted: its items are hidden') } },
+            onPress: async () => {
+              if (!person.muted) return setAsking(true)
+              await mute(person.id, false); toast.show('Chat unmuted')
+            } },
         ]}
       />
+      <ConfirmDialog open={asking} destructive title={`Mute ${first}?`}
+                     body={`${first}’s promises leave Today and soloyolo stops reading this chat. You can unmute it anytime.`}
+                     confirmLabel="Mute chat" onCancel={() => setAsking(false)}
+                     onConfirm={async () => { setAsking(false); await mute(person.id, true); toast.show('Chat muted') }} />
       <View style={{ marginTop: t.space.md + 2 }}>
         <Tabs value={view} onChange={setView} items={[{ key: 'promises', label: 'Promises' }, { key: 'timeline', label: 'Timeline' }, { key: 'about', label: 'About' }]} />
       </View>

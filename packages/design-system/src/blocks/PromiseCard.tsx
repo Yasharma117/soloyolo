@@ -4,7 +4,7 @@ import { ReasonChips } from '../components/Chip/Chip'
 import { NetworkIcon } from '../components/Icon/Icon'
 import { Row } from '../components/Stack/Stack'
 import { Surface } from '../components/Surface/Surface'
-import { SwipeRow } from '../components/SwipeRow/SwipeRow'
+import { SwipeRow, useSwipeTap } from '../components/SwipeRow/SwipeRow'
 import { Text } from '../components/Text/Text'
 import { useTheme } from '../theme'
 import { PromiseSentence } from './PromiseSentence'
@@ -24,12 +24,13 @@ export function Quote({ text }: { text?: string | null }) {
 /** Today's card. Swipe left: Done. Swipe right: Not needed. Tap: open the person. */
 export function PromiseCard({ item, onPress, onDone, onDismiss }: { item: PromiseItem; onPress?: () => void; onDone?: () => void; onDismiss?: () => void }) {
   const t = useTheme()
+  const swipe = useSwipeTap(onPress)
   return (
     <View style={{ marginHorizontal: t.space.lg, marginBottom: t.space.md + 2 }}>
-      <SwipeRow radius={t.radius.card}
+      <SwipeRow radius={t.radius.card} onDragStart={swipe.dragStart}
                 trailing={onDone ? { label: 'Done', icon: 'checkmark', tone: 'success', onAction: onDone } : undefined}
                 leading={onDismiss ? { label: 'Not needed', icon: 'close', tone: 'neutralAction', onAction: onDismiss } : undefined}>
-        <Surface onPress={onPress} style={{ gap: t.space.md }}>
+        <Surface onPress={swipe.tap} style={{ gap: t.space.md }}>
           <Row gap="sm">
             <Avatar name={item.name} size="sm" />
             <Text variant="small" style={{ fontWeight: '600', flexShrink: 1, fontSize: 14 }} numberOfLines={1}>{item.name}</Text>

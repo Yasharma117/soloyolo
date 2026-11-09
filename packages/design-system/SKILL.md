@@ -5,13 +5,15 @@ description: Use when building or changing any soloyolo screen or UI (the Expo a
 
 Read `packages/design-system/README.md` first. Then:
 
-1. **Find the block.** Screens are composed from `src/blocks` (TodayHeader, PromiseCard, PromiseRow, PersonRow,
-   QuietPile, PageTitle, PersonHeader, TimelineEvent, SourceRow, FloatingTabBar). Use one as it is when it fits.
+1. **Find the block.** Screens are composed from `src/blocks`: a new screen starts from `Screen`, results use
+   `StatusScreen`, and the rest (TodayHeader, PromiseCard, PromiseRow, PersonRow, QuietPile, PageTitle,
+   PersonHeader, TimelineEvent, SourceRow, FloatingTabBar) are used as they are when they fit. Add the route to `/screens`.
 2. **Else compose components** from `src/components`. Layout with `Stack`/`Row` and `gap`; text only through
    `<Text variant tone>`; colors only through `useTheme().color`.
 3. **Else add to the system**: a token, a component or a block, in the package, with a catalog entry in
    `mobile/src/app/design.tsx`. Never style around it inside a screen.
-4. **Write like the voice section**: promises as sentences, sentence case, no emoji, empty states that say what's next.
+4. **Write like the voice section and its per-component table**: promises as sentences, sentence case, destructive
+   buttons repeat the object, toasts are object + state, errors name the next step, no dashes or exclamation marks.
 5. **Verify**: `npx tsc --noEmit` and `npx expo lint` in `mobile/`, `npm run check -w @soloyolo/design-system` at
    the root, and look at both themes in the catalog (Sources → Design system).
 

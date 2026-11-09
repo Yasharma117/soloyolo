@@ -1,12 +1,14 @@
 // The design system's catalog: every token, component and block, live, in either theme.
 // Like a Storybook that runs on the phone. Open it from Sources → Design system.
 import {
-  AVATAR_SIZE, Avatar, Badge, Button, Chip, Divider, EmptyState, Facepile, Icon, IconButton, ListRow, PageTitle, PersonHeader,
+  AVATAR_SIZE, Avatar, Badge, Banner, BottomSheet, ConfirmDialog, ReasonSheet, CountUp, FadeIn, KeyValueList, Loader, NavList, SectionCard, Stagger, StatusScreen, StepHeader,
+  formatCompact, formatDate, formatINR, formatRelative, Button, Chip, Divider, EmptyState, Facepile, Icon, IconButton, ListRow, PageTitle, PersonHeader,
   PersonRow, PromiseCard, PromiseRow, QuietPile, ReasonChips, Row, SearchField, SectionLabel, Skeleton, SourceRow, Stack, Surface, Tabs,
   Text, ThemeProvider, TimelineEvent, TodayHeader, colors, radius, space, type, useTheme, type PromiseItem, type Scheme, type TypeVariant,
 } from '@soloyolo/design-system'
 import { useRouter } from 'expo-router'
 import { useState, type ReactNode } from 'react'
+import { REASONS } from '../lib/reasons'
 import { ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -45,6 +47,10 @@ function Catalog() {
   const t = useTheme()
   const [tab, setTab] = useState<'a' | 'b'>('a')
   const [q, setQ] = useState('')
+  const [sheet, setSheet] = useState(false)
+  const [dialog, setDialog] = useState(false)
+  const [why, setWhy] = useState(false)
+  const [replay, setReplay] = useState(0)
   const swatches = Object.keys(colors.light) as (keyof typeof colors.light)[]
   return (
     <View style={{ backgroundColor: t.color.background }}>
@@ -102,6 +108,64 @@ function Catalog() {
         <SectionLabel trailing={<Text variant="caption" tone="tertiary">trailing</Text>}>SectionLabel</SectionLabel>
         <ListRow lead={<Avatar name="Ma" />} title="ListRow" subtitle="lead · title · subtitle · trailing" trailing={<Text variant="caption" tone="tertiary">2d</Text>} onPress={() => {}} />
         <View style={{ marginTop: t.space.lg }}><EmptyState title="Nothing you said you’d do needs you today." body="EmptyState: what’s missing, and what happens next." /></View>
+      </Section>
+      <Section title="Feedback" note="Banner: a state worth knowing before reading the screen. Sheet: a secondary choice. Dialog: a decision that's hard to undo. ReasonSheet: why, asked after the action, skippable.">
+        <Stack gap="sm" padX="lg">
+          <Banner tone="warning" title="WhatsApp isn’t syncing" body="Last message arrived 13 hours ago. New promises won’t show up until your Mac syncs again." action={{ label: 'Open sources', onPress: () => {} }} />
+          <Banner tone="info" title="Telegram not paired" body="Pair it to get Today’s items every morning at 07:30." />
+          <Banner tone="success" title="LinkedIn imported" body="312 messages read and 4 promises found." />
+          <Banner tone="danger" title="Import failed" body="We couldn’t read this file. Export it again as JSON, then try once more." />
+        </Stack>
+        <Row gap="sm" padX="xl" style={{ marginTop: t.space.lg }}>
+          <Button label="Open sheet" onPress={() => setSheet(true)} />
+          <Button label="Open dialog" onPress={() => setDialog(true)} />
+          <Button label="Ask why" onPress={() => setWhy(true)} />
+        </Row>
+        <ReasonSheet open={why} title="Why isn’t it needed?" subtitle="Return Kabir’s tripod" reasons={REASONS}
+                     onPick={() => setWhy(false)} onSkip={() => setWhy(false)} />
+        <BottomSheet open={sheet} onClose={() => setSheet(false)} title="Snooze until" subtitle="It leaves Today and comes back then."
+                     footer={<Button label="Snooze 3 days" variant="primary" onPress={() => setSheet(false)} />}>
+          <NavList rows={[{ label: 'Tomorrow morning', onPress: () => setSheet(false) }, { label: 'This weekend', onPress: () => setSheet(false) }, { label: 'Next week', onPress: () => setSheet(false) }]} />
+        </BottomSheet>
+        <ConfirmDialog open={dialog} destructive title="Unlink WhatsApp?" body="soloyolo stops reading your chats. Promises already found stay on your list."
+                       confirmLabel="Unlink WhatsApp" onCancel={() => setDialog(false)} onConfirm={() => setDialog(false)} />
+      </Section>
+      <Section title="Layout" note="SectionCard groups rows on the paper; KeyValueList and NavList are what goes inside. StepHeader for short setups.">
+        <Stack gap="lg">
+          <SectionCard title="WhatsApp" action={{ label: 'Unlink', onPress: () => {} }}>
+            <KeyValueList items={[{ label: 'Messages', value: '5,602' }, { label: 'Last sync', value: '4 min ago', tone: 'success' }, { label: 'Group chats', value: 'Read as evidence' }]} />
+          </SectionCard>
+          <SectionCard title="Settings">
+            <NavList rows={[{ icon: 'time-outline', label: 'Morning message', value: '07:30', onPress: () => {} }, { icon: 'link-outline', label: 'Linked sources', value: '2', onPress: () => {} }, { icon: 'settings-outline', label: 'Privacy log', onPress: () => {} }]} />
+          </SectionCard>
+          <View style={{ paddingHorizontal: t.space.xl }}><StepHeader step={2} total={3} label="Pair Telegram" /></View>
+        </Stack>
+      </Section>
+      <Section title="Motion" note="Under 400ms, no bounce, off when the phone asks for reduced motion.">
+        <Stack gap="md" padX="xl">
+          <Row gap="lg"><CountUp key={replay} value={5602} format={(n) => n.toLocaleString('en-IN')} variant="display" /><Loader label="Reading your chats..." /></Row>
+          <View key={`s${replay}`}><Stagger>{['Rohan Mehta', 'Ma', 'Priya Nair'].map((n) => <Row key={n} gap="sm" style={{ paddingVertical: 4 }}><Avatar name={n} size="sm" /><Text>{n}</Text></Row>)}</Stagger></View>
+          <View style={{ alignSelf: 'flex-start' }}><Button label="Replay" size="sm" icon="refresh" onPress={() => setReplay((x) => x + 1)} /></View>
+          <FadeIn><Text variant="small" tone="secondary">FadeIn, Stagger, CountUp, Loader</Text></FadeIn>
+        </Stack>
+      </Section>
+      <Section title="Format" note="One way to write numbers and time. Screens never format by hand.">
+        <View style={{ marginHorizontal: t.space.lg }}><SectionCard>
+          <KeyValueList items={[{ label: 'formatINR(14500)', value: formatINR(14500) }, { label: 'formatCompact(15400)', value: formatCompact(15400) },
+                                { label: 'formatRelative(4 min)', value: formatRelative(now - 240) }, { label: 'formatRelative(3 days)', value: formatRelative(now - 3 * 86400) },
+                                { label: 'formatDate(2025)', value: formatDate(1744329600) }]} />
+        </SectionCard></View>
+      </Section>
+      <Section title="Patterns" note="Result screens: success, error, pending, info. Shown here in frames; in the app they fill the screen.">
+        <Stack gap="md" padX="lg">
+          {(['success', 'error', 'pending', 'info'] as const).map((tone) => (
+            <View key={tone} style={{ height: 360, borderRadius: t.radius.card, overflow: 'hidden', borderWidth: 1, borderColor: t.color.border }}>
+              <StatusScreen tone={tone} title={{ success: 'Chats imported', error: 'Import failed', pending: 'Reading your chats', info: 'Telegram not paired' }[tone]}
+                            body={{ success: '312 messages read and 4 promises found.', error: 'We couldn’t read this file. Export it again as JSON.', pending: 'This takes a minute or two.', info: 'Pair it to get Today’s items every morning.' }[tone]}
+                            primary={tone === 'pending' ? undefined : { label: { success: 'Go to Today', error: 'Try again', info: 'Pair Telegram' }[tone], onPress: () => {} }} />
+            </View>
+          ))}
+        </Stack>
       </Section>
       <Section title="Blocks" note="Whole patterns, imported as they are. Screens are made of these.">
         <Specimen name="TodayHeader"><View style={{ marginHorizontal: -t.space.xl }}><TodayHeader count={3} /></View></Specimen>

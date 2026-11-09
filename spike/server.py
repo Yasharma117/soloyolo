@@ -20,6 +20,10 @@ from .store import Store
 
 INDEX = Path(__file__).with_name("viewer.html")
 APP = Path(__file__).with_name("app.html")
+# Why an item closed without the chat saying so (the app asks after "Not needed"). Run 6 found most
+# promises close off the chat; these are its buckets, so the answers can be counted the same way.
+REASONS = {"off_chat": "done off the chat", "not_needed": "no longer needed",
+           "let_go": "let it go", "misread": "not a real promise"}
 # app.html is written as a page body (so the same file publishes as a demo); the server adds the document.
 APP_HEAD = (b'<!doctype html><html lang="en"><head><meta charset="utf-8">'
             b'<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"></head><body>')
@@ -161,6 +165,11 @@ class Handler(BaseHTTPRequestHandler):
                     and state in ("done", "dismissed", "snoozed", "open", "clear")):
                 raise ValueError
             days = req.get("days", 3)
+            reason = req.get("reason")  # optional, after "Not needed": why it closed without the chat saying so
+            if reason is not None and reason not in REASONS:
+                raise ValueError
+            if reason == "off_chat":
+                state = "done"  # it was done, just not where soloyolo could see
             if state == "snoozed" and not (isinstance(days, int) and 1 <= days <= 60):
                 raise ValueError
         except (ValueError, KeyError, TypeError):
@@ -173,7 +182,8 @@ class Handler(BaseHTTPRequestHandler):
                 store.unresolve(pid, src, owner)
             else:
                 until = time.time() + days * 86400 if state == "snoozed" else None
-                store.resolve(pid, src, owner, state, "you", until=until)
+                store.resolve(pid, src, owner, state, "you", until=until,
+                              evidence=f"you: {REASONS[reason]}" if reason else None)
             return self._json({"ok": True})
         finally:
             store.close()

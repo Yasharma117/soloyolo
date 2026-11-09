@@ -2,13 +2,18 @@ import { View } from 'react-native'
 import { useTheme } from '../../theme'
 import { Text } from '../Text/Text'
 
-/** A short reason or status. `hot` is for what's urgent: a date, someone chasing. */
-export function Chip({ label, tone = 'neutral' }: { label: string; tone?: 'neutral' | 'hot' }) {
+export type ChipTone = 'neutral' | 'hot' | 'success' | 'danger' | 'info'
+
+const FILL = { neutral: 'surfaceRaised', hot: 'accentSoft', success: 'successSoft', danger: 'dangerSoft', info: 'infoSoft' } as const
+const INK = { neutral: 'secondary', hot: 'accent', success: 'success', danger: 'danger', info: 'info' } as const
+
+/** A short reason or status, at most two words for a status ("Synced", "On hold").
+ *  hot: urgent (a date, someone chasing). success / danger / info: the state of a source or import. */
+export function Chip({ label, tone = 'neutral' }: { label: string; tone?: ChipTone }) {
   const t = useTheme()
-  const hot = tone === 'hot'
   return (
-    <View style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: t.radius.pill, backgroundColor: hot ? t.color.accentSoft : t.color.surfaceRaised }}>
-      <Text variant="caption" tone={hot ? 'accent' : 'secondary'} style={hot ? { fontWeight: '600' } : undefined}>{label}</Text>
+    <View style={{ alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 4, borderRadius: t.radius.pill, backgroundColor: t.color[FILL[tone]] }}>
+      <Text variant="caption" tone={INK[tone]} style={tone !== 'neutral' ? { fontWeight: '600' } : undefined}>{label}</Text>
     </View>
   )
 }

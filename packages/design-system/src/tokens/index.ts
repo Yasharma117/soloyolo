@@ -12,7 +12,9 @@ export const palette = {
   leaf: { 500: '#2fa864', 600: '#35c272', 700: '#2e7d5b', 400: '#5cc08e' },
   violet: { 500: '#6a5acd', 400: '#8b7dff' },
   stone: { 500: '#8a857a', 600: '#6a665d' },
-  ember: { 500: '#d64545', 400: '#ff6b6b' },
+  ember: { 100: '#fbe3e1', 500: '#d64545', 400: '#ff6b6b', 700: '#a32a2a', 900: '#3d1715' },
+  sky: { 100: '#e1effa', 400: '#7cb8f2', 500: '#2f7fd1', 700: '#1f5f9e', 900: '#122a3d' },
+  leafSoft: { 100: '#e2f1e9', 900: '#11261c' },
   white: '#ffffff',
   shadow: '#2b2310',
 } as const
@@ -35,6 +37,13 @@ const light = {
   later: palette.violet[500], // Still on / Later
   neutralAction: palette.stone[500], // Not needed
   danger: palette.ember[500],
+  dangerText: palette.ember[700],
+  dangerSoft: palette.ember[100],
+  successSoft: palette.leafSoft[100],
+  info: palette.sky[500],
+  infoText: palette.sky[700],
+  infoSoft: palette.sky[100],
+  scrim: 'rgba(22,21,15,0.32)', // behind sheets and dialogs
   inverse: palette.paper[900], // the selected tab, primary buttons
   onInverse: palette.paper[50],
   onColor: palette.white, // text on a colored fill
@@ -61,6 +70,13 @@ const dark: ColorTokens = {
   later: palette.violet[400],
   neutralAction: palette.stone[600],
   danger: palette.ember[400],
+  dangerText: palette.ember[400],
+  dangerSoft: palette.ember[900],
+  successSoft: palette.leafSoft[900],
+  info: palette.sky[400],
+  infoText: palette.sky[400],
+  infoSoft: palette.sky[900],
+  scrim: 'rgba(0,0,0,0.55)',
   inverse: palette.night[900],
   onInverse: palette.night[0],
   onColor: palette.white,

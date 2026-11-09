@@ -10,6 +10,7 @@ What exists, and what to build next, in the order screens will need it.
 | Theme | `ThemeProvider` (device or pinned), `useTheme()` |
 | Components | Text · Stack/Row · Surface (card, outline, raised, dashed) · Divider · Icon (allow-list) + NetworkIcon · Button (primary, secondary, ghost, danger; sm, md; icon; loading) · IconButton · Chip · ReasonChips · Badge · Avatar (xs–xl) · Facepile · SearchField · Tabs · SectionLabel · ListRow · EmptyState · Skeleton · DotGrid · Toast + useToast · SwipeRow |
 | Blocks | TodayHeader · PromiseCard · PromiseRow · PromiseSentence · PersonRow · QuietPile · PageTitle · PersonHeader · TimelineEvent · SourceRow · FloatingTabBar |
+| From Markon (v0.2) | Screen · StatusScreen · ReasonSheet (from its confirm-with-reason dialog, made optional and after the fact) · BottomSheet (88% cap, scrolling body, close button, fixed footer) · ConfirmDialog (grows from 95%) · Banner · Chip tones · SectionCard · KeyValueList · NavRow/NavList · StepHeader · FadeIn · Stagger · CountUp · Loader · format helpers · `/screens` and `?tone=` state routes · writing rules. Rebuilt from Markon's docs for React Native; no Markon or Untitled UI code copied (its PRO components are licensed to Markon's owner) |
 | Gates | lint rules for screens (`mobile/eslint.config.js`), color check for the package (`scripts/check.mjs`), both in CI |
 
 ## Next
@@ -17,12 +18,11 @@ What exists, and what to build next, in the order screens will need it.
 ### Tier 1: needed by the next features
 | Part | Why |
 |---|---|
-| **Sheet** (bottom sheet) | Snooze picker, "why is this here", Telegram pairing |
 | **Menu / action sheet** | Long-press on a card: Done, Not needed, Later, Open chat |
 | **Toggle** | Settings: morning time, which sources count |
 | **TextField** | Notes on a person, renaming |
 | **SegmentedControl** | Today / This week |
-| **Banner** | "Sync stopped 12h ago" at the top of Today |
+| **Skeletons per block** | PromiseCard and PersonRow while loading |
 
 ### Tier 2: blocks for screens not built yet
 | Block | Screen |

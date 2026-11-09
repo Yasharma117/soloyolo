@@ -29,6 +29,25 @@ Plain, warm, specific. The app talks like a friend who remembers, not a task man
 - **No emoji** in the interface. They appear only inside quoted messages, as people wrote them.
 - **Hinglish stays as written** in quotes. Don't translate people.
 
+### Writing rules by component (tightened from Markon's UX-writing spec)
+
+| Where | Rule | Example |
+|---|---|---|
+| Screen title | Sentence case, at most 4 words, no end punctuation | Every screen |
+| Subtitle | One sentence, what the screen is for | Everyone you talk to, closest first, with what you owe each other. |
+| Button | Sentence case, verb first, at most 3 words | Open sources · Pair Telegram |
+| Destructive button | Repeat the object, never Yes or Confirm | Unlink WhatsApp · Mute chat |
+| Dialog title | Verb and object; a question only when it destroys something | Unlink WhatsApp? |
+| Toast | Object and state, no exclamation | Chat muted · Marked done |
+| Error | Name the object, the problem, the next step. Never "Something went wrong" | We couldn't read this file. Export it again as JSON, then try once more. |
+| Banner | State, then its impact, one sentence each | WhatsApp isn't syncing. New promises won't show up until your Mac syncs again. |
+| Empty state | What isn't here, then what happens next | Nothing you said you'd do needs you today. |
+| Loading | What's happening, with three periods | Reading your chats... |
+| Status chip | At most two words | Synced · On hold |
+| Time | Relative under a day, the date after | 4 min ago · Apr 11, 2025 (`formatRelative`) |
+
+Never in copy: em or en dashes, semicolons, exclamation marks, "oops", "just", "simply", "magic".
+
 ## Visual foundations
 
 From the references the design was built on (Mobbin: Mesh, HEY, Atoms, Joi):
@@ -58,16 +77,26 @@ From the references the design was built on (Mobbin: Mesh, HEY, Atoms, Joi):
 src/
   tokens/      palette (raw) → semantic colors per theme, type scale, space, radius, shadow, motion, icon sizes
   theme/       ThemeProvider + useTheme(): follows the device, or pinned (the catalog pins it)
-  components/  the parts: Text, Stack/Row, Surface, Divider, Icon, Button/IconButton, Chip/ReasonChips, Badge,
-               Avatar/Facepile, SearchField, Tabs, SectionLabel, ListRow, EmptyState, Skeleton, DotGrid,
-               Toast (provider + useToast), SwipeRow
-  blocks/      whole patterns, imported as they are: TodayHeader, PromiseCard, PromiseRow, PromiseSentence,
-               PersonRow, QuietPile, PageTitle, PersonHeader, TimelineEvent, SourceRow, FloatingTabBar
+  components/  the parts: Text, Stack/Row, Surface, Divider, Icon, Button/IconButton, Chip (tones)/ReasonChips,
+               Badge, Avatar/Facepile, SearchField, Tabs, SectionLabel, ListRow, EmptyState, Skeleton, DotGrid,
+               Toast (provider + useToast), SwipeRow, Banner, BottomSheet, ConfirmDialog,
+               SectionCard/KeyValueList/NavRow/NavList, StepHeader, Motion (FadeIn, Stagger, CountUp, Loader)
+  blocks/      whole patterns, imported as they are: Screen (Header, Body, Footer), StatusScreen, ReasonSheet, TodayHeader,
+               PromiseCard, PromiseRow, PromiseSentence, PersonRow, QuietPile, PageTitle, PersonHeader,
+               TimelineEvent, SourceRow, FloatingTabBar
+  format.ts    formatINR, formatCount, formatCompact, formatDate, formatRelative
   index.ts     the only import path: import { PromiseCard, useTheme } from '@soloyolo/design-system'
 ```
 
 **Use a block if one fits, compose components if not, add a component if neither.** A screen that hand-builds a
 card, a row or a tab bar is a bug.
+
+New full screens start from `Screen` (header with back and title, scrolling body, footer with one primary action).
+Result screens (imported, failed, waiting, not set up) are `StatusScreen`, never a hand-built centred icon.
+After an action that closes something without proof (Not needed), ask why with `ReasonSheet`: save first, ask
+second, Skip always there. Never put a reason in front of the action.
+
+Every screen and state is listed in the app at `/screens` (Sources → Every screen); add new routes there.
 
 ## Rules the build enforces
 

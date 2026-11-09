@@ -436,6 +436,14 @@ class MarkTest(unittest.TestCase):
             self.assertEqual(self.item()["resolved_by"], "you")
             self.assertEqual(post({**good, "state": "clear"}), 200)
             self.assertIsNone(self.item()["resolved_by"])
+            # a reason after "Not needed": only the known ones, and "done off the chat" counts as done
+            self.assertEqual(post({**good, "state": "dismissed", "reason": "because"}), 400)
+            self.assertEqual(post({**good, "state": "dismissed", "reason": "off_chat"}), 200)
+            row = self.st.conn.execute("SELECT state, evidence FROM resolution WHERE person_id = ?", (self.pid,)).fetchone()
+            self.assertEqual(tuple(row), ("done", "you: done off the chat"))
+            self.assertEqual(post({**good, "state": "dismissed", "reason": "misread"}), 200)
+            row = self.st.conn.execute("SELECT state, evidence FROM resolution WHERE person_id = ?", (self.pid,)).fetchone()
+            self.assertEqual(tuple(row), ("dismissed", "you: not a real promise"))
         finally:
             httpd.shutdown()
             httpd.server_close()

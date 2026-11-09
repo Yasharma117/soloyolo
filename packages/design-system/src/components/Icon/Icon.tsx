@@ -9,11 +9,13 @@ export const ICONS = [
   'chatbubble-outline', 'notifications-outline', 'notifications-off-outline', 'flask-outline', 'paper-plane-outline',
   'reader-outline', 'color-palette-outline', 'logo-whatsapp', 'logo-linkedin', 'logo-instagram', 'logo-x', 'logo-slack',
   'chatbubble', 'chatbox', 'paper-plane', 'chatbubble-ellipses',
+  'information-circle', 'warning', 'checkmark-circle', 'alert-circle', 'chevron-back', 'settings-outline', 'time-outline', 'link-outline', 'cloud-upload-outline',
+  'remove-circle-outline', 'hand-left-outline',
 ] as const
 export type IconName = (typeof ICONS)[number]
 
-type Tone = 'primary' | 'secondary' | 'tertiary' | 'accent' | 'onColor' | 'inverse'
-const TONE = { primary: 'textPrimary', secondary: 'textSecondary', tertiary: 'textTertiary', accent: 'accentText', onColor: 'onColor', inverse: 'onInverse' } as const
+type Tone = 'primary' | 'secondary' | 'tertiary' | 'accent' | 'onColor' | 'inverse' | 'success' | 'danger' | 'info'
+const TONE = { primary: 'textPrimary', secondary: 'textSecondary', tertiary: 'textTertiary', accent: 'accentText', onColor: 'onColor', inverse: 'onInverse', success: 'successText', danger: 'dangerText', info: 'infoText' } as const
 
 export function Icon({ name, size = 'md', tone = 'secondary' }: { name: IconName; size?: keyof typeof iconSize; tone?: Tone }) {
   const t = useTheme()

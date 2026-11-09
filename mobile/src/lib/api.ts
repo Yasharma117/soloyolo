@@ -6,6 +6,7 @@
 // there's a private route to the Mac (Tailscale), until then a phone shows the demo.
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { demo } from './demo'
+import type { ReasonKey } from './reasons'
 import type { Item, Mark } from './types'
 
 const BASE = (process.env.EXPO_PUBLIC_SOLOYOLO_URL ?? 'http://127.0.0.1:8765').replace(/\/$/, '')
@@ -45,14 +46,15 @@ async function post(path: string, body: object): Promise<void> {
   if (!r.ok) throw new Error(await r.text())
 }
 
-export async function mark(c: Item, state: Mark): Promise<void> {
+export async function mark(c: Item, state: Mark, reason?: ReasonKey): Promise<void> {
   await ready
   if (mode === 'live') {
     const body: Record<string, unknown> = { person_id: c.person_id, source_message_id: c.source_message_id, owner: c.owner, state }
     if (state === 'snoozed') body.days = 3
+    if (reason) body.reason = reason
     await post('/api/mark', body)
   } else {
-    await demo.mark(c, state)
+    await demo.mark(c, reason === 'off_chat' ? 'done' : state)
   }
   version++
   emit()

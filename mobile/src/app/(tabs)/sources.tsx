@@ -72,6 +72,8 @@ export default function Sources() {
       <SectionLabel>For builders</SectionLabel>
       <View style={{ paddingHorizontal: t.space.lg, alignItems: 'flex-start' }}>
         <Button label="Design system" icon="color-palette-outline" onPress={() => router.push('/design')} />
+        <View style={{ height: t.space.sm }} />
+        <Button label="Every screen" icon="albums-outline" onPress={() => router.push('/screens')} />
       </View>
     </ScrollView>
   )
