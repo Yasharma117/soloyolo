@@ -1,15 +1,38 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
+import { LinearGradient } from 'expo-linear-gradient'
+import type { ReactNode } from 'react'
 import { StyleSheet, Text, View, type TextStyle, type ViewStyle } from 'react-native'
-import { HOT } from '../lib/types'
-import { nameColor, usePalette } from '../lib/theme'
+import Svg, { Circle, Defs, Pattern, Rect } from 'react-native-svg'
+import { HOT, type Item } from '../lib/types'
+import { orbColors, serif, usePalette } from '../lib/theme'
 
-export function Avatar({ name, size = 28 }: { name: string; size?: number }) {
-  // No \p{L} here: plain ranges work on every JS engine (emoji halves and punctuation dropped)
+/** A Mesh-style gradient orb with the person's initials. */
+export function Orb({ name, size = 32 }: { name: string; size?: number }) {
   const words = name.replace(/[\uD800-\uDFFF()[\]{}.,!?'"@#*_~-]/g, '').trim().split(/\s+/)
   const initials = ((words[0]?.[0] ?? '') + (words.length > 1 ? words[words.length - 1]![0] : '')).toUpperCase() || '?'
+  const [a, b] = orbColors(name)
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: nameColor(name), alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: '#fff', fontSize: size * 0.4, fontWeight: '600' }}>{initials}</Text>
+    <LinearGradient colors={[a, b]} start={{ x: 0.15, y: 0.1 }} end={{ x: 0.9, y: 0.95 }}
+                    style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: '#fff', fontSize: size * 0.38, fontWeight: '700' }}>{initials}</Text>
+    </LinearGradient>
+  )
+}
+
+/** Atoms' dotted paper, fading out behind a header. */
+export function DotGrid({ height = 220 }: { height?: number }) {
+  const c = usePalette()
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { height }]}>
+      <Svg width="100%" height={height}>
+        <Defs>
+          <Pattern id="dots" width={10} height={10} patternUnits="userSpaceOnUse">
+            <Circle cx={2} cy={2} r={1.1} fill={c.dot} />
+          </Pattern>
+        </Defs>
+        <Rect width="100%" height={height} fill="url(#dots)" />
+      </Svg>
+      <LinearGradient colors={['transparent', c.ground]} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: height * 0.7 }} />
     </View>
   )
 }
@@ -22,30 +45,32 @@ export const NET_NAME: Record<string, string> = {
   whatsapp: 'WhatsApp', linkedin: 'LinkedIn', instagram: 'Instagram', x: 'X', slack: 'Slack', imessage: 'iMessage', sms: 'SMS', telegram: 'Telegram',
 }
 
-/** The apps a person is on, as small glyphs; with `label`, the first app's name beside it. */
-export function Apps({ networks = [], label = false }: { networks?: string[]; label?: boolean }) {
+export function NetIcon({ network, size = 13, color }: { network: string; size?: number; color?: string }) {
   const c = usePalette()
-  if (!networks.length) return null
+  return <Ionicons name={NET_ICON[network] ?? 'chatbubble-ellipses'} size={size} color={color ?? c.ink3} />
+}
+
+/** Small uppercase label with air around the letters, as Mesh sections its lists. */
+export function Label({ children, right, style }: { children: string; right?: ReactNode; style?: ViewStyle }) {
+  const c = usePalette()
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-      {networks.slice(0, label ? 1 : 3).map((n) => (
-        <Ionicons key={n} name={NET_ICON[n] ?? 'chatbubble-ellipses'} size={13} color={c.ink3} />
-      ))}
-      {label && <Text style={{ color: c.ink2, fontSize: 13 }}>{NET_NAME[networks[0]!] ?? networks[0]}</Text>}
+    <View style={[styles.label, style]}>
+      <Text style={{ color: c.ink3, fontSize: 11, fontWeight: '600', letterSpacing: 1.2 }}>{children.toUpperCase()}</Text>
+      {right}
     </View>
   )
 }
 
-export function Chips({ reasons }: { reasons?: string[] }) {
+export function Chips({ reasons, style }: { reasons?: string[]; style?: ViewStyle }) {
   const c = usePalette()
   if (!reasons?.length) return null
   return (
-    <View style={styles.chips}>
+    <View style={[{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, style]}>
       {reasons.slice(0, 3).map((r) => {
         const hot = HOT.test(r)
         return (
-          <View key={r} style={[styles.chip, { backgroundColor: hot ? c.hotSoft : c.raised }]}>
-            <Text style={{ color: hot ? c.hot : c.ink2, fontSize: 13, fontWeight: hot ? '600' : '400' }}>{r}</Text>
+          <View key={r} style={{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: hot ? c.hotSoft : c.raised }}>
+            <Text style={{ color: hot ? c.hot : c.ink2, fontSize: 12, fontWeight: hot ? '600' : '500' }}>{r}</Text>
           </View>
         )
       })}
@@ -53,35 +78,46 @@ export function Chips({ reasons }: { reasons?: string[] }) {
   )
 }
 
+const lower = (s: string) => (s.length > 1 && s[1] === s[1]!.toLowerCase() ? s[0]!.toLowerCase() + s.slice(1) : s)
+
+/** The promise as a sentence, its key words underlined (Atoms). */
+export function Sentence({ item, size = 21, style }: { item: Item; size?: number; style?: TextStyle }) {
+  const c = usePalette()
+  const first = item.name.split(' ')[0]!
+  const lead = item.owner === 'me'
+    ? item.kind === 'ask' ? `${first} asked you to ` : 'You said you’d '
+    : item.kind === 'ask' ? `You asked ${first} to ` : `Waiting on ${first} to `
+  return (
+    <Text style={[{ fontFamily: serif, fontSize: size, lineHeight: Math.round(size * 1.32), color: c.ink }, style]}>
+      <Text style={{ color: c.ink2 }}>{lead}</Text>
+      <Text style={{ textDecorationLine: 'underline', textDecorationColor: c.accent }}>{lower(item.action)}</Text>
+    </Text>
+  )
+}
+
 export function Quote({ text, style }: { text?: string | null; style?: ViewStyle }) {
   const c = usePalette()
   if (!text) return null
   return (
-    <View style={[{ borderLeftWidth: 2, borderLeftColor: c.line, paddingLeft: 10 }, style]}>
-      <Text style={{ color: c.ink2, fontSize: 15, lineHeight: 20 }} numberOfLines={3}>
-        “{text}”
-      </Text>
+    <View style={[{ flexDirection: 'row', gap: 8 }, style]}>
+      <View style={{ width: 2, borderRadius: 1, backgroundColor: c.line }} />
+      <Text style={{ flex: 1, color: c.ink2, fontSize: 14, lineHeight: 19 }} numberOfLines={2}>“{text}”</Text>
     </View>
   )
 }
 
-export function SectionTitle({ children, style }: { children: string; style?: TextStyle }) {
-  const c = usePalette()
-  return <Text style={[styles.section, { color: c.ink2 }, style]}>{children.toUpperCase()}</Text>
-}
-
-export function LargeTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+/** HEY-style page title: big, plain, with one line saying what this is for. */
+export function Title({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
   const c = usePalette()
   return (
-    <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 }}>
-      <Text style={{ color: c.ink, fontSize: 34, fontWeight: '700', letterSpacing: 0.3 }}>{title}</Text>
-      {subtitle ? <Text style={{ color: c.ink2, fontSize: 15, marginTop: 2 }}>{subtitle}</Text> : null}
+    <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 }}>
+      <Text style={{ color: c.ink, fontSize: 32, fontWeight: '800', letterSpacing: -0.6 }}>{title}</Text>
+      {subtitle ? <Text style={{ color: c.ink2, fontSize: 15, lineHeight: 21, marginTop: 4 }}>{subtitle}</Text> : null}
+      {children}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
-  section: { fontSize: 13, fontWeight: '600', letterSpacing: 0.3, paddingHorizontal: 20, marginTop: 24, marginBottom: 8 },
+  label: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 28, marginBottom: 10 },
 })

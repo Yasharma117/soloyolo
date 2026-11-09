@@ -25,7 +25,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {toast && (
         <Animated.View key={toast.id} entering={FadeInDown.duration(180)} exiting={FadeOutDown.duration(160)}
-                       style={[styles.toast, { backgroundColor: c.ink, bottom: insets.bottom + 64 }]} pointerEvents="box-none">
+                       style={[styles.toast, { backgroundColor: c.ink, bottom: Math.max(insets.bottom, 12) + 70 }]} pointerEvents="box-none">
           <Text style={{ color: c.ground, fontSize: 15, flexShrink: 1 }}>{toast.text}</Text>
           {toast.undo && (
             <Pressable hitSlop={10} onPress={() => { const u = toast.undo!; setToast(null); u() }}>

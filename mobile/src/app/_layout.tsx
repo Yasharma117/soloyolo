@@ -17,7 +17,7 @@ export default function Root() {
           <ToastProvider>
             <Stack screenOptions={{ headerShadowVisible: false, headerStyle: { backgroundColor: c.ground }, headerTintColor: c.ink }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="person/[id]" options={{ title: '', headerBackTitle: 'Back' }} />
+              <Stack.Screen name="person/[id]" options={{ headerShown: false, presentation: 'modal' }} />
             </Stack>
           </ToastProvider>
           <StatusBar style="auto" />

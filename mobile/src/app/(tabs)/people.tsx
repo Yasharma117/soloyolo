@@ -1,8 +1,9 @@
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Apps, Avatar, LargeTitle } from '../../components/ui'
+import { Label, NetIcon, Orb, Title } from '../../components/ui'
 import { useData } from '../../lib/api'
 import { usePalette } from '../../lib/theme'
 import { ago, isOpen, type PersonSummary } from '../../lib/types'
@@ -20,38 +21,41 @@ export default function People() {
   return (
     <FlatList
       style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 40 }}
+      contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}
       data={list}
       keyExtractor={(p) => String(p.id)}
       keyboardDismissMode="on-drag"
       ListHeaderComponent={
         <View>
-          <LargeTitle title="People" subtitle="Ranked by how much you two talk lately" />
-          <TextInput value={q} onChangeText={setQ} placeholder="Search" placeholderTextColor={c.ink3} clearButtonMode="while-editing"
-                     style={[styles.search, { backgroundColor: c.raised, color: c.ink }]} />
+          <Title title="People" subtitle="Everyone you talk to, closest first, with what you owe each other." />
+          <View style={[styles.search, { backgroundColor: c.raised }]}>
+            <Ionicons name="search" size={16} color={c.ink3} />
+            <TextInput value={q} onChangeText={setQ} placeholder="Search" placeholderTextColor={c.ink3}
+                       style={{ flex: 1, color: c.ink, fontSize: 16, paddingVertical: 0 }} />
+          </View>
+          <Label>{q ? 'Matches' : 'Closest first'}</Label>
         </View>
       }
-      renderItem={({ item: p, index }) => {
+      renderItem={({ item: p }) => {
         const mine = p.commitments.filter((x) => x.owner === 'me' && isOpen(x)).length
         const theirs = p.commitments.filter((x) => x.owner === 'them' && isOpen(x)).length
-        const first = index === 0, last = index === list.length - 1
         return (
           <Pressable onPress={() => router.push({ pathname: '/person/[id]', params: { id: String(p.id) } })}
-                     style={[styles.row, { backgroundColor: c.card }, first && styles.top, last && styles.bottom]}>
-            <Avatar name={p.name} size={38} />
-            <View style={[styles.rowBody, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line }]}>
-              <View style={{ flex: 1, gap: 2 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={{ color: c.ink, fontSize: 17, fontWeight: '500', flexShrink: 1 }} numberOfLines={1}>{p.name}</Text>
-                  <Apps networks={p.networks} />
-                </View>
-                <Text style={{ color: c.ink2, fontSize: 14 }}>last talked {ago(p.last)} ago</Text>
+                     style={[styles.row, { borderBottomColor: c.line }]}>
+            <Orb name={p.name} size={40} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ color: c.ink, fontSize: 16, fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>{p.name}</Text>
+                {p.networks.slice(0, 2).map((n) => <NetIcon key={n} network={n} size={12} />)}
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                {mine ? <Text style={{ color: c.hot, fontSize: 13, fontWeight: '600' }}>you owe {mine}</Text> : null}
-                {theirs ? <Text style={{ color: c.ink2, fontSize: 13 }}>owes you {theirs}</Text> : null}
-              </View>
+              <Text style={{ color: c.ink3, fontSize: 13 }}>
+                {mine ? <Text style={{ color: c.hot, fontWeight: '600' }}>you owe {mine}</Text> : null}
+                {mine && theirs ? ' · ' : ''}
+                {theirs ? `owes you ${theirs}` : ''}
+                {!mine && !theirs ? 'nothing open' : ''}
+              </Text>
             </View>
+            <Text style={{ color: c.ink3, fontSize: 12 }}>{ago(p.last)}</Text>
           </Pressable>
         )
       }}
@@ -60,9 +64,6 @@ export default function People() {
 }
 
 const styles = StyleSheet.create({
-  search: { marginHorizontal: 16, marginTop: 8, marginBottom: 14, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 17 },
-  row: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, paddingLeft: 14, gap: 12 },
-  rowBody: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingRight: 14, gap: 8 },
-  top: { borderTopLeftRadius: 14, borderTopRightRadius: 14 },
-  bottom: { borderBottomLeftRadius: 14, borderBottomRightRadius: 14 },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 14, borderRadius: 12, paddingHorizontal: 12, height: 40 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
 })

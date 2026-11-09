@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons'
 import { useRouter } from 'expo-router'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { LargeTitle, SectionTitle } from '../../components/ui'
+import { Label, Title } from '../../components/ui'
 import { serverUrl, useData, useMode } from '../../lib/api'
 import { usePalette } from '../../lib/theme'
 import { ago, type Status } from '../../lib/types'
@@ -55,13 +55,13 @@ export default function Sources() {
     </View>
   )
   return (
-    <ScrollView style={{ backgroundColor: c.ground }} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 40 }}>
-      <LargeTitle title="Sources" subtitle={mode === 'live' ? `Connected to your Mac (${serverUrl})` : 'Showing the demo: your Mac isn’t reachable'} />
-      <SectionTitle>Messages</SectionTitle>
+    <ScrollView style={{ backgroundColor: c.ground }} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}>
+      <Title title="Sources" subtitle={mode === 'live' ? `Where soloyolo reads from. Connected to your Mac (${serverUrl}).` : 'Where soloyolo reads from. Showing the demo: your Mac isn’t reachable.'} />
+      <Label>Messages</Label>
       {group(messages)}
-      <SectionTitle>Every morning</SectionTitle>
+      <Label>Every morning</Label>
       {group(daily)}
-      <SectionTitle>Privacy</SectionTitle>
+      <Label>Privacy</Label>
       <View style={[styles.group, { backgroundColor: c.card, padding: 14 }]}>
         <Text style={{ color: c.ink2, fontSize: 15, lineHeight: 20 }}>
           {s?.disclosures.length
@@ -71,7 +71,7 @@ export default function Sources() {
       </View>
       {s?.muted.length ? (
         <>
-          <SectionTitle>Muted</SectionTitle>
+          <Label>Muted</Label>
           <View style={[styles.group, { backgroundColor: c.card }]}>
             {s.muted.map((m) => (
               <Pressable key={m.id} style={[styles.row, { paddingVertical: 12 }]} onPress={() => router.push({ pathname: '/person/[id]', params: { id: String(m.id) } })}>
@@ -87,7 +87,7 @@ export default function Sources() {
 }
 
 const styles = StyleSheet.create({
-  group: { marginHorizontal: 16, borderRadius: 14, overflow: 'hidden' },
+  group: { marginHorizontal: 16, borderRadius: 18, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'flex-start', paddingLeft: 14, gap: 12 },
   rowBody: { flex: 1, paddingVertical: 11, paddingRight: 14 },
   line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 },
