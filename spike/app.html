@@ -1,0 +1,470 @@
+<title>soloyolo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one calm column, phone-first; Today's cards are the only boxed objects, everything else is rows. */
+:root {
+  --bg: #f4f5f2; --surface: #ffffff; --raised: #eceee9;
+  --ink: #15181a; --ink-2: #565d61; --ink-3: #8b9195; --line: #e1e4de;
+  --accent: #e39a0b; --accent-ink: #94590a; --accent-soft: #fbefd6;
+  --ok: #2e7d5b; --ok-soft: #e2f1e9;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Geist", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1112; --surface: #181b1c; --raised: #202425;
+    --ink: #ecedea; --ink-2: #a5aaac; --ink-3: #6d7376; --line: #282c2d;
+    --accent: #f2b33d; --accent-ink: #f5c568; --accent-soft: #2d2311;
+    --ok: #5cc08e; --ok-soft: #11261c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1112; --surface: #181b1c; --raised: #202425;
+  --ink: #ecedea; --ink-2: #a5aaac; --ink-3: #6d7376; --line: #282c2d;
+  --accent: #f2b33d; --accent-ink: #f5c568; --accent-soft: #2d2311;
+  --ok: #5cc08e; --ok-soft: #11261c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--body); -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+.wrap { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px 120px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 8px 4px; }
+.brand { font: 600 13px/1 var(--mono); letter-spacing: 0.02em; color: var(--ink-2); }
+.pill { font: 500 11px/1 var(--mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 5px 8px;
+        border-radius: 999px; background: var(--raised); color: var(--ink-2); }
+.pill.live { background: var(--ok-soft); color: var(--ok); }
+
+h1 { font: 700 34px/1.05 var(--display); letter-spacing: -0.02em; margin: 18px 0 6px; text-wrap: balance; }
+h2 { font: 700 24px/1.1 var(--display); letter-spacing: -0.015em; margin: 14px 0 4px; text-wrap: balance; }
+h3 { font: 600 11px/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin: 28px 0 10px; }
+.sub { color: var(--ink-2); margin: 0; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Today's cards */
+.cards { display: grid; gap: 12px; margin-top: 20px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px;
+        display: grid; gap: 10px; transition: opacity .25s, transform .25s; }
+.card.gone { opacity: 0; transform: translateY(-6px); }
+.who { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); min-width: 0; }
+.who b { color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who .when { margin-left: auto; font: 12px var(--mono); color: var(--ink-3); white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+.dot.theirs { background: transparent; border: 1.5px solid var(--ink-3); }
+.dot.quiet { background: var(--line); }
+.action { font: 500 19px/1.3 var(--body); letter-spacing: -0.01em; margin: 0; overflow-wrap: anywhere; }
+.action .owes { display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 2px; }
+.quote { margin: 0; padding-left: 10px; border-left: 2px solid var(--line); color: var(--ink-2); font-size: 14px; overflow-wrap: anywhere; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 12px/1 var(--body); padding: 5px 8px; border-radius: 6px; background: var(--raised); color: var(--ink-2); }
+.chip.hot { background: var(--accent-soft); color: var(--accent-ink); font-weight: 500; }
+.acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 14px; font-size: 14px;
+       font-weight: 500; cursor: pointer; min-height: 40px; }
+.btn:hover { border-color: var(--ink-3); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.small { padding: 6px 10px; min-height: 32px; font-size: 13px; border-radius: 8px; }
+.btn.link { border: 0; background: none; padding: 6px 0; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; min-height: 0; }
+.empty { text-align: left; padding: 28px 0 8px; }
+.empty p { color: var(--ink-2); margin: 6px 0 0; max-width: 46ch; }
+.rule { font-size: 13px; color: var(--ink-3); margin-top: 28px; max-width: 52ch; }
+
+/* rows: People, All, Person items */
+.rows { display: grid; }
+.row { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 12px 0;
+       border-bottom: 1px solid var(--line); text-align: left; background: none; border-left: 0; border-right: 0; border-top: 0; width: 100%; cursor: pointer; }
+.row > * { min-width: 0; }
+.row:last-child { border-bottom: 0; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--raised);
+          font: 600 13px var(--body); color: var(--ink-2); }
+.line1 { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.line1 b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.line2 { font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nets { display: inline-flex; gap: 3px; flex: none; }
+.net { font: 500 10px/1 var(--mono); padding: 3px 4px; border-radius: 4px; border: 1px solid var(--line); color: var(--ink-3); }
+.count { font: 12px var(--mono); color: var(--ink-3); text-align: right; white-space: nowrap; }
+.count .mine { color: var(--accent-ink); font-weight: 500; }
+.search { width: 100%; font: inherit; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--line);
+          background: var(--surface); color: var(--ink); margin-top: 16px; }
+
+.item { display: grid; grid-template-columns: 14px 1fr; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.item:last-child { border-bottom: 0; }
+.item .dot { margin-top: 7px; }
+.item .what { font-weight: 500; overflow-wrap: anywhere; }
+.item .meta { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+.item .acts { margin-top: 8px; }
+.item.closed .what { color: var(--ink-3); text-decoration: line-through; text-decoration-color: var(--ink-3); }
+.item.focus { background: linear-gradient(var(--accent-soft), var(--accent-soft)) no-repeat; background-size: 100% 100%; border-radius: 10px; padding-inline: 8px; margin-inline: -8px; }
+
+.back { margin-top: 12px; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.fact { font-size: 13px; padding: 5px 9px; border-radius: 8px; background: var(--raised); color: var(--ink-2); overflow-wrap: anywhere; }
+.fact b { color: var(--ink); font-weight: 500; }
+
+.thread { display: flex; flex-direction: column; gap: 4px; }
+.bubble { max-width: 82%; padding: 7px 11px; border-radius: 14px; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface); border: 1px solid var(--line); align-self: flex-start; }
+.bubble.me { align-self: flex-end; background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.bubble.src { box-shadow: 0 0 0 2px var(--accent); }
+.bubble.call { align-self: center; background: none; border: 0; color: var(--ink-3); font-size: 12px; }
+.day { align-self: center; font: 11px var(--mono); color: var(--ink-3); margin: 12px 0 4px; }
+
+.source { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.source:last-child { border-bottom: 0; }
+.source .name { font-weight: 600; }
+.source .state { font: 12px var(--mono); color: var(--ink-3); text-align: right; }
+.source .state.on { color: var(--ok); }
+.source .state.hold { color: var(--accent-ink); }
+.source .how { grid-column: 1 / -1; font-size: 13px; color: var(--ink-2); }
+code { font: 12.5px var(--mono); background: var(--raised); padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere; }
+
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent);
+           backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--line);
+           padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
+nav.tabs .in { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); }
+nav.tabs a { text-align: center; padding: 12px 4px 14px; font-size: 13px; font-weight: 500; color: var(--ink-3); text-decoration: none; position: relative; }
+nav.tabs a[aria-current="page"] { color: var(--ink); }
+nav.tabs a[aria-current="page"]::after { content: ""; position: absolute; top: 0; left: 30%; right: 30%; height: 2px; background: var(--accent); border-radius: 2px; }
+nav.tabs .badge { font: 500 10px var(--mono); margin-left: 4px; color: var(--accent-ink); }
+
+[hidden] { display: none !important; }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 6;
+         background: var(--ink); color: var(--bg); border-radius: 12px; padding: 10px 14px; font-size: 14px; display: flex; gap: 14px; align-items: center;
+         box-shadow: 0 6px 24px rgb(0 0 0 / .18); max-width: calc(100% - 32px); }
+#toast button { background: none; border: 0; color: var(--accent); font-weight: 600; cursor: pointer; padding: 4px; }
+@media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+</style>
+
+<div class="wrap">
+  <div class="top"><span class="brand">soloyolo</span><span class="pill" id="mode">Loading</span></div>
+  <main id="view" aria-live="polite"></main>
+</div>
+<nav class="tabs" aria-label="Sections"><div class="in">
+  <a href="#today" data-tab="today">Today<span class="badge" id="b-today"></span></a>
+  <a href="#people" data-tab="people">People</a>
+  <a href="#all" data-tab="all">All open</a>
+  <a href="#sources" data-tab="sources">Sources</a>
+</div></nav>
+<div id="toast" role="status" hidden></div>
+
+<script>
+"use strict";
+// One page, two data sources. Served by `python -m spike serve` it reads your store through /api/*.
+// Anywhere else (a shared preview) it runs on the made-up demo below, and says so.
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const NOW = () => Date.now() / 1000;
+const NETS = { whatsapp: "WA", linkedin: "in", instagram: "IG", x: "X", slack: "SL", telegram: "TG", imessage: "iM", sms: "SMS", notification: "N" };
+const NET_NAMES = { whatsapp: "WhatsApp", linkedin: "LinkedIn", instagram: "Instagram", x: "X", slack: "Slack", imessage: "iMessage", telegram: "Telegram" };
+const HOT = /^(due|overdue)|again|chased/i;  // urgent: a date, or someone chasing; "they wrote last" is context
+
+function ago(ts) {
+  const s = NOW() - ts;
+  if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m`;
+  if (s < 86400) return `${Math.round(s / 3600)}h`;
+  if (s < 86400 * 30) return `${Math.round(s / 86400)}d`;
+  return new Date(ts * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+const initials = (n) => (n || "?").replace(/[^\p{L}\p{N} ]/gu, "").trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
+const nets = (list) => `<span class="nets">${(list || []).map((n) => `<span class="net" title="${esc(NET_NAMES[n] || n)}">${esc(NETS[n] || n.slice(0, 2))}</span>`).join("")}</span>`;
+const isOpen = (c) => c.status === "open" && !c.snoozed && !c.dismissed;
+
+// --- demo data: made-up people, shaped like the real store ---------------------------------------
+function demo() {
+  const t = NOW(), h = 3600, d = 86400;
+  const people = [
+    { id: 1, name: "Rohan Mehta", networks: ["whatsapp"], score: 64, last: t - 3 * h, attrs: [["city", "Gurugram"]] },
+    { id: 2, name: "Ma", networks: ["whatsapp"], score: 120, last: t - 40 * 60, attrs: [] },
+    { id: 3, name: "Priya Nair", networks: ["linkedin", "whatsapp"], score: 18, last: t - 26 * h, attrs: [["company", "Northwind Labs"], ["position", "Design Lead"]] },
+    { id: 4, name: "Kabir Anand", networks: ["whatsapp", "instagram"], score: 31, last: t - 2 * d, attrs: [] },
+    { id: 5, name: "Arjun Sethi", networks: ["linkedin"], score: 4, last: t - 6 * d, attrs: [["company", "Quill"], ["position", "Founder"]] },
+    { id: 6, name: "Meera Iyer", networks: ["instagram"], score: 9, last: t - 4 * d, attrs: [] },
+    { id: 7, name: "Tanvi Rao", networks: ["x"], score: 3, last: t - 9 * d, attrs: [["x", "@tanvibuilds"]] },
+    { id: 8, name: "Sector 72 flat (owner)", networks: ["whatsapp"], score: 6, last: t - 12 * d, attrs: [] },
+    { id: 9, name: "Nova (AI assistant)", networks: ["whatsapp"], score: 40, last: t - 1 * h, attrs: [], muted: true },
+  ];
+  let n = 100;
+  const it = (pid, owner, action, src, ago_s, live, reasons, extra = {}) =>
+    ({ id: ++n, person_id: pid, source_message_id: n, owner, kind: extra.kind || "promise", action, source_text: src,
+       source_ts: t - ago_s, due: extra.due || null, status: "open", live, reasons, snoozed: false, dismissed: false, resolved_by: null });
+  const items = [
+    it(1, "me", "Send Rohan the scan of the rent agreement", "Agreement ka scan bhej dena kal tak, broker maang raha hai", 2 * d, true, ["he asked again 3h ago", "due tomorrow"]),
+    it(2, "me", "Book Ma's train ticket for the 21st", "21 ki ticket kara dena beta, Rajdhani mil jaye toh", 1 * d, true, ["1 day", "close"]),
+    it(3, "them", "Share the hiring manager's email", "I'll dig out Anand's email and send it over this week", 3 * d, true, ["overdue 1d"], { kind: "promise" }),
+    it(4, "me", "Return Kabir's tripod", "Tripod Sunday tak wapas kar dena", 9 * d, false, ["9 days"]),
+    it(5, "me", "Send Arjun your portfolio link", "Would love to see your work, can you share a link?", 6 * d, false, ["6 days"], { kind: "ask" }),
+    it(6, "them", "Send the list of cafes in Hauz Khas", "will send you the list tonight!!", 4 * d, false, ["4 days"]),
+    it(7, "me", "Reply to Tanvi about the beta invite", "any chance you could take a look at the beta this week?", 9 * d, false, ["9 days"], { kind: "ask" }),
+    it(8, "me", "Pay ₹14,500 rent for November", "Rent 14,500 by 5th please", 12 * d, false, ["12 days", "money"]),
+    it(2, "me", "Call Mausi about the wedding dates", "Mausi ko phone kar lena, dates confirm karni hai", 16 * d, false, ["16 days", "close"]),
+  ];
+  const threads = {
+    1: [[3 * d, 0, "Bhai flat wale ne agreement maanga hai"], [2 * d, 0, "Agreement ka scan bhej dena kal tak, broker maang raha hai"], [2 * d - 600, 1, "haan bhejta hoon"], [3 * h, 0, "bhai scan??"]],
+    2: [[16 * d, 0, "Mausi ko phone kar lena, dates confirm karni hai"], [1 * d + 400, 0, "Diwali ke baad aa rahe ho na?"], [1 * d, 0, "21 ki ticket kara dena beta, Rajdhani mil jaye toh"], [1 * d - 300, 1, "ok ma, aaj dekhta hoon"], [40 * 60, 0, "[call]"]],
+    3: [[4 * d, 1, "Hi Priya! Saw the Design Lead opening at Northwind, would love an intro to whoever is hiring"], [3 * d, 0, "Of course! I'll dig out Anand's email and send it over this week"], [3 * d - 900, 1, "Thank you so much 🙏"]],
+  };
+  return { people, items, threads, snapshot: JSON.stringify(items) };
+}
+
+const D = demo();
+const demoApi = {
+  person(pid) {
+    const p = D.people.find((x) => x.id === pid);
+    if (!p) return null;
+    return { id: p.id, name: p.name, score: p.score, last: p.last, count: (D.threads[pid] || []).length || 12, muted: !!p.muted,
+             networks: p.networks, handles: p.networks.map((n) => ({ network: n, address: n === "whatsapp" ? "+91 98xxx xx" + (40 + pid) : "demo" })),
+             attributes: p.attrs.map(([key, value]) => ({ key, value, source: "demo" })),
+             commitments: D.items.filter((c) => c.person_id === pid).map((c) => ({ ...c })) };
+  },
+  async get(path) {
+    const nameOf = (pid) => D.people.find((p) => p.id === pid);
+    const visible = D.items.filter((c) => !nameOf(c.person_id).muted).map((c) => ({ ...c, name: nameOf(c.person_id).name, networks: nameOf(c.person_id).networks }));
+    const open = visible.filter(isOpen);
+    if (path === "/api/today") {
+      const live = open.filter((c) => c.live);
+      return { today: live.slice(0, 3), live: live.length, quiet: open.length - live.length, open: open.length };
+    }
+    if (path === "/api/all") return [...open.filter((c) => c.live), ...open.filter((c) => !c.live)];
+    if (path === "/api/people") return D.people.map((p) => ({ id: p.id, name: p.name, score: p.score, last: p.last, networks: p.networks, muted: !!p.muted,
+                                                            commitments: visible.filter((c) => c.person_id === p.id) }));
+    let m = path.match(/^\/api\/person\/(\d+)$/);
+    if (m) return this.person(Number(m[1]));
+    m = path.match(/^\/api\/thread\/(\d+)$/);
+    if (m) {
+      const items = D.items.filter((c) => c.person_id === Number(m[1]));
+      return (D.threads[m[1]] || []).map(([a, me, text], i) => ({ id: items.find((c) => c.source_text === text)?.source_message_id ?? 9000 + i, ts: NOW() - a, from_me: me, text }));
+    }
+    if (path === "/api/status") return {
+      networks: [{ network: "whatsapp", messages: 5602, last: NOW() - 240 }, { network: "linkedin", messages: 312, last: NOW() - 2 * 86400 }],
+      groups: [{ source: "whatsapp-group", lines: 5403, last: NOW() - 600 }], telegram: true, last_read: NOW() - 18 * 60,
+      disclosures: ["claude-opus (claude code)", "telegram (morning message)"], muted: D.people.filter((p) => p.muted).map((p) => ({ id: p.id, name: p.name })) };
+    throw new Error("not in the demo");
+  },
+  async post(path, body) {
+    if (path === "/api/mute") { D.people.find((p) => p.id === body.person_id).muted = body.mute; return; }
+    const c = D.items.find((x) => x.person_id === body.person_id && x.source_message_id === body.source_message_id && x.owner === body.owner);
+    if (!c) return;
+    const orig = JSON.parse(D.snapshot).find((x) => x.id === c.id);
+    if (body.state === "clear") return Object.assign(c, orig);
+    Object.assign(c, { resolved_by: "you", status: body.state === "done" ? "done" : "open", dismissed: body.state === "dismissed",
+                       snoozed: body.state === "snoozed", live: body.state === "open" ? true : c.live });
+    if (body.state === "open" && !c.reasons.includes("you kept it on")) c.reasons = ["you kept it on", ...c.reasons];
+  },
+};
+
+const liveApi = {
+  async get(path) {
+    const r = await fetch(path, { cache: "no-store" });
+    if (!r.ok) throw new Error(`${path}: ${r.status}`);
+    return r.json();
+  },
+  async post(path, body) {
+    const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+  },
+};
+let api = demoApi;
+
+// --- shared pieces --------------------------------------------------------------------------------
+const STATE_SAID = { done: "Marked done", dismissed: "Marked not needed", open: "Kept on for 3 more days", snoozed: "Snoozed for 3 days", clear: "Undone" };
+let toastTimer;
+function toast(text, undo) {
+  const t = $("#toast");
+  t.innerHTML = `<span>${esc(text)}</span>${undo ? '<button type="button" id="undo">Undo</button>' : ""}`;
+  t.hidden = false;
+  if (undo) $("#undo").onclick = () => { t.hidden = true; undo(); };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
+}
+async function mark(c, state) {
+  const body = { person_id: c.person_id, source_message_id: c.source_message_id, owner: c.owner, state };
+  if (state === "snoozed") body.days = 3;
+  try { await api.post("/api/mark", body); } catch (e) { return toast("Couldn't save that. Is soloyolo still running on your Mac?"); }
+  toast(STATE_SAID[state], state === "clear" ? null : () => mark(c, "clear").then(route));
+}
+function chips(reasons) {
+  return (reasons || []).length ? `<div class="chips">${reasons.map((r) => `<span class="chip ${HOT.test(r) ? "hot" : ""}">${esc(r)}</span>`).join("")}</div>` : "";
+}
+function actionsFor(c) {
+  const b = (state, label, cls = "") => `<button type="button" class="btn small ${cls}" data-state="${state}">${label}</button>`;
+  if (c.dismissed || (c.status === "done" && c.resolved_by === "you") || c.snoozed) return b("clear", "Undo");
+  if (c.status === "done") return b("open", "Not done yet");
+  return b("done", "Done", "primary") + b("dismissed", "Not needed") + (c.live ? b("snoozed", "Later") : b("open", "Still on"));
+}
+function wire(root, list, after) {
+  root.querySelectorAll("[data-state]").forEach((btn) => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const el = btn.closest("[data-key]");
+      const c = list.find((x) => key(x) === el.dataset.key);
+      el.classList.add("gone");
+      await mark(c, btn.dataset.state);
+      setTimeout(after, 180);
+    };
+  });
+}
+const key = (c) => `${c.person_id}:${c.source_message_id}:${c.owner}`;
+
+// --- views ----------------------------------------------------------------------------------------
+async function today() {
+  const s = await api.get("/api/today");
+  const date = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  $("#b-today").textContent = s.today.length || "";
+  const n = s.today.length;
+  const head = `<h1>${esc(date)}</h1><p class="sub">${n ? `${n} ${n === 1 ? "thing" : "things"} today` : "Nothing owed today"} ·
+    <span class="num">${s.quiet}</span> quiet, assumed done</p>`;
+  const cards = s.today.map((c) => `
+    <article class="card" data-key="${key(c)}" data-person="${c.person_id}">
+      <div class="who"><span class="dot ${c.owner === "me" ? "" : "theirs"}"></span><b>${esc(c.name)}</b>${nets(c.networks)}<span class="when">${ago(c.source_ts)}</span></div>
+      <p class="action">${c.owner === "me" ? "" : `<span class="owes">${esc(c.name.split(" ")[0])} owes you</span>`}${esc(c.action)}</p>
+      ${c.source_text ? `<p class="quote">“${esc(c.source_text.slice(0, 160))}”</p>` : ""}
+      ${chips(c.reasons)}
+      <div class="acts">${actionsFor(c)}</div>
+    </article>`).join("");
+  $("#view").innerHTML = head + (n ? `<div class="cards">${cards}</div>` : `<div class="empty"><p>Nothing you said you'd do needs you today.
+    Anything older than a few days is assumed done unless someone chases you about it.</p></div>`) +
+    `<p class="rule">An item shows for 3 days after it's said, or around its due date, and comes back when the other person chases you.
+     Silence means done. <a href="#all">See all ${s.open} open</a>.</p>`;
+  wire($("#view"), s.today, route);
+  $("#view").querySelectorAll(".card").forEach((el) => {
+    el.onclick = (e) => { if (!e.target.closest("button")) location.hash = `p-${el.dataset.person}-${el.dataset.key.split(":")[1]}`; };
+    el.style.cursor = "pointer";
+  });
+}
+
+let peopleCache = [];
+async function people() {
+  peopleCache = await api.get("/api/people");
+  $("#view").innerHTML = `<h2>People</h2><p class="sub">Ranked by how much you two talk lately.</p>
+    <input class="search" id="q" type="search" placeholder="Search names" autocomplete="off" aria-label="Search people">
+    <div class="rows" id="plist"></div>`;
+  const draw = () => {
+    const q = $("#q").value.trim().toLowerCase();
+    const list = peopleCache.filter((p) => !p.muted && (!q || p.name.toLowerCase().includes(q))).sort((a, b) => b.score - a.score).slice(0, 80);
+    $("#plist").innerHTML = list.map((p) => {
+      const mine = p.commitments.filter((c) => c.owner === "me" && isOpen(c)).length;
+      const theirs = p.commitments.filter((c) => c.owner === "them" && isOpen(c)).length;
+      return `<button type="button" class="row" data-id="${p.id}"><span class="avatar">${esc(initials(p.name))}</span>
+        <span><span class="line1"><b>${esc(p.name)}</b>${nets(p.networks)}</span>
+        <span class="line2">last ${ago(p.last)}</span></span>
+        <span class="count">${mine ? `<span class="mine">you owe ${mine}</span>` : ""}${mine && theirs ? "<br>" : ""}${theirs ? `owes you ${theirs}` : ""}</span></button>`;
+    }).join("") || `<p class="sub">No one matches.</p>`;
+    $("#plist").querySelectorAll(".row").forEach((r) => { r.onclick = () => { location.hash = `p-${r.dataset.id}`; }; });
+  };
+  $("#q").oninput = draw;
+  draw();
+}
+
+function itemRow(c, focus) {
+  const closed = !isOpen(c);
+  const state = c.dismissed ? "not needed" : c.snoozed ? "later" : c.status === "done" ? (c.resolved_by && c.resolved_by !== "you" ? `done (${c.resolved_by})` : "done")
+    : c.live ? "on today's list" : "quiet, assumed done";
+  return `<div class="item ${closed ? "closed" : ""} ${focus ? "focus" : ""}" data-key="${key(c)}">
+    <span class="dot ${closed || !c.live ? "quiet" : c.owner === "me" ? "" : "theirs"}"></span>
+    <div><div class="what">${esc(c.action)}</div>
+    <div class="meta">${esc(state)} · said ${ago(c.source_ts)} ago${c.due ? ` · due ${esc(c.due)}` : ""}</div>
+    ${c.source_text ? `<p class="quote" style="margin-top:6px">“${esc(c.source_text.slice(0, 160))}”</p>` : ""}
+    ${!closed ? chips(c.reasons) : ""}<div class="acts">${actionsFor(c)}</div></div></div>`;
+}
+
+async function personView(pid, focusSrc) {
+  const p = await api.get(`/api/person/${pid}`);
+  const thread = await api.get(`/api/thread/${pid}`).catch(() => []);
+  const items = (p.commitments || []).map((c) => ({ ...c, person_id: pid, name: p.name }));
+  const mine = items.filter((c) => c.owner === "me"), theirs = items.filter((c) => c.owner === "them");
+  const facts = [...(p.attributes || []).map((a) => `<span class="fact">${esc(a.key)} <b>${esc(a.value)}</b></span>`),
+                 ...(p.handles || []).map((h) => `<span class="fact">${esc(NET_NAMES[h.network] || h.network)} <b>${esc(h.address)}</b></span>`)].join("");
+  const srcs = new Set(items.map((c) => c.source_message_id));
+  let lastDay = "";
+  const bubbles = thread.slice(-40).map((m) => {
+    const day = new Date(m.ts * 1000).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    const sep = day !== lastDay ? `<div class="day">${esc(day)}</div>` : "";
+    lastDay = day;
+    if (m.text === "[call]") return `${sep}<div class="bubble call">Call</div>`;
+    return `${sep}<div class="bubble ${m.from_me ? "me" : ""} ${srcs.has(m.id) ? "src" : ""}">${esc(m.text)}</div>`;
+  }).join("");
+  const sec = (title, list) => `<h3>${title}</h3>${list.length ? list.map((c) => itemRow(c, focusSrc && c.source_message_id === focusSrc)).join("") : `<p class="sub">Nothing.</p>`}`;
+  $("#view").innerHTML = `<button type="button" class="btn link back" id="back">← Back</button>
+    <h2>${esc(p.name)}</h2><p class="sub">${nets(p.networks)} last talked ${ago(p.last)} ago${p.muted ? " · muted" : ""}</p>
+    ${facts ? `<div class="facts">${facts}</div>` : ""}
+    ${sec("You owe", mine)}${sec(`${esc(p.name.split(" ")[0])} owes you`, theirs)}
+    ${bubbles ? `<h3>Recent messages</h3><div class="thread">${bubbles}</div>` : ""}
+    <h3>This chat</h3><button type="button" class="btn small" id="mute">${p.muted ? "Unmute: show its items again" : "Mute: it's a bot or a service, not a person"}</button>`;
+  $("#back").onclick = () => history.length > 1 ? history.back() : (location.hash = "people");
+  $("#mute").onclick = async () => { await api.post("/api/mute", { person_id: pid, mute: !p.muted }); toast(p.muted ? "Unmuted" : "Muted: its items are hidden"); route(); };
+  wire($("#view"), items, () => personView(pid));
+  const f = $(".item.focus");
+  if (f) f.scrollIntoView({ block: "center" });
+}
+
+async function all() {
+  const list = await api.get("/api/all");
+  const live = list.filter((c) => c.live), quiet = list.filter((c) => !c.live);
+  const row = (c) => `<div class="item" data-key="${key(c)}"><span class="dot ${c.live ? (c.owner === "me" ? "" : "theirs") : "quiet"}"></span>
+    <div><div class="what"><a href="#p-${c.person_id}" style="color:inherit">${esc(c.name)}</a>: ${c.owner === "me" ? "" : "owes you · "}${esc(c.action)}</div>
+    ${chips(c.reasons)}<div class="acts">${c.live ? actionsFor(c) : '<button type="button" class="btn small" data-state="open">Still on</button>'}</div></div></div>`;
+  $("#view").innerHTML = `<h2>All open</h2><p class="sub">Everything still open, with the reasons it ranks where it does.</p>
+    <h3>On today's list · ${live.length}</h3>${live.map(row).join("") || `<p class="sub">Nothing.</p>`}
+    <h3>Quiet · ${quiet.length}</h3><p class="sub" style="margin-bottom:6px">Assumed done. Tap Still on for anything that isn't.</p>${quiet.map(row).join("")}`;
+  wire($("#view"), list, all);
+}
+
+async function sources() {
+  const s = await api.get("/api/status");
+  const has = Object.fromEntries((s.networks || []).map((n) => [n.network, n]));
+  const src = (name, state, cls, how) => `<div class="source"><span class="name">${name}</span><span class="state ${cls}">${state}</span><span class="how">${how}</span></div>`;
+  const synced = (n, verb) => has[n] ? [`${verb} ${ago(has[n].last)} ago`, "on", `<span class="num">${has[n].messages.toLocaleString()}</span> messages.`] : null;
+  const wa = synced("whatsapp", "synced") || ["not linked", "", "Link your phone: <code>connectord link --phone 91…</code>"];
+  const imp = (n, label, how) => { const x = synced(n, "imported"); return src(label, x ? x[0] : "not imported", x ? "on" : "", x ? x[2] : how); };
+  const groups = (s.groups || []).reduce((a, g) => a + g.lines, 0);
+  $("#view").innerHTML = `<h2>Sources</h2><p class="sub">Where soloyolo reads from. Everything stays on your Mac except what's listed under Privacy.</p>
+    <h3>Messages</h3>
+    ${src("WhatsApp", wa[0], wa[1], wa[2] + (groups ? ` Group chats are read only as evidence: <span class="num">${groups.toLocaleString()}</span> lines.` : ""))}
+    ${imp("linkedin", "LinkedIn", "From your data export: <code>python -m spike import-linkedin &lt;zip&gt;</code>")}
+    ${imp("instagram", "Instagram", "From your data export (JSON): <code>python -m spike import-instagram &lt;zip&gt;</code>")}
+    ${imp("x", "X", "From your archive: <code>python -m spike import-x &lt;folder&gt;</code>")}
+    ${src("Slack", "on hold", "hold", "Your work Slack belongs to your employer. Waiting on their written OK before connecting it.")}
+    ${src("Android notifications", "not set up", "", "Catches people chasing you on any app. The phone app is built; the Mac side is next.")}
+    <h3>Morning message</h3>
+    ${src("Telegram", s.telegram ? "paired" : "not paired", s.telegram ? "on" : "", s.telegram ? "Today's items arrive at 07:30 with Done / Not needed / Still on." : "Run <code>python -m spike telegram pair</code> once.")}
+    ${src("Reading", s.last_read ? `last pass ${ago(s.last_read)} ago` : "never", s.last_read ? "on" : "", "Claude reads the chats that changed, every 30 minutes, through your Claude Code login.")}
+    <h3>Privacy</h3>
+    <p class="sub">${s.disclosures.length ? `Text from this store has been sent to: ${s.disclosures.map(esc).join(", ")}. Each send is logged before it happens.` : "No text from this store has left your Mac."}</p>
+    ${s.muted.length ? `<h3>Muted</h3><div class="rows">${s.muted.map((m) => `<button type="button" class="row" data-id="${m.id}"><span class="avatar">${esc(initials(m.name))}</span><span><b>${esc(m.name)}</b></span><span class="count">open</span></button>`).join("")}</div>` : ""}`;
+  $("#view").querySelectorAll(".row").forEach((r) => { r.onclick = () => { location.hash = `p-${r.dataset.id}`; }; });
+}
+
+// --- routing --------------------------------------------------------------------------------------
+async function route() {
+  const h = location.hash.slice(1) || "today";
+  const m = h.match(/^p-(\d+)(?:-(\d+))?$/);
+  const tab = m ? "people" : ["today", "people", "all", "sources"].includes(h) ? h : "today";
+  document.querySelectorAll("nav.tabs a").forEach((a) => a.setAttribute("aria-current", a.dataset.tab === tab ? "page" : "false"));
+  try {
+    if (m) await personView(Number(m[1]), m[2] ? Number(m[2]) : null);
+    else await ({ today, people, all, sources })[tab]();
+  } catch (e) {
+    $("#view").innerHTML = `<h2>Couldn't load this</h2><p class="sub">${esc(e.message)}. If you're on your Mac, check that <code>python -m spike serve</code> is still running.</p>`;
+  }
+  if (!m) window.scrollTo(0, 0);
+}
+
+(async function start() {
+  try {
+    const r = await fetch("/api/today", { cache: "no-store" });
+    if (r.ok && (r.headers.get("content-type") || "").includes("json")) api = liveApi;
+  } catch (e) { /* not served by soloyolo: demo */ }
+  $("#mode").textContent = api === liveApi ? "Your data" : "Demo · made-up people";
+  $("#mode").classList.toggle("live", api === liveApi);
+  window.addEventListener("hashchange", route);
+  await route();
+  if (api === demoApi) api.get("/api/today").then((s) => { $("#b-today").textContent = s.today.length || ""; });
+})();
+</script>
