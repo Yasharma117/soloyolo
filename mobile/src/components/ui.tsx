@@ -4,7 +4,8 @@ import { HOT } from '../lib/types'
 import { nameColor, usePalette } from '../lib/theme'
 
 export function Avatar({ name, size = 28 }: { name: string; size?: number }) {
-  const words = name.replace(/[^\p{L}\p{N} ]/gu, '').trim().split(/\s+/)
+  // No \p{L} here: plain ranges work on every JS engine (emoji halves and punctuation dropped)
+  const words = name.replace(/[\uD800-\uDFFF()[\]{}.,!?'"@#*_~-]/g, '').trim().split(/\s+/)
   const initials = ((words[0]?.[0] ?? '') + (words.length > 1 ? words[words.length - 1]![0] : '')).toUpperCase() || '?'
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: nameColor(name), alignItems: 'center', justifyContent: 'center' }}>
