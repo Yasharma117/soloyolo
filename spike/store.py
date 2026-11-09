@@ -108,6 +108,34 @@ class Store:
             " m.ts AS source_ts, m.text AS source_text FROM commitment c JOIN message m ON m.id = c.source_message_id"
             " WHERE c.person_id = ? ORDER BY m.ts, c.id", (person_id,))]
 
+    # --- muted: chats that aren't a person you owe things to (a bot, an assistant, a shop) ----
+    def mute(self, person_id: int, why: str = "not a person") -> None:
+        """Keep this chat out of Today and the ranked list, and stop sending it for extraction.
+        Its messages stay: they still count as evidence, and `unmute` brings it back."""
+        with self.conn:
+            self.conn.execute("DELETE FROM attribute WHERE person_id = ? AND key = 'muted'", (person_id,))
+            self.conn.execute("INSERT INTO attribute(person_id, key, value, source, ts) VALUES (?, 'muted', ?, 'you', ?)",
+                              (person_id, why, time.time()))
+
+    def unmute(self, person_id: int) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM attribute WHERE person_id = ? AND key = 'muted'", (person_id,))
+
+    def muted(self) -> set[int]:
+        return {r[0] for r in self.conn.execute("SELECT person_id FROM attribute WHERE key = 'muted'")}
+
+    def find_person(self, query: str) -> list[tuple[int, str]]:
+        """By id, by phone digits in a handle (any 7+ digits), or by part of the name."""
+        if query.isdigit() and len(query) < 7:
+            return [tuple(r) for r in self.conn.execute("SELECT id, display_name FROM person WHERE id = ?", (int(query),))]
+        digits = "".join(ch for ch in query if ch.isdigit())
+        if len(digits) >= 7:
+            return [tuple(r) for r in self.conn.execute(
+                "SELECT DISTINCT p.id, p.display_name FROM person p JOIN handle h ON h.person_id = p.id"
+                " WHERE h.address LIKE ?", (f"%{digits[-10:]}%",))]
+        return [tuple(r) for r in self.conn.execute(
+            "SELECT id, display_name FROM person WHERE display_name LIKE ? ORDER BY id", (f"%{query}%",))]
+
     def decided_by_you(self, person_id: int) -> set[tuple[int, str]]:
         return {(r[0], r[1]) for r in self.conn.execute(
             "SELECT source_message_id, owner FROM resolution WHERE person_id = ? AND decided_by = 'you'", (person_id,))}

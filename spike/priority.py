@@ -73,8 +73,11 @@ def rank(store, now: float | None = None, limit: int | None = None) -> list[dict
     last_from_them = {r[0]: not r[1] for r in store.conn.execute(
         "SELECT person_id, from_me FROM message m WHERE ts = (SELECT MAX(ts) FROM message WHERE person_id = m.person_id)"
         " AND text != '[call]'")}
+    muted = store.muted()  # a bot or an assistant: nothing in it is owed to a person
     out = []
     for p in people:
+        if p["id"] in muted:
+            continue
         close = min(2.0, math.log1p(p["score"]) / 3)  # score: recent messages, decayed (store.people)
         for c in p["commitments"]:
             if not store.is_open(c):

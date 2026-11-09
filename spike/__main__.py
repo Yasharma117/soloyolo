@@ -47,7 +47,8 @@ def extract(store: Store, kind: str, window: int, only: int | None = None, top: 
         ids = [only]
     else:
         ids = store.changed_ids() if changed else store.person_ids()
-        ids = [i for i in ids if i in people and people[i]["count"] >= min_messages]
+        muted = store.muted()  # never sent for extraction; `mute --undo` to read it again
+        ids = [i for i in ids if i in people and people[i]["count"] >= min_messages and i not in muted]
         if top:
             ids = sorted(ids, key=lambda i: -people[i]["score"])[:top]
     for pid in ids:
@@ -226,6 +227,11 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("show", help="print people and what each side owes")
     sub.add_parser("today", help="the 1-3 things that matter now; quiet items are assumed done (spike/nudge.py)")
+    mu = sub.add_parser("mute", help="keep a chat that isn't a person (an AI assistant, a bot, a shop) out of "
+                                     "Today and the ranked list, and stop sending it for extraction")
+    mu.add_argument("person", help="person id, phone number, or part of the name")
+    mu.add_argument("--why", default="not a person")
+    mu.add_argument("--undo", action="store_true", help="bring it back")
     t = sub.add_parser("top", help="every open item in one list, what to do first at the top, with why")
     t.add_argument("-n", type=int, default=15)
     g = sub.add_parser("digest", help="the morning message: the 1-3 things for today, and a line if sync or "
@@ -315,6 +321,14 @@ def main(argv: list[str] | None = None) -> int:
             show(store)
         elif a.cmd == "today":
             today(store)
+        elif a.cmd == "mute":
+            found = store.find_person(a.person)
+            if len(found) != 1:
+                ap.error(f"{len(found)} people match {a.person!r}" + (": " + ", ".join(f"{i} {n}" for i, n in found[:8])
+                                                                    if found else "") + ". Use the id")
+            pid, name = found[0]
+            store.unmute(pid) if a.undo else store.mute(pid, a.why)
+            print(f"{'unmuted' if a.undo else 'muted'}: {name} (person {pid})")
         elif a.cmd == "top":
             top(store, a.n)
         elif a.cmd == "digest":

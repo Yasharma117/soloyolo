@@ -972,6 +972,16 @@ class PriorityTest(unittest.TestCase):
         self.assertLess(order.index("Send Dad ₹950"), order.index("Book the cab"))  # your move first
         self.assertEqual(order[-1], "Deliver the sofa")  # theirs, old, a stranger
 
+    def test_muted_chat_leaves_the_lists_and_comes_back(self):
+        from spike import nudge, priority
+        self.put("Ravi", ("me", "Send Ravi the deck", None, 11))
+        self.st.mute(self.pids["Ravi"], "an AI assistant")
+        self.assertEqual(priority.rank(self.st, self.now), [])
+        self.assertEqual(nudge.today(self.st, self.now), [])
+        self.assertEqual(self.st.find_person("ravi"), [(self.pids["Ravi"], "Ravi")])
+        self.st.unmute(self.pids["Ravi"])
+        self.assertEqual([c["action"] for c in priority.rank(self.st, self.now)], ["Send Ravi the deck"])
+
     def test_maybe_settled_sinks_and_one_chat_cannot_fill_the_top(self):
         from spike import priority
         self.put("Dad", *[("me", f"Fix bug {n}", None, 6) for n in range(6)])
