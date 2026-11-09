@@ -5,6 +5,7 @@
 #   com.soloyolo.connectord  connectord sync, always on, restarted if it exits
 #   com.soloyolo.watch       one extraction pass every SOLOYOLO_WATCH_MINUTES
 #   com.soloyolo.digest      the morning message at SOLOYOLO_DIGEST_AT (the Mac's local time)
+#   com.soloyolo.telegram    applies your taps on it, once `python -m spike telegram pair` is done
 #
 # Settings (environment variables; defaults in brackets):
 #   SOLOYOLO_REPO           this checkout                         [the folder above scripts/]
@@ -40,7 +41,7 @@ NOTIFY=${SOLOYOLO_NOTIFY:-1}
 AGENTS=${SOLOYOLO_AGENTS_DIR:-$HOME/Library/LaunchAgents}
 DRY_RUN=${DRY_RUN:-0}
 JOB=$HERE/soloyolo-job.sh
-LABELS="com.soloyolo.connectord com.soloyolo.watch com.soloyolo.digest"
+LABELS="com.soloyolo.connectord com.soloyolo.watch com.soloyolo.digest com.soloyolo.telegram"
 
 die() { echo "install-mac: $*" >&2; exit 1; }
 

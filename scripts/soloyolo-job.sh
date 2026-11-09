@@ -1,12 +1,14 @@
 #!/bin/bash
-# What each launchd agent runs: soloyolo-job.sh {sync|watch|digest}. Settings come from the
+# What each launchd agent runs: soloyolo-job.sh {sync|watch|digest|telegram}. Settings come from the
 # environment the plist sets (scripts/install-mac.sh writes it). Works on bash 3.2 (macOS /bin/bash).
 #
 #   sync    connectord, always on. Live-message lines carry message text, so they are dropped
 #           before the log; status and errors are kept.
 #   watch   one extraction pass over the chats that changed, if no other pass is running.
 #   digest  one fresh pass, then the morning message to $DATA/digest/today.txt, and a local
-#           macOS notification when SOLOYOLO_NOTIFY=1. Nothing is sent over the network.
+#           macOS notification when SOLOYOLO_NOTIFY=1. With Telegram paired, also sends it there
+#           (the 1-3 item lines only, never message text).
+#   telegram  applies your taps on that message as they come; exits cleanly if not paired.
 set -euo pipefail
 
 DATA=${SOLOYOLO_DATA:?SOLOYOLO_DATA is not set}
@@ -91,14 +93,25 @@ digest)
 	(cd "${SOLOYOLO_REPO:?}" && "${SOLOYOLO_PYTHON:?}" -m spike --db "$DB" digest --out "$out" >/dev/null)
 	cp "$out" "$DATA/digest/$(date +%Y-%m-%d).txt"
 	echo "$(stamp) digest written to $out"
+	if [ -f "$DATA/telegram.json" ]; then
+		(cd "$SOLOYOLO_REPO" && "$SOLOYOLO_PYTHON" -m spike --db "$DB" telegram send) || echo "$(stamp) telegram send failed"
+	fi
 	if [ "${SOLOYOLO_NOTIFY:-0}" = 1 ] && command -v osascript >/dev/null 2>&1; then
 		# The text goes in as an argument, never spliced into the script.
 		osascript -e 'on run argv' -e 'display notification (item 2 of argv) with title (item 1 of argv)' \
 			-e 'end run' "$(head -n 1 "$out")" "$(tail -n +2 "$out" | head -n 4)" || true
 	fi
 	;;
+telegram)
+	rotate "$LOGS/telegram.log"
+	if [ ! -f "$DATA/telegram.json" ]; then
+		echo "$(stamp) not paired; run: python -m spike --db $DB telegram pair"
+		exit 0
+	fi
+	cd "${SOLOYOLO_REPO:?}" && exec "${SOLOYOLO_PYTHON:?}" -m spike --db "$DB" telegram listen
+	;;
 *)
-	echo "usage: $0 {sync|watch|digest}" >&2
+	echo "usage: $0 {sync|watch|digest|telegram}" >&2
 	exit 2
 	;;
 esac

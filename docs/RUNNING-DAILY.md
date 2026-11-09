@@ -11,7 +11,7 @@ every 30 minutes, and the digest at 07:30. Data stays in `~/.soloyolo`. Extracti
 login**. A usage limit delays reads and never loses data. **Deliver the morning message through a
 Telegram bot.** It's the only option that pushes to an Android phone, has real buttons, carries no
 ban risk and needs no open port. The cost: the 1–3 item lines (never chat text) pass through Telegram's
-servers. Until the sender is built, the digest goes to a file and a local macOS notification.
+servers. Built: `spike/telegram.py` (`python -m spike telegram pair|send|poll|listen`).
 
 ## Process model (built: `scripts/`)
 
@@ -78,15 +78,16 @@ servers. Until the sender is built, the digest goes to a file and a local macOS 
 (ntfy.sh is a fair second choice: push, action buttons, self-hostable. But its buttons call a URL, so taps
 need a way back to a sleeping Mac behind NAT. Telegram's queue does that for free.)
 
-**How Telegram works here** (formatting built in `spike/daily.py`; the network sender is not built):
-1. Setup, once: in Telegram, message **@BotFather** → `/newbot` → get a token. Save it in the Keychain
-   (`security add-generic-password -s soloyolo-telegram -a bot -w`), never in a file. Send your bot `/start`.
+**How Telegram works here** (`spike/daily.py` formats, `spike/telegram.py` sends and applies taps):
+1. Setup, once: in Telegram, message **@BotFather** → `/newbot` → get a token. Run `telegram pair`, paste
+   the token (not echoed), send your bot `/start`. The token and your chat id go in `~/.soloyolo/telegram.json`
+   (mode 600, in a mode-700 folder; `SOLOYOLO_TELEGRAM_TOKEN` overrides it). Only that chat is ever answered.
 2. 07:30: `python -m spike digest --format telegram` produces the `sendMessage` body: plain text, no
    `parse_mode`, one row of buttons per item: **Done · Not needed · Still on**. The sender adds `chat_id`, and
    before sending it records a `telegram` disclosure for each person named, like extraction does for Claude.
 3. A tap sends a `callback_query` carrying `sy1:<d|x|o>:<person>:<message>:<m|t>` (≤64 bytes, no state on
-   the Mac). A small agent long-polls `getUpdates` (outbound HTTPS only, works behind Jio/Airtel CGNAT),
-   drops any update not from your own user id, and calls `daily.apply_callback` (it records your mark).
+   the Mac). The `com.soloyolo.telegram` agent long-polls `getUpdates` (outbound HTTPS only, works behind Jio/Airtel CGNAT),
+   drops any update not from your own chat, and calls `daily.apply_callback` (it records your mark).
    `daily.tapped` collapses the row to "2: not needed". Telegram keeps taps for 24 h, so a tap made while
    the Mac sleeps is applied when it wakes.
 4. **Silence = done.** Run 6 showed most items get finished off-chat and nobody reports back. So the message
@@ -112,13 +113,11 @@ The digest uses the Mac's time zone: keep it on Asia/Kolkata.
 
 ```bash
 git clone <repo> ~/soloyolo && cd ~/soloyolo
-python3 -m venv .venv && .venv/bin/pip install -r spike/requirements.txt
-(cd connectord && go build -o connectord ./cmd/connectord)
-claude                                          # log in once, then quit
-./connectord/connectord link --phone 91XXXXXXXXXX   # type the code on the phone; Ctrl-C once it says Linked
-scripts/install-mac.sh                          # or: SOLOYOLO_DIGEST_AT=07:15 SOLOYOLO_TOP=10 scripts/install-mac.sh
-launchctl kickstart gui/$(id -u)/com.soloyolo.digest && sleep 60 && cat ~/.soloyolo/digest/today.txt
+scripts/setup-mac.sh       # checks python3, go, claude; makes .venv; builds connectord; prints the rest
 ```
+
+It then prints the three remaining steps: link WhatsApp with a pairing code, `telegram pair`, and
+`scripts/install-mac.sh` (or `SOLOYOLO_DIGEST_AT=07:15 SOLOYOLO_TOP=10 scripts/install-mac.sh`).
 
 Settings are environment variables, listed at the top of `scripts/install-mac.sh`. Re-run it after you
 change one or move the checkout. It's idempotent.

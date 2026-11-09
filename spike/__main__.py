@@ -1,8 +1,9 @@
-"""python -m spike {demo,ingest,import-*,extract,close,watch,show,today,top,digest,serve}. See spike/README.md."""
+"""python -m spike {demo,ingest,import-*,extract,close,watch,show,today,top,digest,telegram,mute,serve}. See spike/README.md."""
 from __future__ import annotations
 
 import argparse
 import inspect
+import os
 import sys
 import time
 from datetime import datetime
@@ -227,6 +228,11 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("show", help="print people and what each side owes")
     sub.add_parser("today", help="the 1-3 things that matter now; quiet items are assumed done (spike/nudge.py)")
+    tg = sub.add_parser("telegram", help="the morning message on Telegram: pair once, then send / apply taps "
+                                         "(spike/telegram.py)")
+    tg.add_argument("action", choices=["pair", "send", "poll", "listen"],
+                    help="pair: link your bot and chat. send: today's message. poll: apply waiting taps once. "
+                         "listen: apply taps as they come (what the launchd agent runs)")
     mu = sub.add_parser("mute", help="keep a chat that isn't a person (an AI assistant, a bot, a shop) out of "
                                      "Today and the ranked list, and stop sending it for extraction")
     mu.add_argument("person", help="person id, phone number, or part of the name")
@@ -321,6 +327,26 @@ def main(argv: list[str] | None = None) -> int:
             show(store)
         elif a.cmd == "today":
             today(store)
+        elif a.cmd == "telegram":
+            from . import telegram
+            path = telegram.config_path(a.db)
+            try:
+                if a.action == "pair":
+                    import getpass
+                    token = os.environ.get("SOLOYOLO_TELEGRAM_TOKEN") or getpass.getpass(
+                        "Bot token from @BotFather (not shown as you type): ").strip()
+                    telegram.pair(path, telegram.Bot(token), token)
+                elif a.action == "send":
+                    mid = telegram.send(store, path)
+                    print("sent" if mid else "nothing for today: no message sent")
+                elif a.action == "poll":
+                    print(f"applied {telegram.poll(store, path)} tap(s)")
+                else:
+                    store.close()
+                    telegram.listen(lambda: Store(a.db), path)
+            except telegram.TelegramError as err:
+                print(f"telegram: {err}", file=sys.stderr)
+                return 1
         elif a.cmd == "mute":
             found = store.find_person(a.person)
             if len(found) != 1:

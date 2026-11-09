@@ -11,7 +11,7 @@ DATA=${SOLOYOLO_DATA:-$HOME/.soloyolo}
 AGENTS=${SOLOYOLO_AGENTS_DIR:-$HOME/Library/LaunchAgents}
 PURGE=${PURGE:-0}
 DRY_RUN=${DRY_RUN:-0}
-LABELS="com.soloyolo.connectord com.soloyolo.watch com.soloyolo.digest"
+LABELS="com.soloyolo.connectord com.soloyolo.watch com.soloyolo.digest com.soloyolo.telegram"
 
 for label in $LABELS; do
 	if [ "$DRY_RUN" != 1 ] && command -v launchctl >/dev/null 2>&1; then

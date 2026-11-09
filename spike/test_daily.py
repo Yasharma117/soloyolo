@@ -303,7 +303,7 @@ class MacScriptsTest(unittest.TestCase):
         self.sh("install-mac.sh")
         got = self.plists()
         self.assertEqual(set(got), {"com.soloyolo.connectord.plist", "com.soloyolo.watch.plist",
-                                    "com.soloyolo.digest.plist"})
+                                    "com.soloyolo.digest.plist", "com.soloyolo.telegram.plist"})
         sync, watch, dig = (got[f"com.soloyolo.{n}.plist"] for n in ("connectord", "watch", "digest"))
         self.assertEqual(sync["ProgramArguments"], ["/bin/bash", str(SCRIPTS / "soloyolo-job.sh"), "sync"])
         self.assertIs(sync["KeepAlive"], True)
