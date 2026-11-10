@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import nudge, priority
+from . import linkedin_export, linkedin_live, nudge, priority
 from .store import Store
 
 INDEX = Path(__file__).with_name("viewer.html")
@@ -159,6 +159,8 @@ class Handler(BaseHTTPRequestHandler):
         host = self.headers.get("Host", "")
         if host not in self.allowed_hosts:
             return self._send(b"forbidden host", "text/plain", 403)
+        if urlsplit(self.path).path == "/api/linkedin/sync":
+            return self._linkedin_sync()
         origin = self.headers.get("Origin")
         if origin is not None and origin != f"http://{host}":
             return self._send(b"forbidden origin", "text/plain", 403)
@@ -221,6 +223,33 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True})
         finally:
             store.close()
+
+    def _linkedin_sync(self) -> None:
+        # From the Chrome extension, so the Origin is chrome-extension://. The pairing token stands in for the
+        # same-origin check: a web page can't send an Authorization header here without a preflight we never answer.
+        if not linkedin_live.authorized(self.db, self.headers.get("Authorization")):
+            return self._send(b"not paired: run python -m spike linkedin-token", "text/plain", 401)
+        if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
+            return self._send(b"json only", "text/plain", 415)
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = -1
+        if not 0 < length <= linkedin_live.MAX_BODY:
+            return self._send(b"bad length", "text/plain", 400)
+        try:
+            body = json.loads(self.rfile.read(length))
+            if body == {"ping": True}:  # the extension checks it's paired before spending LinkedIn requests
+                return self._json({"ok": True})
+            res = linkedin_live.parse(body)
+        except ValueError as err:
+            return self._send(str(err).encode(), "text/plain", 400)
+        store = Store(self.db)
+        try:
+            summary = linkedin_export.save(store, res)
+        finally:
+            store.close()
+        self._json({"ok": True, "summary": summary, "notes": res.notes})
 
     def _json(self, data) -> None:
         self._send(json.dumps(data).encode(), "application/json")

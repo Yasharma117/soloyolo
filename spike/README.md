@@ -51,6 +51,10 @@ python -m spike import-linkedin ~/Downloads/Complete_LinkedInDataExport_*.zip
 1:1 threads become messages, group threads evidence, and connections people with company, position and email.
 Format notes and what's unverified: `docs/LINKEDIN.md`.
 
+To stay in sync without re-exporting, use the Chrome extension in `extension/` (setup in `extension/README.md`). It
+reads new LinkedIn messages through your logged-in browser while Chrome is open and posts them to `serve`. The
+export and the extension store a message both have seen once.
+
 Or from your own Messages history (macOS; give your terminal Full Disk Access first):
 
 ```bash

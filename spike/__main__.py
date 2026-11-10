@@ -9,8 +9,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import (chatdb, closure, fixture, instagram_export, json_import, linkedin_export, nudge, priority, reconcile,
-               sms, whatsapp_export, x_export)
+from . import (chatdb, closure, fixture, instagram_export, json_import, linkedin_export, linkedin_live, nudge, priority,
+               reconcile, sms, whatsapp_export, x_export)
 from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor
 from .store import Store
 
@@ -186,6 +186,9 @@ def main(argv: list[str] | None = None) -> int:
         so.add_argument("--me", help="who you are, when it can't be inferred: your Instagram name as threads "
                                      "show it, or your X user id")
 
+    sub.add_parser("linkedin-token", help="print the token that pairs the Chrome extension (extension/) for live "
+                                          "LinkedIn sync; made on first run")
+
     j = sub.add_parser("import-json", help="import conversations from a JSON file (format in spike/json_import.py)")
     j.add_argument("file", type=Path)
 
@@ -288,6 +291,9 @@ def main(argv: list[str] | None = None) -> int:
                 ap.error(str(err))
             print("\n".join(res.notes))
             print(linkedin_export.save(store, res))
+        elif a.cmd == "linkedin-token":
+            print(linkedin_live.token(a.db, create=True))
+            print("Paste it into the soloyolo extension's options. Keep `python -m spike serve` running while Chrome is open.")
         elif a.cmd in ("import-instagram", "import-x"):
             mod = instagram_export if a.cmd == "import-instagram" else x_export
             try:

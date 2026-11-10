@@ -103,3 +103,12 @@ or trailing slashes. Connections and messages for the same person therefore shar
   inferring "me", formats, the sponsored filter. Public sample rows (Shreeyashj, predator-911, steveraaen; shape only).
 - hestiaAI/data-catalog `workshop/linkedin.md`, bgoleno/opportun `docs/guide/network.md`: two-email delivery,
   72-hour link, "larger archive" advice.
+
+## Live sync (the Chrome extension)
+
+The export is a snapshot. To stay current, `extension/` reads LinkedIn's own web API through the session in Chrome
+(as Kondo does) and posts to `/api/linkedin/sync` (`spike/linkedin_live.py`). Setup, pacing, risk and what's
+unverified: `extension/README.md`. Both paths go through `save()`. Its `_unseen` check matches a message across
+the two by person, direction, text and a 2-second window, because the export rounds times to the second and gives
+messages no stable id. Group lines aren't matched across the two yet, so a group line can be stored twice as
+evidence. That's harmless: evidence only closes items.

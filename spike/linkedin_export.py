@@ -386,6 +386,24 @@ def _load_connections(res: Result, files: list[tuple[str, str]], notes: list[str
 
 
 # --- writing --------------------------------------------------------------------------------
+SAME_MESSAGE_WINDOW = 2.0  # seconds: the export rounds to the second, the live sync has milliseconds
+
+
+def _unseen(store, res: Result) -> list[Message]:
+    """Messages not already stored under another id. The export and the live sync (linkedin_live.py) name the same
+    message differently, so a message both have seen is matched by person, direction, time and text."""
+    out = []
+    for m in res.messages:
+        row = store.conn.execute(
+            "SELECT 1 FROM message m JOIN handle h ON h.person_id = m.person_id AND h.network = ? AND h.address = ?"
+            " WHERE m.network = ? AND m.remote_id != ? AND m.from_me = ? AND m.text = ? AND m.ts BETWEEN ? AND ?",
+            (NETWORK, m.handle, NETWORK, m.guid, int(m.from_me), m.text,
+             m.ts - SAME_MESSAGE_WINDOW, m.ts + SAME_MESSAGE_WINDOW)).fetchone()
+        if not row:
+            out.append(m)
+    return out
+
+
 def save(store, res: Result) -> str:
     """Writes res into the store. Returns a one-line summary. Safe to run again: adds only what's new."""
     conn = store.conn
@@ -400,7 +418,7 @@ def save(store, res: Result) -> str:
                 if value:
                     attrs += conn.execute("INSERT OR IGNORE INTO attribute(person_id, key, value, source, ts)"
                                           " VALUES (?, ?, ?, ?, ?)", (pid, key, value, SOURCE, ts)).rowcount
-    added = store.add_messages(NETWORK, res.messages, res.names)
+    added = store.add_messages(NETWORK, _unseen(store, res), res.names)
     with conn:
         for handle in res.names:
             pid = store.person_for(NETWORK, handle)
