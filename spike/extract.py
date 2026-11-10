@@ -1,14 +1,15 @@
 """Find commitments in a 1:1 thread: who promised what, by when, and whether it got done.
 
-Three extractors behind one call shape, `extract(thread) -> Extraction`:
+Four extractors behind one call shape, `extract(thread) -> Extraction`:
 
 - HeuristicExtractor: regexes, no network. Exists so the pipeline runs offline and as a
   floor to beat. It misses most real-world phrasing (see spike/eval/RESULTS.md).
 - ClaudeCodeExtractor: runs Claude through the Claude Code CLI (`claude -p`), so it uses your
   Claude login. No API key needed.
 - ClaudeExtractor: the Anthropic API directly. Needs ANTHROPIC_API_KEY or `ant auth login`.
+- OpenModelExtractor: an open model on any OpenAI-compatible server (OpenRouter by default).
 
-Both Claude extractors send the thread *text* off the machine, which breaks the local-first
+All but the heuristic send the thread *text* off the machine, which breaks the local-first
 promise, so the CLI only uses them when asked for by name.
 """
 from __future__ import annotations
@@ -20,6 +21,8 @@ import shutil
 import subprocess
 import tempfile
 import time
+import urllib.error
+import urllib.request
 from datetime import date, datetime, timedelta
 from typing import Literal, Optional, Sequence
 
@@ -316,3 +319,62 @@ class ClaudeExtractor:
         if response.stop_reason == "refusal" or response.parsed_output is None:
             raise RuntimeError(f"no result (stop_reason={response.stop_reason}, request={response._request_id})")
         return response.parsed_output
+
+
+class OpenModelExtractor:
+    """One chat-completions call per thread, to any server that speaks the OpenAI API: OpenRouter (the default),
+    DeepInfra, Groq, a llama.cpp or Ollama server of your own.
+
+        SOLOYOLO_LLM_MODEL   the model id, e.g. google/gemma-4-31b-it:free
+        SOLOYOLO_LLM_URL     the API base (default https://openrouter.ai/api/v1)
+        SOLOYOLO_LLM_KEY     the key (or OPENROUTER_API_KEY)
+
+    Servers disagree on structured output, so the schema goes in the prompt and the reply is parsed and
+    validated here; a reply that isn't valid is asked for once more. Who sees the text depends on the server:
+    OpenRouter's free models may keep and train on it, so those are for the eval's made-up threads only.
+    """
+
+    remote = True  # sends thread text to whoever runs the server
+
+    def __init__(self, model: str | None = None, url: str | None = None, key: str | None = None, timeout: float = 180):
+        self.model = model or os.environ.get("SOLOYOLO_LLM_MODEL")
+        if not self.model:
+            raise RuntimeError("No model chosen. Set SOLOYOLO_LLM_MODEL, e.g. google/gemma-4-31b-it:free.")
+        self.url = (url or os.environ.get("SOLOYOLO_LLM_URL") or "https://openrouter.ai/api/v1").rstrip("/")
+        self.key = key or os.environ.get("SOLOYOLO_LLM_KEY") or os.environ.get("OPENROUTER_API_KEY") or ""
+        self.name, self.timeout, self.pause = self.model, timeout, 8.0
+
+    def extract(self, thread: Sequence, prior: Sequence[dict] | None = None) -> Extraction:
+        result = self.ask(SYSTEM, f"Today is {_today()}. List the promises and asks in the thread.", _stdin(thread, prior), Extraction)
+        return _checked(result, thread, prior)
+
+    def ask(self, system: str, prompt: str, stdin: str, schema: type[BaseModel]) -> BaseModel:
+        system = (f"{system}\n\nAnswer with one JSON object and nothing else: no prose, no code fence. It must match this "
+                  f"JSON schema:\n{json.dumps(schema.model_json_schema())}")
+        body = {"model": self.model, "temperature": 0, "max_tokens": 4000,
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": f"{prompt}\n\n{stdin}"}]}
+        why = ""
+        for _ in range(2):
+            text = self._post(body)
+            try:
+                return schema.model_validate_json(text[text.index("{"):text.rindex("}") + 1])
+            except ValueError as err:  # not JSON, or not this schema (pydantic's error is a ValueError too)
+                why = str(err)[:200]
+        raise RuntimeError(f"{self.model} didn't answer in the schema: {why}")
+
+    def _post(self, body: dict) -> str:
+        req = urllib.request.Request(f"{self.url}/chat/completions", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.key}"})
+        for attempt in range(4):
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                    out = json.loads(r.read())
+                if out.get("choices"):  # OpenRouter reports an upstream failure as 200 with an "error" body
+                    return out["choices"][0]["message"].get("content") or ""
+                err, busy = str(out.get("error"))[:200], True
+            except urllib.error.HTTPError as e:
+                err, busy = f"HTTP {e.code}: {e.read().decode(errors='replace')[:200]}", e.code == 429 or e.code >= 500
+            if not busy or attempt == 3:
+                break
+            time.sleep(self.pause * (attempt + 1))  # a rate limit or a busy host: wait, then ask again
+        raise RuntimeError(f"{self.model}: {err}")

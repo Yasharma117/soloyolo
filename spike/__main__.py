@@ -11,7 +11,7 @@ from pathlib import Path
 
 from . import (chatdb, closure, fixture, instagram_export, json_import, linkedin_export, linkedin_live, nudge, priority,
                reconcile, sms, whatsapp_export, x_export)
-from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor
+from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor, OpenModelExtractor
 from .store import Store
 
 DEFAULT_DB = "soloyolo.db"
@@ -24,7 +24,8 @@ def ingest(store: Store, source: Path, days: int, names: dict[str, str] | None =
     print(f"read {len(rows)} messages from {source}, {added} new")
 
 
-EXTRACTORS = {"heuristic": HeuristicExtractor, "claude-code": ClaudeCodeExtractor, "api": ClaudeExtractor}
+EXTRACTORS = {"heuristic": HeuristicExtractor, "claude-code": ClaudeCodeExtractor, "api": ClaudeExtractor,
+              "open-model": OpenModelExtractor}  # open-model: any OpenAI-compatible server (see its docstring)
 
 
 WINDOW_DAYS = 60

@@ -2,6 +2,7 @@
 
     python -m spike.eval                          # offline heuristic
     python -m spike.eval --extractor claude-code  # Claude via your Claude Code login (~$0.02 a case)
+    python -m spike.eval --extractor open-model --model google/gemma-4-31b-it:free   # an open model (OpenRouter)
 
 A prediction matches an expected commitment when the owner agrees and it cites one of the
 expected source messages. Each expected item matches at most once; extra predictions count
@@ -55,11 +56,12 @@ def score(case: dict, predicted: list) -> dict:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m spike.eval")
     ap.add_argument("--extractor", choices=EXTRACTORS, default="heuristic")
+    ap.add_argument("--model", help="the model id, for extractors that take one")
     ap.add_argument("--jobs", type=int, default=4, help="cases run in parallel")
     ap.add_argument("--out", type=Path, help="write per-case results as JSON")
     a = ap.parse_args(argv)
 
-    ex = EXTRACTORS[a.extractor]()
+    ex = EXTRACTORS[a.extractor](model=a.model) if a.model else EXTRACTORS[a.extractor]()
     now = time.time()
 
     def run(case):

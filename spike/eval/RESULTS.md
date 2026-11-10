@@ -1,5 +1,26 @@
 # Extraction eval: results
 
+## Run 7 (2026-11-10): an open model, so nobody needs a Claude plan
+
+The same 30 cases and 20 items as run 2's table below, read by an open model through OpenRouter's free tier
+(`--extractor open-model`, new: any OpenAI-compatible server). The prompt is the one written for Claude, unchanged.
+
+| Extractor | Precision | Recall | F1 | Open/done right | Kind right | Errors |
+|---|---|---|---|---|---|---|
+| `heuristic` | 0.94 | 0.75 | 0.83 | 12/15 | 15/15 | 0 |
+| `nvidia/nemotron-3-ultra-550b-a55b:free` | 0.69 | 1.00 | 0.82 | 19/20 | 17/20 | 0 |
+| `claude-code` (earlier runs) | 0.95 to 1.00 | 0.95 to 1.00 | 0.95 to 1.00 | all | 18/19 to 20/20 | 0 |
+
+- **It found every item and invented nine.** Five are the cases built to tempt: a joke ("grab a table", "order a
+  drink"), a cancelled plan, a hope ("decide whether to attend"), and "reading it tonight". Four are a second item
+  beside a promise it had already listed. Claude lists one of the nine ("reading it tonight") in its worse runs.
+- **Every reply parsed.** The schema goes in the prompt and the reply is validated here; no case needed the retry.
+- **One model, one run.** The free tier allows 50 requests a day, and the Gemma 4 free endpoints were rate-limited
+  both times they were tried, so the model the research favoured for Hinglish is not scored yet. 7 minutes for 30 cases, two at
+  a time, mostly waiting on the free queue.
+- **Not for real chats.** OpenRouter's free endpoints may keep and train on what they're sent. This set is made up.
+  Real chats need a paid endpoint with no retention.
+
 ## Run 6 (2026-11-08): the ranked list, scored by the user. Right items, wrong moment
 
 The top 15 of "Do first" on the live store, scored by the user against today's reality. The question this
