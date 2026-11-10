@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import { Platform, useColorScheme } from 'react-native'
+import { useColorScheme } from 'react-native'
 import { colors, font, iconSize, motion, radius, shadow, space, type, type ColorTokens } from '../tokens'
 
 export type Scheme = 'light' | 'dark'
@@ -14,11 +14,12 @@ export type Theme = {
   motion: typeof motion
   iconSize: typeof iconSize
   serif: string
+  serifMedium: string
 }
 
 function build(scheme: Scheme): Theme {
   return { scheme, color: colors[scheme], space, radius, type, shadow, motion, iconSize,
-           serif: Platform.select(font.serif) as string }
+           serif: font.serif, serifMedium: font.serifMedium }
 }
 
 const themes = { light: build('light'), dark: build('dark') }

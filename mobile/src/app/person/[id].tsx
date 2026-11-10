@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Linking, View } from 'react-native'
 import Animated from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { mute, refresh, useData } from '../../lib/api'
 import { useMarks } from '../../lib/marks'
 import { ago, isOpen, keyOf, type Item, type Message, type Person } from '../../lib/types'
@@ -26,6 +27,7 @@ function snoozeOptions(it: Item): Option<Days>[] {
 
 export default function PersonScreen() {
   const t = useTheme()
+  const insets = useSafeAreaInsets()
   const toast = useToast()
   const router = useRouter()
   const marks = useMarks()
@@ -79,7 +81,7 @@ export default function PersonScreen() {
   const messages = (thread.data ?? []).slice(-60).reverse()
   return (
     <View style={{ flex: 1, backgroundColor: t.color.background }}>
-    <Animated.ScrollView showsVerticalScrollIndicator={false} onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: 52, paddingBottom: 60 }}>
+    <Animated.ScrollView showsVerticalScrollIndicator={false} onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top + 52, paddingBottom: 60 }}>
       <Wash />
       <PersonHeader
         name={person.name} network={person.networks[0]} subtitle={`last talked ${ago(person.last)} ago${person.muted ? ' · muted' : ''}`}

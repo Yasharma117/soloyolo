@@ -1,4 +1,4 @@
-import { Button, Text, ThemeProvider as DSTheme, ToastProvider, useTheme } from '@soloyolo/design-system'
+import { Button, Text, ThemeProvider as DSTheme, ToastProvider, useDesignFonts, useTheme } from '@soloyolo/design-system'
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { ScrollView } from 'react-native'
@@ -29,6 +29,7 @@ function Navigation() {
 }
 
 export default function Root() {
+  if (!useDesignFonts()) return null // a moment at launch, so headlines never flash in a fallback face
   return (
     <AppearanceProvider>
       {(scheme) => (

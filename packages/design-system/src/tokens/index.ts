@@ -8,9 +8,9 @@
 export const palette = {
   paper: { 0: '#ffffff', 50: '#f6f4ef', 100: '#ece9e2', 200: '#e6e2d9', 300: '#d9d4c8', 500: '#a8a399', 700: '#6b675e', 900: '#16150f' },
   night: { 0: '#0e0d0b', 50: '#1a1916', 100: '#26241f', 200: '#2c2a25', 300: '#24221d', 500: '#6a665d', 700: '#a19c91', 900: '#f2efe8' },
-  marigold: { 50: '#fbf1dc', 100: '#fbeccb', 300: '#f2b33d', 500: '#e8a317', 700: '#a35c00', 900: '#3a2b10', 950: '#ffc35a' },
+  marigold: { 50: '#fbf1dc', 100: '#fbeccb', 200: '#fddca0', 300: '#f2b33d', 500: '#e8a317', 700: '#a35c00', 900: '#3a2b10', 950: '#ffc35a' },
   leaf: { 500: '#2fa864', 600: '#35c272', 700: '#2e7d5b', 400: '#5cc08e' },
-  violet: { 500: '#6a5acd', 400: '#8b7dff' },
+  violet: { 100: '#ebe2ff', 500: '#6a5acd', 400: '#8b7dff', 900: '#231c35' },
   amber: { 200: '#fdd086', 400: '#fbad41' }, // the warm gradient on the one action that matters (from the Atoms redesign)
   // the Atoms redesign's accents: sun, tangerine and orchid for counts; indigo to lilac for a headline worth stopping on
   atoms: { sun: '#fbc157', tangerine: '#ff7b02', orchid: '#d15ff8', lilac: '#e299ff', indigo: '#4200ff', violet: '#d879fc', creamA: '#fff8ef', creamB: '#f3eadd' },
@@ -25,6 +25,8 @@ export const palette = {
 const light = {
   background: palette.paper[50], // warm paper, never pure white as a page
   wash: palette.marigold[50], // the warm tint at the top of a screen, fading into the paper (Markon's wash)
+  glowWarm: palette.marigold[200], // Atoms' ambient light: amber from the top left of a screen
+  glowCool: palette.violet[100], // and lilac from the right
   warmFrom: palette.amber[200], // warm button, top
   warmTo: palette.amber[400], // warm button, bottom
   onWarm: palette.paper[900], // text on the warm button: dark in both themes
@@ -71,6 +73,8 @@ export type ColorTokens = { [K in keyof typeof light]: string }
 const dark: ColorTokens = {
   background: palette.night[0],
   wash: palette.night[100],
+  glowWarm: palette.marigold[900],
+  glowCool: palette.violet[900],
   warmFrom: palette.amber[200],
   warmTo: palette.amber[400],
   onWarm: palette.paper[900],
@@ -123,19 +127,24 @@ export const orbs: readonly [string, string][] = [
 /** 4-point grid. Use the names, not numbers, in components. */
 export const space = { none: 0, xxs: 2, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, xxxl: 40 } as const
 
-export const radius = { sm: 6, md: 10, lg: 14, xl: 18, card: 22, pill: 999 } as const
+export const radius = { sm: 6, md: 10, lg: 14, xl: 18, card: 28, pill: 999 } as const
 
 export const font = {
   /** The platform's own faces: nothing to download, native on every device. */
   sans: undefined as string | undefined,
-  /** Editorial serif for promise sentences (Georgia on iOS and web, the system serif on Android). */
-  serif: { ios: 'Georgia', android: 'serif', default: 'Georgia, "Times New Roman", serif' },
+  /** Newsreader, an editorial serif (Atoms' headlines), bundled with the app: titles, the greeting, promise
+   *  sentences. Loaded by useDesignFonts(); the names are the families expo-font registers. */
+  serif: 'Newsreader_400Regular',
+  serifMedium: 'Newsreader_500Medium',
 } as const
+
+export type TypeVariant = keyof typeof type
 
 /** Type scale: size / line height / weight. Hierarchy comes from size and weight, one step at a time. */
 export const type = {
-  display: { fontSize: 52, lineHeight: 56, fontWeight: '800', letterSpacing: -2 },
-  title: { fontSize: 32, lineHeight: 38, fontWeight: '800', letterSpacing: -0.6 },
+  display: { fontSize: 50, lineHeight: 54, fontWeight: '500', letterSpacing: -1.2 }, // serif
+  title: { fontSize: 34, lineHeight: 39, fontWeight: '500', letterSpacing: -0.6 }, // serif
+  headline: { fontSize: 28, lineHeight: 33, fontWeight: '400', letterSpacing: -0.4 }, // serif: the greeting
   heading: { fontSize: 24, lineHeight: 30, fontWeight: '700', letterSpacing: -0.4 },
   subheading: { fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: 0 },
   body: { fontSize: 15, lineHeight: 21, fontWeight: '400', letterSpacing: 0 },
@@ -143,14 +152,16 @@ export const type = {
   small: { fontSize: 13, lineHeight: 18, fontWeight: '400', letterSpacing: 0 },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '500', letterSpacing: 0 },
   label: { fontSize: 11, lineHeight: 14, fontWeight: '600', letterSpacing: 1.2 }, // uppercase section labels
-  sentence: { fontSize: 21, lineHeight: 28, fontWeight: '400', letterSpacing: 0 }, // serif
-  sentenceSmall: { fontSize: 16, lineHeight: 21, fontWeight: '400', letterSpacing: 0 }, // serif
+  sentence: { fontSize: 22, lineHeight: 29, fontWeight: '400', letterSpacing: -0.2 }, // serif
+  sentenceSmall: { fontSize: 17, lineHeight: 22, fontWeight: '400', letterSpacing: -0.1 }, // serif
 } as const
 
-export type TypeVariant = keyof typeof type
+/** The variants set in the serif. Everything else is the platform sans. */
+export const serifVariants: readonly TypeVariant[] = ['display', 'title', 'headline', 'sentence', 'sentenceSmall']
+
 
 export const shadow = {
-  card: { shadowOpacity: 0.07, shadowRadius: 18, shadowOffset: { width: 0, height: 6 }, elevation: 2 },
+  card: { shadowOpacity: 0.08, shadowRadius: 28, shadowOffset: { width: 0, height: 12 }, elevation: 3 }, // Atoms: deep and soft
   floating: { shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
 } as const
 

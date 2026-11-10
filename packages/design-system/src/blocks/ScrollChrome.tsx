@@ -2,6 +2,7 @@ import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import type { ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
+import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg'
 import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated'
 import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Text } from '../components/Text/Text'
@@ -23,14 +24,32 @@ export function useScrollChrome() {
   return { y, onScroll }
 }
 
-/** The warm tint at the top of a screen, gone by about a quarter of the way down. Put it first inside the scroller. */
+/** The warm tint at the top of a screen and Atoms' ambient light (amber from the top left, lilac from the right),
+ *  gone by about a quarter of the way down. Put it first inside the scroller. */
 export function Wash() {
   const t = useTheme()
-  const { height } = useSafeAreaFrame()
+  const { height, width } = useSafeAreaFrame()
   const h = Math.min(240, Math.max(180, height * 0.25))
+  const glow = h * 1.4 // both glows fade out by about h, before lists with solid rows begin
   return (
-    <LinearGradient pointerEvents="none" colors={[t.color.wash, t.color.background]}
-                    style={{ position: 'absolute', top: -400, left: 0, right: 0, height: h + 400 }} locations={[400 / (h + 400), 1]} />
+    <View pointerEvents="none" style={{ position: 'absolute', top: -400, left: 0, right: 0, height: glow + 400 }}>
+      <LinearGradient colors={[t.color.wash, t.color.background]} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: h + 400 }}
+                      locations={[400 / (h + 400), 1]} />
+      <Svg width={width} height={glow} style={{ position: 'absolute', top: 400, left: 0 }}>
+        <Defs>
+          <RadialGradient id="ds-glow-warm" cx="0.5" cy="0.5" r="0.5">
+            <Stop offset="0" stopColor={t.color.glowWarm} stopOpacity={0.9} />
+            <Stop offset="1" stopColor={t.color.glowWarm} stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id="ds-glow-cool" cx="0.5" cy="0.5" r="0.5">
+            <Stop offset="0" stopColor={t.color.glowCool} stopOpacity={0.85} />
+            <Stop offset="1" stopColor={t.color.glowCool} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Ellipse cx={width * 0.12} cy={0} rx={width * 0.9} ry={glow * 0.6} fill="url(#ds-glow-warm)" />
+        <Ellipse cx={width} cy={glow * 0.25} rx={width * 0.7} ry={glow * 0.45} fill="url(#ds-glow-cool)" />
+      </Svg>
+    </View>
   )
 }
 

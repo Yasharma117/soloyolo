@@ -57,17 +57,21 @@ From the references the design was built on (Mobbin: Mesh, HEY, Atoms, Joi):
 - **One accent: marigold.** It marks what's urgent (a due date, someone chasing) and underlines the owed words in a
   sentence. Never decoration. Green means Done, violet means Still on, stone means Not needed, each only on its
   swipe action.
-- **Two faces.** The platform sans for everything in the interface. A serif only for promise sentences
-  (`sentence`, `sentenceSmall`): it makes the promise read like something a person said.
+- **Two faces.** The platform sans for the interface. A serif, Newsreader (bundled, loaded by
+  `useDesignFonts()`), for what should read like writing, as in Atoms: screen titles (`display`, `title`), the
+  greeting (`headline`) and promise sentences (`sentence`, `sentenceSmall`). Card headings, numbers and buttons
+  stay sans (`heading`).
 - **Hierarchy from size and weight**, one step at a time: display (the date), title (a screen), heading (the
   greeting), body, small, caption, label.
 - **Space on a 4-point grid** (`space.*`). Gaps between siblings come from the parent's `gap`, never from margins.
-- **Radius grows with the object:** 6 small chips, 10–14 fields and groups, 18 piles, 22 cards, pill for buttons and
+- **Radius grows with the object:** 6 small chips, 10–14 fields and groups, 18 piles, 28 cards, pill for buttons and
   the tab bar.
 - **Shadows are soft and warm** and only on things that float: cards (`shadow.card`) and the tab bar
   (`shadow.floating`). Lists sit flat on the paper with hairline dividers.
 - **People are gradient orbs** with initials, two hues picked from the name, so a person always looks the same.
 - **Texture once:** the dot grid behind Today's header, fading out. Nowhere else.
+- **Ambient light** (Atoms): `Wash` puts an amber glow at the top left and a lilac one at the right
+  (`glowWarm`, `glowCool`), gone a quarter of the way down.
 - **Motion is quick and calm:** 160ms toasts, 220ms leaving cards, 400ms sheets. No bounce. Swipes follow the
   finger 1:1 and confirm with a light haptic.
 

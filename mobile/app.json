@@ -38,7 +38,8 @@
           },
           "sitemap": false
         }
-      ]
+      ],
+      "expo-font"
     ],
     "scheme": "soloyolo"
   }

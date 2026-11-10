@@ -1,6 +1,7 @@
 // @soloyolo/design-system: import everything from here, never from inside src/ (lint enforces it).
 export * from './tokens'
 export * from './theme'
+export * from './theme/fonts'
 export * from './components/Text'
 export * from './components/Stack'
 export * from './components/Surface'

@@ -67,7 +67,7 @@ function Catalog() {
           ))}
         </View>
       </Section>
-      <Section title="Type" note="One family for UI, the serif only for promise sentences. Hierarchy from size and weight.">
+      <Section title="Type" note="The platform sans for UI; Newsreader for titles, the greeting and promise sentences. Hierarchy from size and weight.">
         {(Object.keys(type) as TypeVariant[]).map((v) => (
           <Specimen key={v} name={`${v} · ${type[v].fontSize}/${type[v].lineHeight}`}>
             <Text variant={v} numberOfLines={1}>{v === 'display' ? '9' : v.startsWith('sentence') ? 'You said you’d send the scan' : 'Good morning, three things'}</Text>

@@ -9,6 +9,8 @@
     "check": "node scripts/check.mjs"
   },
   "peerDependencies": {
+    "@expo-google-fonts/newsreader": "*",
+    "expo-font": "*",
     "@expo/vector-icons": "*",
     "expo-haptics": "*",
     "expo-linear-gradient": "*",

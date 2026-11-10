@@ -18,4 +18,4 @@ Read `packages/design-system/README.md` first. Then:
    the root, and look at both themes in the catalog (Sources → Design system).
 
 Quick reference: background `paper`, cards `surface`, one accent `marigold` (urgent + the owed words), Done `success`,
-Still on `later`, Not needed `neutralAction`. Serif only for promise sentences. Radius 22 cards, pill buttons.
+Still on `later`, Not needed `neutralAction`. Serif (Newsreader) for titles, the greeting and promise sentences. Radius 28 cards, pill buttons.
