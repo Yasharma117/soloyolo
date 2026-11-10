@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../theme'
 import { IconButton } from '../Button/Button'
+import { Overlay } from '../Overlay/Overlay'
 import { Text } from '../Text/Text'
 
 export type BottomSheetProps = {
@@ -24,10 +25,10 @@ export type BottomSheetProps = {
 export function BottomSheet({ open, onClose, title, subtitle, children, footer }: BottomSheetProps) {
   const t = useTheme()
   const insets = useSafeAreaInsets()
-  const { height } = useWindowDimensions()
+  const { height } = useSafeAreaFrame()
   const bottom = Math.max(insets.bottom, t.space.lg) + t.space.sm
   return (
-    <Modal visible={open} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+    <Overlay open={open} onClose={onClose}>
       {open ? (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Animated.View entering={FadeIn.duration(t.motion.fast)} exiting={FadeOut.duration(t.motion.fast)}
@@ -62,6 +63,6 @@ export function BottomSheet({ open, onClose, title, subtitle, children, footer }
           </Animated.View>
         </KeyboardAvoidingView>
       ) : null}
-    </Modal>
+    </Overlay>
   )
 }

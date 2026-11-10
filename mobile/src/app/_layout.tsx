@@ -3,8 +3,8 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps 
 import { StatusBar } from 'expo-status-bar'
 import { ScrollView } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { AppearanceProvider } from '../lib/appearance'
+import { DeviceFrame } from '../lib/device-frame'
 import { ReasonProvider } from '../lib/reasons'
 
 function Navigation() {
@@ -30,17 +30,17 @@ function Navigation() {
 
 export default function Root() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AppearanceProvider>
-          {(scheme) => (
-            <DSTheme scheme={scheme}>
+    <AppearanceProvider>
+      {(scheme) => (
+        <DSTheme scheme={scheme}>
+          <DeviceFrame>
+            <GestureHandlerRootView style={{ flex: 1 }}>
               <Navigation />
-            </DSTheme>
-          )}
-        </AppearanceProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+            </GestureHandlerRootView>
+          </DeviceFrame>
+        </DSTheme>
+      )}
+    </AppearanceProvider>
   )
 }
 

@@ -1,9 +1,9 @@
 import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import type { ReactNode } from 'react'
-import { StyleSheet, View, useWindowDimensions } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Text } from '../components/Text/Text'
 import { useTheme } from '../theme'
 
@@ -26,7 +26,7 @@ export function useScrollChrome() {
 /** The warm tint at the top of a screen, gone by about a quarter of the way down. Put it first inside the scroller. */
 export function Wash() {
   const t = useTheme()
-  const { height } = useWindowDimensions()
+  const { height } = useSafeAreaFrame()
   const h = Math.min(240, Math.max(180, height * 0.25))
   return (
     <LinearGradient pointerEvents="none" colors={[t.color.wash, t.color.background]}

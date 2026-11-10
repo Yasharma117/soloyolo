@@ -1,7 +1,8 @@
-import { Modal, Pressable, View } from 'react-native'
+import { Pressable, View } from 'react-native'
 import Animated, { FadeIn, FadeOut, Keyframe } from 'react-native-reanimated'
 import { useTheme } from '../../theme'
 import { Button } from '../Button/Button'
+import { Overlay } from '../Overlay/Overlay'
 import { Text } from '../Text/Text'
 
 export type ConfirmDialogProps = {
@@ -23,7 +24,7 @@ const arrive = (ms: number) => new Keyframe({ 0: { opacity: 0, transform: [{ sca
 export function ConfirmDialog({ open, title, body, confirmLabel, destructive, onConfirm, onCancel }: ConfirmDialogProps) {
   const t = useTheme()
   return (
-    <Modal visible={open} transparent animationType="none" onRequestClose={onCancel} statusBarTranslucent>
+    <Overlay open={open} onClose={onCancel}>
       {open ? (
         <Animated.View entering={FadeIn.duration(t.motion.fast)} exiting={FadeOut.duration(t.motion.fast)}
                        style={{ flex: 1, backgroundColor: t.color.scrim, justifyContent: 'center', padding: t.space.xxl }}>
@@ -39,6 +40,6 @@ export function ConfirmDialog({ open, title, body, confirmLabel, destructive, on
           </Animated.View>
         </Animated.View>
       ) : null}
-    </Modal>
+    </Overlay>
   )
 }
