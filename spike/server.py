@@ -1,7 +1,8 @@
 """The local viewer. Binds to 127.0.0.1 only: this is your message history.
 
-It reads everything and writes two things: your own marks on items (done, not needed, still on,
-snooze) and which chats are muted (a bot or an assistant, not a person).
+It reads everything and writes three things: your own marks on items (done, not needed, still on,
+snooze), which chats are muted (a bot or an assistant, not a person), and your yes or no when two
+chats look like one person.
 
 `/` is the app (app.html: Today, People, All, Sources); `/viewer` is the older desktop viewer.
 """
@@ -15,7 +16,7 @@ from urllib.parse import urlsplit
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import linkedin_export, linkedin_live, nudge, priority
+from . import identity, linkedin_export, linkedin_live, nudge, priority
 from .store import Store
 
 INDEX = Path(__file__).with_name("viewer.html")
@@ -56,8 +57,53 @@ def person(store, pid: int) -> dict | None:
     p["attributes"] = [dict(r) for r in store.conn.execute(
         "SELECT key, value, source FROM attribute WHERE person_id = ? AND key != 'muted' ORDER BY key", (pid,))]
     p["muted"] = pid in store.muted()
+    p["edges"] = edges(store, pid)
     p["networks"] = sorted({h["network"] for h in p["handles"]})
     return p
+
+
+def edges(store, pid: int) -> list[dict]:
+    """Who this person knows, from what was said: each edge with both names and the line that says so."""
+    return [dict(r) for r in store.conn.execute(
+        "SELECT e.id, e.src, e.dst, s.display_name AS src_name, d.display_name AS dst_name, e.kind, e.note,"
+        " m.text AS quote, e.ts FROM edge e JOIN person s ON s.id = e.src JOIN person d ON d.id = e.dst"
+        " LEFT JOIN message m ON m.id = e.evidence_message_id WHERE e.src = ? OR e.dst = ? ORDER BY e.ts DESC", (pid, pid))]
+
+
+def merges(store, nets: dict[int, list[str]]) -> list[dict]:
+    """The pairs that look like one person, surest first, each side with enough to tell them apart."""
+    def who(pid: int) -> dict:
+        name = store.conn.execute("SELECT display_name FROM person WHERE id = ?", (pid,)).fetchone()[0]
+        detail = store.conn.execute(
+            "SELECT value FROM attribute WHERE person_id = ? AND key IN ('company', 'position', 'city') ORDER BY key LIMIT 1",
+            (pid,)).fetchone() or store.conn.execute(
+            "SELECT address FROM handle WHERE person_id = ? ORDER BY network LIMIT 1", (pid,)).fetchone()
+        count = store.conn.execute("SELECT COUNT(*) FROM message WHERE person_id = ?", (pid,)).fetchone()[0]
+        return dict(id=pid, name=name, networks=nets.get(pid, []), messages=count, detail=detail[0] if detail else None)
+    return [dict(a=who(a), b=who(b), score=score, reasons=json.loads(reasons)) for a, b, score, reasons in store.conn.execute(
+        "SELECT a, b, score, reasons FROM merge_suggestion WHERE state = 'open' ORDER BY score DESC, at DESC").fetchall()]
+
+
+def week(store, now: float | None = None, days: int = 7) -> dict:
+    """The week's review: what you closed, what closed without you (the chat said so, or a signal did), and
+    what's open but quiet. Items, not counts, so the app can show them."""
+    now = now or time.time()
+    since = now - days * 86400
+    by = {(r[0], r[1], r[2]): r[3] for r in store.conn.execute(
+        "SELECT person_id, source_message_id, owner, decided_by FROM resolution WHERE at >= ? AND state = 'done'", (since,))}
+    on_chat = {tuple(r) for r in store.conn.execute(
+        "SELECT c.person_id, c.source_message_id, c.owner FROM commitment c JOIN message d ON d.id = c.done_message_id"
+        " WHERE d.ts >= ? AND c.status = 'done'", (since,))}
+    muted, done, settled = store.muted(), [], []
+    for p in store.people(now):
+        if p["id"] in muted:
+            continue
+        for c in p["commitments"]:
+            key = (p["id"], c["source_message_id"], c["owner"])
+            if c["status"] != "done" or c["dismissed"] or not (key in by or key in on_chat):
+                continue
+            (done if by.get(key) == "you" else settled).append(dict(person_id=p["id"], name=p["name"], **c))
+    return {"since": since, "done": done, "settled": settled, "quiet": [c for c in nudge.assess(store, now) if not c["live"]]}
 
 
 def status(store, telegram_config: Path) -> dict:
@@ -134,6 +180,13 @@ class Handler(BaseHTTPRequestHandler):
                                        + priority._spread([c for c in items if not c["live"]]), nets))
             if path == "/api/insight":
                 return self._json(insight(store))
+            if path == "/api/week":
+                w = week(store)
+                for k in ("done", "settled", "quiet"):
+                    _tag(w[k], nets)
+                return self._json(w)
+            if path == "/api/merges":
+                return self._json(merges(store, nets))
             if path == "/api/status":
                 from .telegram import config_path
                 return self._json(status(store, config_path(self.db)))
@@ -167,7 +220,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
             return self._send(b"json only", "text/plain", 415)
         route = urlsplit(self.path).path
-        if route not in ("/api/mark", "/api/mute"):
+        if route not in ("/api/mark", "/api/mute", "/api/merge", "/api/merge/undo"):
             return self._send(b"not found", "text/plain", 404)
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -177,6 +230,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(b"bad length", "text/plain", 400)
         if route == "/api/mute":
             return self._mute(length)
+        if route.startswith("/api/merge"):
+            return self._merge(length, undo=route.endswith("/undo"))
         try:
             req = json.loads(self.rfile.read(length))
             pid, src, owner, state = (req["person_id"], req["source_message_id"], req["owner"], req["state"])
@@ -220,6 +275,38 @@ class Handler(BaseHTTPRequestHandler):
             if not store.conn.execute("SELECT 1 FROM person WHERE id = ?", (pid,)).fetchone():
                 return self._send(b"no such person", "text/plain", 404)
             store.mute(pid, "muted in the app") if on else store.unmute(pid)
+            return self._json({"ok": True})
+        finally:
+            store.close()
+
+    def _merge(self, length: int, undo: bool) -> None:
+        """Your answer to "same person?", or taking a yes back. Only a pair soloyolo asked about can be merged."""
+        try:
+            req = json.loads(self.rfile.read(length))
+            if undo:
+                log_id = req["log_id"]
+                if not isinstance(log_id, int):
+                    raise ValueError
+            else:
+                a, b, same = req["a"], req["b"], req["same"]
+                if not (isinstance(a, int) and isinstance(b, int) and a != b and isinstance(same, bool)):
+                    raise ValueError
+        except (ValueError, KeyError, TypeError):
+            return self._send(b"bad request", "text/plain", 400)
+        store = Store(self.db)
+        try:
+            if undo:
+                try:
+                    identity.undo(store.conn, log_id)
+                except ValueError as err:
+                    return self._send(str(err).encode(), "text/plain", 409)
+                return self._json({"ok": True})
+            if not store.conn.execute("SELECT 1 FROM merge_suggestion WHERE a = ? AND b = ? AND state = 'open'",
+                                      (min(a, b), max(a, b))).fetchone():
+                return self._send(b"no such suggestion", "text/plain", 404)
+            if same:
+                return self._json({"ok": True, "log_id": identity.accept(store.conn, a, b)})
+            identity.reject(store.conn, a, b)
             return self._json({"ok": True})
         finally:
             store.close()

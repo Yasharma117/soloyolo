@@ -20,6 +20,10 @@ function Navigation() {
             <Stack.Screen name="design" options={{ presentation: 'modal' }} />
             <Stack.Screen name="screens" options={{ presentation: 'modal' }} />
             <Stack.Screen name="status" />
+            <Stack.Screen name="welcome" />
+            <Stack.Screen name="import" />
+            <Stack.Screen name="merges" />
+            <Stack.Screen name="week" />
           </Stack>
         </ReasonProvider>
       </ToastProvider>

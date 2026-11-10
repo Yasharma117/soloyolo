@@ -7,7 +7,7 @@ Read `packages/design-system/README.md` first. Then:
 
 1. **Find the block.** Screens are composed from `src/blocks`: a new screen starts from `Screen`, results use
    `StatusScreen`, and the rest (TodayHeader, PromiseCard, PromiseRow, PersonRow, QuietPile, PageTitle,
-   PersonHeader, TimelineEvent, SourceRow, FloatingTabBar) are used as they are when they fit. Add the route to `/screens`.
+   PersonHeader, TimelineEvent, SourceRow, FloatingTabBar, OnboardingStep, ImportProgress, MergeSuggestion, EdgeRow, WeekReview) are used as they are when they fit. Add the route to `/screens`.
 2. **Else compose components** from `src/components`. Layout with `Stack`/`Row` and `gap`; text only through
    `<Text variant tone>`; colors only through `useTheme().color`.
 3. **Else add to the system**: a token, a component or a block, in the package, with a catalog entry in

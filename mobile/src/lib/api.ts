@@ -41,9 +41,10 @@ async function get<T>(path: string): Promise<T> {
   return (await r.json()) as T
 }
 
-async function post(path: string, body: object): Promise<void> {
+async function post<T = unknown>(path: string, body: object): Promise<T> {
   const r = await fetch(`${BASE}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!r.ok) throw new Error(await r.text())
+  return (await r.json()) as T
 }
 
 /** `reason` only after Not needed; `days` only for a snooze (1 to 60, default 3). */
@@ -65,6 +66,23 @@ export async function mute(personId: number, on: boolean): Promise<void> {
   await ready
   if (mode === 'live') await post('/api/mute', { person_id: personId, mute: on })
   else await demo.mute(personId, on)
+  version++
+  emit()
+}
+
+/** Your answer to "same person?". A yes returns the merge's id, which `undoMerge` takes back. */
+export async function decideMerge(a: number, b: number, same: boolean): Promise<number | null> {
+  await ready
+  const id = mode === 'live' ? (await post<{ log_id?: number }>('/api/merge', { a, b, same })).log_id ?? null : await demo.merge(a, b, same)
+  version++
+  emit()
+  return id
+}
+
+export async function undoMerge(logId: number): Promise<void> {
+  await ready
+  if (mode === 'live') await post('/api/merge/undo', { log_id: logId })
+  else await demo.undoMerge(logId)
   version++
   emit()
 }

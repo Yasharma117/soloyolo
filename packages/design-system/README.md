@@ -89,7 +89,7 @@ src/
                ActionMenu, Toggle, TextField, SegmentedControl
   blocks/      whole patterns, imported as they are: Screen (Header, Body, Footer), StatusScreen, ReasonSheet, TodayHeader,
                PromiseCard, PromiseRow, PromiseSentence, PersonRow, QuietPile, PageTitle, PersonHeader,
-               TimelineEvent, SourceRow, FloatingTabBar
+               TimelineEvent, SourceRow, FloatingTabBar, OnboardingStep, ImportProgress, MergeSuggestion, EdgeRow, WeekReview
   format.ts    formatINR, formatCount, formatCompact, formatDate, formatRelative
   index.ts     the only import path: import { PromiseCard, useTheme } from '@soloyolo/design-system'
 ```

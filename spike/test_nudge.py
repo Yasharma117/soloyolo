@@ -239,6 +239,58 @@ class NudgeTest(unittest.TestCase):
             httpd.shutdown()
             httpd.server_close()
 
+    def test_server_week_merges_and_edges(self):
+        from spike.server import Handler
+        self.c.NOW = time.time()
+        sent = self.c.say("ivy", 3, True, "I'll send the slides")
+        self.c.say("ivy", 2, True, "I'll book the room")
+        self.c.items("ivy", dict(action="Send Ivy the slides", source_message_id=sent))
+        old = self.c.say("raj", 40, True, "will return your charger")
+        self.c.items("raj", dict(action="Return Raj's charger", source_message_id=old))
+        st = self.c.st
+        ivy, raj = st.find_person("ivy")[0][0], st.find_person("raj")[0][0]
+        st.resolve(ivy, sent, "me", "done", "you")
+        twin = st.person_for("whatsapp", "ivy-2", "Ivy R")
+        st.add_messages("whatsapp", [])  # nothing new; the twin has a handle and no messages
+        with st.conn:
+            st.conn.execute("INSERT INTO merge_suggestion(a, b, score, reasons, state, at) VALUES (?, ?, 0.8, ?, 'open', ?)",
+                            (min(ivy, twin), max(ivy, twin), json.dumps(["name: initial"]), time.time()))
+            st.conn.execute("INSERT INTO edge(src, dst, kind, evidence_message_id, note, extractor, ts) VALUES (?, ?, 'knows', ?, ?, 'you', ?)",
+                            (ivy, raj, sent, "works with Raj", time.time()))
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), lambda *a, **k: None)
+        port = httpd.server_address[1]
+        httpd.RequestHandlerClass = partial(Handler, db=str(self.path), port=port)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{port}"
+        get = lambda path: json.loads(urllib.request.urlopen(base + path).read())
+
+        def post(path, body):
+            req = urllib.request.Request(base + path, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+            try:
+                with urllib.request.urlopen(req) as r:
+                    return r.status, json.loads(r.read())
+            except urllib.error.HTTPError as err:
+                return err.code, None
+        try:
+            w = get("/api/week")
+            self.assertEqual([i["action"] for i in w["done"]], ["Send Ivy the slides"])
+            self.assertEqual([i["action"] for i in w["quiet"]], ["Return Raj's charger"])
+            self.assertEqual(w["settled"], [])
+            edge = get(f"/api/person/{ivy}")["edges"][0]
+            self.assertEqual((edge["src_name"], edge["dst_name"], edge["note"], edge["quote"]), ("Ivy", "Raj", "works with Raj", "I'll send the slides"))
+            pair = get("/api/merges")[0]
+            self.assertEqual(({pair["a"]["name"], pair["b"]["name"]}, pair["reasons"]), ({"Ivy", "Ivy R"}, ["name: initial"]))
+            self.assertEqual(post("/api/merge", {"a": ivy, "b": raj, "same": True})[0], 404)  # never asked about: not mergeable
+            code, body = post("/api/merge", {"a": ivy, "b": twin, "same": True})
+            self.assertEqual(code, 200)
+            self.assertEqual(get("/api/merges"), [])
+            self.assertEqual(post("/api/merge/undo", {"log_id": body["log_id"]})[0], 200)
+            self.assertEqual(post("/api/merge/undo", {"log_id": body["log_id"]})[0], 409)  # already undone
+            self.assertEqual(get("/api/merges"), [])  # an undone merge is a no: it isn't asked again
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
 
 class ReplayTest(unittest.TestCase):
     def setUp(self):

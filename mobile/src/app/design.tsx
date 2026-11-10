@@ -1,7 +1,7 @@
 // The design system's catalog: every token, component and block, live, in either theme.
 // Like a Storybook that runs on the phone. Open it from Sources → Design system.
 import {
-  ActionMenu, SegmentedControl, TextField, Toggle,
+  ActionMenu, SegmentedControl, TextField, Toggle, EdgeRow, ImportProgress, MergeSuggestion, OnboardingStep, WeekReview,
   AVATAR_SIZE, Avatar, Badge, Banner, BottomSheet, ChipGroup, ConfirmDialog, InlineError, NetworkIcon, OptionList, ReasonSheet, ReviewStrip, STATUS, StatRow, StatTile, StatusBadge, type Status, CountUp, FadeIn, KeyValueList, Loader, NavList, SectionCard, Stagger, StatusScreen, StepHeader,
   formatCompact, formatDate, formatINR, formatRelative, Button, Chip, Divider, EmptyState, Facepile, Icon, IconButton, ListRow, PageTitle, PersonHeader,
   PersonRow, PromiseCard, PromiseRow, QuietPile, ReasonChips, Row, SearchField, SectionLabel, Skeleton, SourceRow, Stack, Surface, Tabs,
@@ -236,6 +236,26 @@ function Catalog() {
         <TimelineEvent who="Rohan" text="haan bhejta hoon" ts={now - 2 * 86400 + 600} fromMe />
         <Text variant="label" tone="tertiary" style={{ paddingHorizontal: t.space.xl, marginVertical: t.space.sm }}>SourceRow</Text>
         <View style={{ marginHorizontal: t.space.lg }}><Surface variant="outline" radius="xl" padded={false}><SourceRow icon="logo-whatsapp" name="WhatsApp" state="synced 4m ago" tone="on" note="5,602 messages" /><SourceRow icon="logo-slack" name="Slack" state="on hold" tone="hold" note="Waiting on your employer" last /></Surface></View>
+        <Text variant="label" tone="tertiary" style={{ paddingHorizontal: t.space.xl, marginTop: t.space.lg, marginBottom: t.space.sm }}>OnboardingStep: done · now · later</Text>
+        <View style={{ gap: t.space.md }}>
+          <OnboardingStep n={1} icon="logo-whatsapp" title="Link WhatsApp" state="done" body="" doneNote="5,602 messages read" />
+          <OnboardingStep n={2} icon="paper-plane-outline" title="Pair Telegram" state="now" how="python -m spike telegram pair" action={{ label: 'Check again', onPress: () => {} }}
+                          body="Each morning at 07:30 you get the one to three things that matter today." />
+          <OnboardingStep n={3} icon="cloud-upload-outline" title="Import your other chats" state="later" body="LinkedIn, Instagram and X come from their data exports." />
+        </View>
+        <Text variant="label" tone="tertiary" style={{ paddingHorizontal: t.space.xl, marginTop: t.space.lg, marginBottom: t.space.sm }}>ImportProgress</Text>
+        <ImportProgress network="linkedin" headline="Found 2 promises so far" detail="780 messages from 64 people" progress={0.6} skipped="46 messages skipped. Sponsored messages and group threads aren’t read."
+                        stages={[{ label: 'Reading messages', state: 'done', value: '780' }, { label: 'Matching people', state: 'done', value: '64' }, { label: 'Finding promises', state: 'now', value: '2' }]} />
+        <Text variant="label" tone="tertiary" style={{ paddingHorizontal: t.space.xl, marginTop: t.space.lg, marginBottom: t.space.sm }}>MergeSuggestion</Text>
+        <MergeSuggestion a={{ name: 'Priya Nair', networks: ['linkedin', 'whatsapp'], detail: 'Northwind Labs', messages: 312 }} b={{ name: 'Priya N', networks: ['instagram'], detail: 'Northwind Labs', messages: 14 }}
+                         reasons={['name: initial', 'context: northwind labs']} onSame={() => {}} onDifferent={() => {}} />
+        <Text variant="label" tone="tertiary" style={{ paddingHorizontal: t.space.xl, marginTop: t.space.lg, marginBottom: t.space.sm }}>EdgeRow</Text>
+        <SectionCard>
+          <EdgeRow first from="Priya Nair" to="Arjun Sethi" kind="referred" note="forwarding your profile to Arjun at Quill" quote="Sent your profile to Arjun too, he runs Quill and is hiring designers" ts={now - 3 * 86400} />
+          <EdgeRow from="Kabir Anand" to="Meera Iyer" kind="knows" note="treks with Meera" />
+        </SectionCard>
+        <Text variant="label" tone="tertiary" style={{ paddingHorizontal: t.space.xl, marginTop: t.space.lg, marginBottom: t.space.sm }}>WeekReview</Text>
+        <WeekReview range="Nov 3 to Nov 10" done={5} settled={1} quiet={2} />
       </Section>
     </View>
   )

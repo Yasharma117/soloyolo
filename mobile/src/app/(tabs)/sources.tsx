@@ -1,11 +1,11 @@
-import { Button, ChipGroup, PageTitle, SectionLabel, SourceRow, StatRow, StatTile, Surface, Text, TopBar, Wash, formatCompact, useScrollChrome, useTheme, type IconName } from '@soloyolo/design-system'
+import { Button, ChipGroup, NavList, PageTitle, SectionCard, SectionLabel, SourceRow, StatRow, StatTile, Surface, Text, TopBar, Wash, formatCompact, useScrollChrome, useTheme, type IconName } from '@soloyolo/design-system'
 import { useRouter } from 'expo-router'
 import { View } from 'react-native'
 import Animated from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { serverUrl, useData, useMode } from '../../lib/api'
 import { useAppearance, type Appearance } from '../../lib/appearance'
-import { ago, type Status } from '../../lib/types'
+import { ago, type MergePair, type Status } from '../../lib/types'
 
 type Src = { icon: IconName; name: string; state: string; tone: 'on' | 'off' | 'hold'; note: string }
 
@@ -17,6 +17,7 @@ export default function Sources() {
   const chrome = useScrollChrome()
   const look = useAppearance()
   const { data: s } = useData<Status>('/api/status')
+  const pairs = useData<MergePair[]>('/api/merges').data
   const has = Object.fromEntries((s?.networks ?? []).map((n) => [n.network, n]))
   const groups = (s?.groups ?? []).reduce((a, g) => a + g.lines, 0)
   const imported = (n: string, icon: IconName, name: string, how: string): Src => has[n]
@@ -60,6 +61,14 @@ export default function Sources() {
           </StatRow>
         </View>
       ) : null}
+      <SectionLabel>Review</SectionLabel>
+      <SectionCard>
+        <NavList rows={[
+          { icon: 'people-outline', label: 'Same person?', description: 'Chats that look like one person', value: pairs?.length ? String(pairs.length) : undefined, onPress: () => router.push('/merges') },
+          { icon: 'sparkles', label: 'This week', description: 'What closed and what went quiet', onPress: () => router.push('/week') },
+          { icon: 'settings-outline', label: 'Set up', description: 'WhatsApp, Telegram and your exports', onPress: () => router.push('/welcome') },
+        ]} />
+      </SectionCard>
       <SectionLabel>Messages</SectionLabel>
       {group(messages)}
       <SectionLabel>Every morning</SectionLabel>

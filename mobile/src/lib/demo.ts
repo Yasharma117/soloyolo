@@ -1,6 +1,6 @@
 // Made-up people, shaped like the real store, for when no soloyolo is reachable
 // (Expo Go on a phone away from the Mac, or the web preview). Marks change it in memory.
-import type { Insight, Item, Mark, Message, Person, PersonSummary, Status, TodaySummary } from './types'
+import type { Edge, Insight, Item, Mark, MergePair, Message, Person, PersonSummary, Status, TodaySummary, Week } from './types'
 import { isOpen } from './types'
 
 const now = () => Date.now() / 1000
@@ -9,7 +9,7 @@ const D = 86400
 
 type P = { id: number; name: string; networks: string[]; score: number; lastAgo: number; attrs: [string, string][]; muted?: boolean }
 
-const PEOPLE: P[] = [
+let PEOPLE: P[] = [
   { id: 1, name: 'Rohan Mehta', networks: ['whatsapp'], score: 64, lastAgo: 3 * H, attrs: [['city', 'Gurugram']] },
   { id: 2, name: 'Ma', networks: ['whatsapp'], score: 120, lastAgo: 40 * 60, attrs: [] },
   { id: 3, name: 'Priya Nair', networks: ['linkedin', 'whatsapp'], score: 18, lastAgo: 26 * H, attrs: [['company', 'Northwind Labs'], ['position', 'Design Lead']] },
@@ -19,6 +19,28 @@ const PEOPLE: P[] = [
   { id: 7, name: 'Tanvi Rao', networks: ['x'], score: 3, lastAgo: 9 * D, attrs: [['x', '@tanvibuilds']] },
   { id: 8, name: 'Sector 72 flat owner', networks: ['whatsapp'], score: 6, lastAgo: 12 * D, attrs: [] },
   { id: 9, name: 'Nova (AI assistant)', networks: ['whatsapp'], score: 40, lastAgo: H, attrs: [], muted: true },
+  // two chats that look like people above: the review queue at /merges
+  { id: 10, name: 'Priya N', networks: ['instagram'], score: 2, lastAgo: 11 * D, attrs: [['company', 'Northwind Labs']] },
+  { id: 11, name: 'Kabir trek', networks: ['x'], score: 1, lastAgo: 20 * D, attrs: [] },
+]
+
+let pairs: { a: number; b: number; score: number; reasons: string[] }[] = [
+  { a: 3, b: 10, score: 0.86, reasons: ['name: initial', 'context: northwind labs'] },
+  { a: 4, b: 11, score: 0.62, reasons: ['name: first name', 'context: weekend trek'] },
+]
+const merged: { id: number; gone: P; pair: (typeof pairs)[number] }[] = []
+const MESSAGES: Record<number, number> = { 3: 312, 4: 890, 10: 14, 11: 6 }
+
+const EDGES: Omit<Edge, 'src_name' | 'dst_name' | 'ts'>[] = [
+  { id: 1, src: 3, dst: 5, kind: 'referred', note: 'forwarding your profile to Arjun at Quill', quote: 'Sent your profile to Arjun too, he runs Quill and is hiring designers' },
+  { id: 2, src: 4, dst: 6, kind: 'knows', note: 'treks with Meera', quote: 'Meera bhi aa rahi hai trek pe, usse cafe list le lena' },
+]
+
+// what the last week closed, for /week: two by you, one by a bank SMS
+const CLOSED: [number, 'me' | 'them', string, string, number, string][] = [
+  [1, 'me', 'Send Rohan the broker’s number', 'Broker ka number bhej de', 5 * D, 'you'],
+  [6, 'them', 'Send the Goa photos', 'photos kal bhejti hoon pakka', 6 * D, 'you'],
+  [8, 'me', 'Pay ₹2,000 for the society maintenance', 'Maintenance 2000 this month', 4 * D, 'sms'],
 ]
 
 let seq = 100
@@ -62,6 +84,7 @@ const THREADS: Record<number, [number, boolean, string][]> = {
       [3 * D, false, 'Of course! I’ll dig out Anand’s email and send it over this week'], [3 * D - 900, true, 'Thank you so much 🙏']],
 }
 
+const named = (id: number) => PEOPLE.find((p) => p.id === id)?.name
 const visible = () => items.filter((c) => !PEOPLE.find((p) => p.id === c.person_id)!.muted)
 
 export const demo = {
@@ -82,7 +105,24 @@ export const demo = {
       return { id: p.id, name: p.name, score: p.score, last: now() - p.lastAgo, networks: p.networks, muted: !!p.muted,
                handles: p.networks.map((n) => ({ network: n, address: n === 'whatsapp' ? `+91 98xxx xx${40 + p.id}` : 'from export' })),
                attributes: p.attrs.map(([key, value]) => ({ key, value, source: 'demo' })),
+               edges: EDGES.filter((e) => e.src === p.id || e.dst === p.id).filter((e) => named(e.src) && named(e.dst))
+                 .map((e) => ({ ...e, src_name: named(e.src)!, dst_name: named(e.dst)!, ts: now() - 3 * D })),
                commitments: items.filter((c) => c.person_id === p.id) } satisfies Person as T
+    }
+    if (path === '/api/merges') {
+      const who = (id: number) => {
+        const p = PEOPLE.find((x) => x.id === id)!
+        return { id, name: p.name, networks: p.networks, messages: MESSAGES[id] ?? 0, detail: p.attrs[0]?.[1] ?? null }
+      }
+      return pairs.map((x) => ({ a: who(x.a), b: who(x.b), score: x.score, reasons: x.reasons })) satisfies MergePair[] as T
+    }
+    if (path === '/api/week') {
+      const closed = CLOSED.map(([pid, owner, action, src, agoS, by], i): Item & { by: string } => ({
+        person_id: pid, name: named(pid) ?? '', networks: PEOPLE.find((x) => x.id === pid)?.networks, source_message_id: 200 + i, owner, kind: 'promise',
+        action, due: null, status: 'done', source_ts: now() - agoS, source_text: src, resolved_by: by, snoozed: false, dismissed: false, by }))
+      const yours = visible().filter((c) => c.status === 'done' && c.resolved_by === 'you')
+      return { since: now() - 7 * D, done: [...yours, ...closed.filter((c) => c.by === 'you')], settled: closed.filter((c) => c.by !== 'you'),
+               quiet: open.filter((c) => !c.live) } satisfies Week as T
     }
     m = path.match(/^\/api\/thread\/(\d+)$/)
     if (m) {
@@ -114,6 +154,23 @@ export const demo = {
       live: state === 'open' ? true : it.live,
       reasons: state === 'open' && !it.reasons?.includes('you kept it on') ? ['you kept it on', ...(it.reasons ?? [])] : it.reasons,
     })
+  },
+
+  /** Same: the smaller chat folds into the bigger one. Different: the pair is never asked again. */
+  async merge(a: number, b: number, same: boolean): Promise<number | null> {
+    const pair = pairs.find((x) => (x.a === a && x.b === b) || (x.a === b && x.b === a))
+    if (!pair) throw new Error('No such suggestion')
+    pairs = pairs.filter((x) => x !== pair)
+    if (!same) return null
+    const gone = PEOPLE.find((p) => p.id === pair.b)!
+    PEOPLE = PEOPLE.filter((p) => p !== gone)
+    merged.push({ id: merged.length + 1, gone, pair })
+    return merged.length
+  },
+
+  async undoMerge(id: number): Promise<void> {
+    const m = merged.find((x) => x.id === id)
+    if (m && !PEOPLE.includes(m.gone)) PEOPLE = [...PEOPLE, m.gone] // split apart again, and not asked again
   },
 
   async mute(personId: number, on: boolean): Promise<void> {

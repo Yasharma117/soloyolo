@@ -15,6 +15,13 @@ const GROUPS: { title: string; rows: { label: string; href: Href; value?: string
     { label: 'Person, promises', href: '/person/1', value: 'demo' }, { label: 'Person, with a promise in focus', href: '/person/1?focus=101', value: 'demo' },
     { label: 'Person, waiting on them', href: '/person/3', value: 'demo' },
   ] },
+  { title: 'Setup and review', rows: [
+    { label: 'Set up, where you are', href: '/welcome' }, { label: 'Set up, nothing done yet', href: '/welcome?state=new' },
+    { label: 'Import, starting', href: '/import?at=start', value: 'sample' }, { label: 'Import, halfway', href: '/import?at=half', value: 'sample' }, { label: 'Import, finished', href: '/import?at=end', value: 'sample' },
+    { label: 'Same person?', href: '/merges' }, { label: 'Same person?, none', href: '/merges?state=empty' }, { label: 'Same person?, failed to load', href: '/merges?state=error' },
+    { label: 'This week', href: '/week' }, { label: 'This week, nothing', href: '/week?state=empty' },
+    { label: 'Person, with connections', href: '/person/3', value: 'demo' },
+  ] },
   { title: 'Results', rows: [
     { label: 'Import finished', href: '/status?tone=success' }, { label: 'Import failed', href: '/status?tone=error' },
     { label: 'Reading chats', href: '/status?tone=pending' }, { label: 'Telegram not paired', href: '/status?tone=info' },

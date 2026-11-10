@@ -14,18 +14,17 @@ What exists, and what to build next, in the order screens will need it.
 | From Markon (v0.3, read from its source) | StatusBadge + STATUS + statusOf (status-badge's single vocabulary) · ChipGroup (chip-group) · OptionList with a suggested pick (option-radio-group) · StatTile/StatRow (stat-tile) · ReviewStrip (review-banner) · InlineError (inline-error) · NavRow lead/description/trailing and KeyValueList emphasis (list.tsx) · TimelineEvent rail and bubble (activity-feed) · FloatingTabBar rebuilt as Markon's floating dock (app-shell/bottom-nav: full-width glass dock, soft pill that slides and stretches, label folds, icon pops, reduced motion respected) · Screen chrome from app-shell/screen.tsx: Wash (warm tint fading out by a quarter screen), TopBar that is clear at rest and fills with the title once content scrolls under it, close/back pinned in it · CardSkeleton/RowSkeleton with a breathing Skeleton · `?state=empty|error|loading` previews from page-state, listed in /screens. Rebuilt for React Native on our tokens; no web code carried over |
 | From the Atoms redesign (Figma, v2) | CheckInCard: the "Is Read 10 pages still working for you?" check-in as Today's Still on? deck for quiet promises, with the stacked cards behind · Button `warm` (amber gradient pill, dark text) and `soft` · tokens wash/warmFrom/warmTo/onWarm · InsightCard (slide 4's suggestion card: caps label, gradient serif headline, one line of why) on Today from /api/insight · PromiseParts (slide 2: 01 what, 02 when, 03 who, gradient underlines) at the top of a person · SplitBar (slide 4's strip and list) on a person's About · GradientText (masked on native, CSS clip on web) |
 | Tier 1 parts (Mobbin: Todoist, 5 Minute Journal, Withings, Telegram) | ActionMenu (long-press a PromiseCard: the card lifted, Mark done, Snooze a day, Open chat, then Not needed; wired on Today) · Toggle (inverse fill when on, never green) · TextField (label, hint, error, multiline with a count) · SegmentedControl (sliding thumb) · Surface and PromiseCard take `onLongPress`. Skeletons per block were already covered by CardSkeleton and RowSkeleton |
+| Tier 2 blocks and screens (Mobbin: Notion Mail, Mesh, Pi, Brink, Blinkist, Copilot, Hims, How We Feel, Gentler Streak) | OnboardingStep (`/welcome`, from `/api/status`) · ImportProgress (`/import`, sample numbers) · MergeSuggestion (`/merges`, from `/api/merges`; Same person can be undone) · EdgeRow (a person's About, from `edges`) · WeekReview + weekSentence (`/week`, from `/api/week`). Reached from Sources → Review, and listed in `/screens` |
 | Gates | lint rules for screens (`mobile/eslint.config.js`), color check for the package (`scripts/check.mjs`), both in CI |
 
 ## Next
 
-### Tier 2: blocks for screens not built yet
-| Block | Screen |
+### Still open from Tier 2
+| What | Why |
 |---|---|
-| **OnboardingStep** | First run: link WhatsApp, pair Telegram, import exports |
-| **ImportProgress** | An export being read: counts, what was skipped |
-| **MergeSuggestion** | Identity: "Are these the same person?" with Yes / No |
-| **EdgeRow** | "Sonu → forwarding your profile to Saurabh at Razorpay" |
-| **WeekReview** | Sunday: what got done, what went quiet |
+| **Real import progress** | `/import` shows sample numbers: `spike serve` doesn't report an import's progress yet. ImportProgress takes the real counts when it does |
+| **Set up from the phone** | `/welcome` shows where you are and what to run on your Mac; linking and pairing still happen there |
+| **Extracting connections** | EdgeRow and `/api/person` read the `edge` table; nothing fills it from chats yet |
 
 ### Tier 3: polish
 Skeleton states per block · reduced-motion variants · haptics map · Dynamic Type sizing · right-to-left check

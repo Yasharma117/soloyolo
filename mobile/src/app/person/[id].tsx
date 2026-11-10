@@ -1,6 +1,6 @@
 // A person, Mesh-style: a sheet with their name and orb, a strip of actions, and three views.
 import {
-  BottomSheet, Button, ConfirmDialog, IconButton, InlineError, KeyValueList, NavList, NETWORK_NAME, NetworkIcon, OptionList, PersonHeader,
+  BottomSheet, Button, ConfirmDialog, EdgeRow, IconButton, InlineError, KeyValueList, NavList, NETWORK_NAME, NetworkIcon, OptionList, PersonHeader,
   PromiseParts, PromiseRow, RowSkeleton, SectionCard, SectionLabel, Skeleton, SplitBar, Surface, Tabs, Text, TimelineEvent, TopBar, Wash, statusOf, useScrollChrome, useTheme, useToast, type Option,
 } from '@soloyolo/design-system'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -152,6 +152,15 @@ export default function PersonScreen() {
           {person.attributes.length ? (
             <SectionCard title="Properties">
               <KeyValueList items={person.attributes.map((a) => ({ label: a.key[0]!.toUpperCase() + a.key.slice(1), value: a.value }))} />
+            </SectionCard>
+          ) : null}
+          {person.edges?.length ? (
+            <SectionCard title={`Who ${first} knows`}>
+              {person.edges.map((e, i) => {
+                const other = e.src === person.id ? e.dst : e.src
+                return <EdgeRow key={e.id} first={i === 0} from={e.src_name} to={e.dst_name} kind={e.kind} note={e.note} quote={e.quote} ts={e.ts}
+                                onPress={() => router.push({ pathname: '/person/[id]', params: { id: String(other) } })} />
+              })}
             </SectionCard>
           ) : null}
           <SectionCard title="Sources">

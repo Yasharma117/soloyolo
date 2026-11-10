@@ -37,7 +37,19 @@ export type PersonSummary = {
 export type Person = PersonSummary & {
   handles: { network: string; address: string }[]
   attributes: { key: string; value: string; source: string }[]
+  /** Missing from a soloyolo older than the connections endpoint. */
+  edges?: Edge[]
 }
+
+/** A connection between two people, with the line that says so (spike/server.py edges). */
+export type Edge = { id: number; src: number; dst: number; src_name: string; dst_name: string; kind: string; note: string | null; quote: string | null; ts: number }
+
+export type MergeWho = { id: number; name: string; networks: string[]; messages: number; detail: string | null }
+/** Two chats that look like one person, and why soloyolo thinks so. */
+export type MergePair = { a: MergeWho; b: MergeWho; score: number; reasons: string[] }
+
+/** The last seven days: closed by you, closed without you, and open but quiet. */
+export type Week = { since: number; done: Item[]; settled: Item[]; quiet: Item[] }
 
 export type Message = { id: number; ts: number; from_me: number | boolean; text: string }
 
@@ -70,3 +82,6 @@ export function ago(ts: number): string {
 }
 
 export const HOT = /^(due|overdue)|again|chased/i
+
+/** A network's name as people write it. */
+export const NETWORK_NAMES: Record<string, string> = { linkedin: 'LinkedIn', instagram: 'Instagram', x: 'X' }
