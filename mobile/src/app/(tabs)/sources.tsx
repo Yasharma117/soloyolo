@@ -48,7 +48,7 @@ export default function Sources() {
   )
   return (
     <View style={{ flex: 1, backgroundColor: t.color.background }}>
-    <Animated.ScrollView onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}>
+    <Animated.ScrollView showsVerticalScrollIndicator={false} onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}>
       <Wash />
       <PageTitle title="Sources" subtitle={mode === 'live' ? `Where soloyolo reads from. Connected to your Mac (${serverUrl}).` : 'Where soloyolo reads from. Showing the demo: your Mac isn’t reachable.'} />
       {s ? (

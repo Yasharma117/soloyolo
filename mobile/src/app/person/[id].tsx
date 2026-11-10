@@ -79,7 +79,7 @@ export default function PersonScreen() {
   const messages = (thread.data ?? []).slice(-60).reverse()
   return (
     <View style={{ flex: 1, backgroundColor: t.color.background }}>
-    <Animated.ScrollView onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: 52, paddingBottom: 60 }}>
+    <Animated.ScrollView showsVerticalScrollIndicator={false} onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: 52, paddingBottom: 60 }}>
       <Wash />
       <PersonHeader
         name={person.name} network={person.networks[0]} subtitle={`last talked ${ago(person.last)} ago${person.muted ? ' · muted' : ''}`}

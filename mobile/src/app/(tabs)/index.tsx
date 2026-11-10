@@ -37,7 +37,7 @@ export default function Today() {
   const open = (it: Item) => router.push({ pathname: '/person/[id]', params: { id: String(it.person_id), focus: String(it.source_message_id) } })
   return (
     <View style={{ flex: 1, backgroundColor: t.color.background }}>
-    <Animated.ScrollView onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}
+    <Animated.ScrollView showsVerticalScrollIndicator={false} onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}
                 refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}>
       <Wash />
       <TodayHeader count={s.data ? n : null} />

@@ -234,7 +234,7 @@ export default function DesignScreen() {
 function Themed({ scheme, setScheme, top, close }: { scheme: Scheme; setScheme: (s: Scheme) => void; top: number; close: () => void }) {
   const t = useTheme()
   return (
-    <ScrollView style={{ backgroundColor: t.color.background }} contentContainerStyle={{ paddingTop: top + t.space.md, paddingBottom: 80 }}>
+    <ScrollView showsVerticalScrollIndicator={false} style={{ backgroundColor: t.color.background }} contentContainerStyle={{ paddingTop: top + t.space.md, paddingBottom: 80 }}>
       <Row padX="lg" justify="space-between"><IconButton icon="chevron-down" label="Close" onPress={close} /></Row>
       <PageTitle title="Design system" subtitle="@soloyolo/design-system: tokens, components and blocks. Everything on every screen comes from here." />
       <View style={{ marginTop: t.space.md }}>

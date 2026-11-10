@@ -25,7 +25,7 @@ export default function People() {
   return (
     <View style={{ flex: 1, backgroundColor: t.color.background }}>
     <Animated.FlatList
-      onScroll={chrome.onScroll} scrollEventThrottle={16}
+      showsVerticalScrollIndicator={false} onScroll={chrome.onScroll} scrollEventThrottle={16}
       contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}
       data={list}
       keyExtractor={(p) => String(p.id)}

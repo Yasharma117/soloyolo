@@ -49,7 +49,7 @@ export function BottomSheet({ open, onClose, title, subtitle, children, footer }
               <IconButton icon="close" label="Close" onPress={onClose} />
             </View>
             {children ? (
-              <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: t.space.xl, paddingBottom: footer ? t.space.lg : bottom, gap: t.space.lg }}
+              <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: t.space.xl, paddingBottom: footer ? t.space.lg : bottom, gap: t.space.lg }}
                           keyboardShouldPersistTaps="handled" bounces={false}>
                 {children}
               </ScrollView>

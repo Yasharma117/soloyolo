@@ -49,7 +49,7 @@ export default function All() {
   }
   return (
     <View style={{ flex: 1, backgroundColor: t.color.background }}>
-    <Animated.ScrollView onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}>
+    <Animated.ScrollView showsVerticalScrollIndicator={false} onScroll={chrome.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 130 }}>
       <Wash />
       <PageTitle title="All open" subtitle="Everything still open. Quiet ones are assumed done; swipe one left if it isn’t." />
       {error ? <InlineError title="We couldn’t load your promises." body="soloyolo on your Mac didn’t answer. Check it’s running, then try again." onRetry={refresh} /> : null}

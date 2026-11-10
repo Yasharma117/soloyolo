@@ -38,7 +38,7 @@ function Header({ title, subtitle, onBack, backIcon = 'chevron-back', large, tra
 function Body({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
   const t = useTheme()
   if (!scroll) return <View style={{ flex: 1, gap: t.space.lg }}>{children}</View>
-  return <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: t.space.xxl, gap: t.space.lg }}>{children}</ScrollView>
+  return <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: t.space.xxl, gap: t.space.lg }}>{children}</ScrollView>
 }
 
 /** Sticks to the bottom above the home indicator. Put one primary Button here; secondary actions above it. */
