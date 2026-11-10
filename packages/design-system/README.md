@@ -85,7 +85,8 @@ src/
                Badge, Avatar/Facepile, SearchField, Tabs, SectionLabel, ListRow, EmptyState, Skeleton, DotGrid,
                Toast (provider + useToast), SwipeRow, Banner, BottomSheet, ConfirmDialog,
                SectionCard/KeyValueList/NavRow/NavList, StepHeader, Motion (FadeIn, Stagger, CountUp, Loader),
-               StatusBadge (STATUS, statusOf), ChipGroup, OptionList, StatTile/StatRow, ReviewStrip, InlineError
+               StatusBadge (STATUS, statusOf), ChipGroup, OptionList, StatTile/StatRow, ReviewStrip, InlineError,
+               ActionMenu, Toggle, TextField, SegmentedControl
   blocks/      whole patterns, imported as they are: Screen (Header, Body, Footer), StatusScreen, ReasonSheet, TodayHeader,
                PromiseCard, PromiseRow, PromiseSentence, PersonRow, QuietPile, PageTitle, PersonHeader,
                TimelineEvent, SourceRow, FloatingTabBar
@@ -104,7 +105,7 @@ Result screens (imported, failed, waiting, not set up) are `StatusScreen`, never
 **soloyolo suggests, you decide.** When a bank SMS or a group chat says something is settled, show it with
 `ReviewStrip` and one action (Mark done). Never close it for the person.
 
-**Pick the right chooser.** `ChipGroup` filters a list (a few short words). `OptionList` is a choice that needs a
+**Pick the right chooser.** `ChipGroup` filters a list (a few short words). `SegmentedControl` switches two to four views of the same thing (Today / This week). `OptionList` is a choice that needs a
 line of explanation, and marks soloyolo's own pick with why. `ReasonSheet` asks why after an action.
 
 **A failed section is an `InlineError`**, naming what failed and the next step, with Try again. The rest of the

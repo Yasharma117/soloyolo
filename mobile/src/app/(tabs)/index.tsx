@@ -1,4 +1,4 @@
-import { Banner, CardSkeleton, CheckInCard, Chip, InsightCard, EmptyState, Icon, InlineError, PromiseCard, TopBar, Wash, useScrollChrome, QuietPile, Row, SectionLabel, Text, TodayHeader, formatRelative, useTheme } from '@soloyolo/design-system'
+import { ActionMenu, Banner, CardSkeleton, CheckInCard, Chip, InsightCard, EmptyState, Icon, InlineError, PromiseCard, TopBar, Wash, useScrollChrome, QuietPile, Row, SectionLabel, Text, TodayHeader, formatRelative, useTheme } from '@soloyolo/design-system'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { RefreshControl, View } from 'react-native'
@@ -33,6 +33,7 @@ export default function Today() {
   const [seen, setSeen] = useState<string[]>([])
   const deck = quiet.filter((x) => !x.suggestion && !seen.includes(keyOf(x)))
   const next = (it: Item) => setSeen((s) => [...s, keyOf(it)])
+  const [menu, setMenu] = useState<Item | null>(null) // the card a long-press lifted
   const n = s.data?.today.length ?? 0
   const open = (it: Item) => router.push({ pathname: '/person/[id]', params: { id: String(it.person_id), focus: String(it.source_message_id) } })
   return (
@@ -56,12 +57,12 @@ export default function Today() {
       {s.error ? <InlineError title="We couldn’t load today’s list." body="soloyolo on your Mac didn’t answer. Check it’s running, then try again." onRetry={refresh} /> : null}
       {s.loading && !s.data && !s.error ? <><CardSkeleton /><CardSkeleton /><CardSkeleton /></> : null}
       {s.data?.today.map((it) => (
-        <PromiseCard key={keyOf(it)} item={it} onPress={() => open(it)} onDone={() => marks.done(it)} onDismiss={() => marks.dismiss(it)} onSettle={() => marks.done(it)} />
+        <PromiseCard key={keyOf(it)} item={it} onPress={() => open(it)} onDone={() => marks.done(it)} onDismiss={() => marks.dismiss(it)} onSettle={() => marks.done(it)} onLongPress={() => setMenu(it)} />
       ))}
       {s.data && !n ? (
         <EmptyState title="Nothing you said you’d do needs you today." body="Older things are assumed done, unless someone chases you about them." />
       ) : null}
-      {n ? <Text variant="small" tone="tertiary" style={{ paddingHorizontal: t.space.xl }}>Swipe left when it’s done, right if it’s not needed.</Text> : null}
+      {n ? <Text variant="small" tone="tertiary" style={{ paddingHorizontal: t.space.xl }}>Swipe left when it’s done, right if it’s not needed. Hold a card for more.</Text> : null}
       {deck.length && s.data ? (
         <>
           <SectionLabel>{`Still on? · ${deck.length}`}</SectionLabel>
@@ -79,6 +80,14 @@ export default function Today() {
       ) : null}
     </Animated.ScrollView>
     <TopBar y={chrome.y} title="Today" at={150} />
+    <ActionMenu open={!!menu} onClose={() => setMenu(null)}
+                preview={menu ? <View style={{ marginHorizontal: -t.space.lg }}><PromiseCard item={menu} /></View> : null}
+                groups={menu ? [
+                  [{ label: 'Mark done', icon: 'checkmark', onPress: () => marks.done(menu) },
+                   { label: 'Snooze a day', icon: 'time-outline', onPress: () => marks.snooze(menu, 1) },
+                   { label: 'Open chat', icon: 'chatbubble-outline', onPress: () => open(menu) }],
+                  [{ label: 'Not needed', icon: 'close', onPress: () => marks.dismiss(menu) }],
+                ] : []} />
     </View>
   )
 }

@@ -22,8 +22,8 @@ export function Quote({ text }: { text?: string | null }) {
   )
 }
 
-/** Today's card. Swipe left: Done. Swipe right: Not needed. Tap: open the person. */
-export function PromiseCard({ item, onPress, onDone, onDismiss, onSettle }: { item: PromiseItem; onPress?: () => void; onDone?: () => void; onDismiss?: () => void; onSettle?: () => void }) {
+/** Today's card. Swipe left: Done. Swipe right: Not needed. Tap: open the person. Long-press: every action (ActionMenu). */
+export function PromiseCard({ item, onPress, onDone, onDismiss, onSettle, onLongPress }: { item: PromiseItem; onPress?: () => void; onLongPress?: () => void; onDone?: () => void; onDismiss?: () => void; onSettle?: () => void }) {
   const t = useTheme()
   const swipe = useSwipeTap(onPress)
   return (
@@ -31,7 +31,7 @@ export function PromiseCard({ item, onPress, onDone, onDismiss, onSettle }: { it
       <SwipeRow radius={t.radius.card} onDragStart={swipe.dragStart}
                 trailing={onDone ? { label: 'Done', icon: 'checkmark', tone: 'success', onAction: onDone } : undefined}
                 leading={onDismiss ? { label: 'Not needed', icon: 'close', tone: 'neutralAction', onAction: onDismiss } : undefined}>
-        <Surface onPress={swipe.tap} style={{ gap: t.space.md }}>
+        <Surface onPress={swipe.tap} onLongPress={onLongPress} style={{ gap: t.space.md }}>
           <Row gap="sm">
             <Avatar name={item.name} size="sm" />
             <Text variant="small" style={{ fontWeight: '600', flexShrink: 1, fontSize: 14 }} numberOfLines={1}>{item.name}</Text>

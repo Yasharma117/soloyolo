@@ -7,10 +7,11 @@ export type SurfaceProps = ViewProps & {
   radius?: 'lg' | 'xl' | 'card'
   padded?: boolean
   onPress?: PressableProps['onPress']
+  onLongPress?: PressableProps['onLongPress']
 }
 
 /** Anything that sits on the page as an object: cards, piles, grouped lists. */
-export function Surface({ variant = 'card', radius = 'card', padded = true, onPress, style, ...rest }: SurfaceProps) {
+export function Surface({ variant = 'card', radius = 'card', padded = true, onPress, onLongPress, style, ...rest }: SurfaceProps) {
   const t = useTheme()
   const look = [
     { borderRadius: t.radius[radius], padding: padded ? t.space.lg + 2 : 0 },
@@ -20,6 +21,6 @@ export function Surface({ variant = 'card', radius = 'card', padded = true, onPr
     variant === 'dashed' && { borderWidth: 1, borderStyle: 'dashed' as const, borderColor: t.color.border },
     style,
   ]
-  if (onPress) return <Pressable onPress={onPress} style={look} {...(rest as PressableProps)} />
+  if (onPress || onLongPress) return <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={look} {...(rest as PressableProps)} />
   return <View style={look} {...rest} />
 }

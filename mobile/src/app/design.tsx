@@ -1,6 +1,7 @@
 // The design system's catalog: every token, component and block, live, in either theme.
 // Like a Storybook that runs on the phone. Open it from Sources → Design system.
 import {
+  ActionMenu, SegmentedControl, TextField, Toggle,
   AVATAR_SIZE, Avatar, Badge, Banner, BottomSheet, ChipGroup, ConfirmDialog, InlineError, NetworkIcon, OptionList, ReasonSheet, ReviewStrip, STATUS, StatRow, StatTile, StatusBadge, type Status, CountUp, FadeIn, KeyValueList, Loader, NavList, SectionCard, Stagger, StatusScreen, StepHeader,
   formatCompact, formatDate, formatINR, formatRelative, Button, Chip, Divider, EmptyState, Facepile, Icon, IconButton, ListRow, PageTitle, PersonHeader,
   PersonRow, PromiseCard, PromiseRow, QuietPile, ReasonChips, Row, SearchField, SectionLabel, Skeleton, SourceRow, Stack, Surface, Tabs,
@@ -53,6 +54,10 @@ function Catalog() {
   const [chip, setChip] = useState<'all' | 'me' | 'them' | 'money'>('all')
   const [opt, setOpt] = useState<'1' | '3' | '7'>('3')
   const [replay, setReplay] = useState(0)
+  const [on, setOn] = useState(true)
+  const [range, setRange] = useState<'today' | 'week'>('today')
+  const [note, setNote] = useState('')
+  const [menu, setMenu] = useState(false)
   const swatches = Object.keys(colors.light) as (keyof typeof colors.light)[]
   return (
     <View style={{ backgroundColor: t.color.background }}>
@@ -103,6 +108,23 @@ function Catalog() {
         <Specimen name="Icon"><Row gap="md" wrap>{(['sunny', 'people', 'albums', 'git-network', 'checkmark', 'close', 'refresh', 'logo-whatsapp', 'logo-linkedin', 'logo-instagram', 'logo-x'] as const).map((n) => <Icon key={n} name={n} size="lg" tone="primary" />)}</Row></Specimen>
         <Specimen name="SearchField"><SearchField value={q} onChangeText={setQ} /></Specimen>
         <Specimen name="Tabs"><View style={{ marginHorizontal: -t.space.xl }}><Tabs value={tab} onChange={setTab} items={[{ key: 'a', label: 'Promises' }, { key: 'b', label: 'Timeline' }]} /></View></Specimen>
+        <Specimen name="SegmentedControl"><SegmentedControl label="Show" value={range} onChange={setRange} options={[{ value: 'today', label: 'Today' }, { value: 'week', label: 'This week' }]} /></Specimen>
+        <Specimen name="Toggle, in a NavRow">
+          <View style={{ marginHorizontal: -t.space.lg }}><SectionCard>
+            <NavList rows={[{ label: 'Morning message', description: 'Today’s things on Telegram at 07:30', trailing: <Toggle label="Morning message" value={on} onChange={setOn} /> },
+                            { label: 'Count LinkedIn', trailing: <Toggle label="Count LinkedIn" value={false} onChange={() => {}} disabled /> }]} />
+          </SectionCard></View>
+        </Specimen>
+        <Specimen name="TextField">
+          <TextField label="Note" multiline maxLength={200} value={note} onChangeText={setNote} placeholder="Met at Kabir’s, works at Razorpay" hint="Only you see notes." />
+          <TextField label="Name" value="" placeholder="Rohan Mehta" error="Add a name, or go back." />
+        </Specimen>
+        <Specimen name="ActionMenu (long-press a card)">
+          <Row><Button label="Open menu" onPress={() => setMenu(true)} /></Row>
+          <ActionMenu open={menu} onClose={() => setMenu(false)} preview={<View style={{ marginHorizontal: -t.space.lg }}><PromiseCard item={SAMPLE} /></View>}
+                      groups={[[{ label: 'Mark done', icon: 'checkmark', onPress: () => {} }, { label: 'Snooze a day', icon: 'time-outline', onPress: () => {} }, { label: 'Open chat', icon: 'chatbubble-outline', onPress: () => {} }],
+                               [{ label: 'Not needed', icon: 'close', onPress: () => {} }]]} />
+        </Specimen>
         <Specimen name="Surface: card · outline · raised · dashed">
           <Surface><Text>Card</Text></Surface><Surface variant="outline"><Text>Outline</Text></Surface><Surface variant="raised"><Text>Raised</Text></Surface><Surface variant="dashed"><Text>Dashed</Text></Surface>
         </Specimen>
