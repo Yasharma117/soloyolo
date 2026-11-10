@@ -1,4 +1,4 @@
-import { ActionMenu, Banner, CardSkeleton, CheckInCard, Chip, InsightCard, EmptyState, Icon, InlineError, PromiseCard, TopBar, Wash, useScrollChrome, QuietPile, Row, SectionLabel, Text, TodayHeader, formatRelative, useTheme } from '@soloyolo/design-system'
+import { ActionMenu, Banner, CardSkeleton, CheckInCard, Chip, InsightCard, EmptyState, Icon, InlineError, PromiseCard, TopBar, Wash, useScrollChrome, QuietPile, Row, SectionLabel, Text, TodayHeader, formatRelative, plural, useTheme } from '@soloyolo/design-system'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
 import { RefreshControl, View } from 'react-native'
@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { refresh, useData, useMode } from '../../lib/api'
 import { useMarks } from '../../lib/marks'
 import { sayInsight } from '../../lib/insight'
-import { keyOf, type Insight, type Item, type Status, type TodaySummary } from '../../lib/types'
+import { keyOf, type Insight, type Item, type SetupStatus, type Status, type TodaySummary } from '../../lib/types'
 
 export default function Today() {
   const t = useTheme()
@@ -24,10 +24,12 @@ export default function Today() {
     : preview === 'empty' ? { data: { today: [], live: 0, quiet: 0, open: 0 }, error: null, loading: false } : live
   const all = useData<Item[]>('/api/all')
   const status = useData<Status>('/api/status')
+  const setup = useData<SetupStatus>('/api/setup')
   const insight = sayInsight(useData<Insight>('/api/insight').data)
   const wa = status.data?.networks.find((x) => x.network === 'whatsapp')
   const [openedAt] = useState(() => Date.now() / 1000) // the clock is read once, when Today opens
   const stale = wa && openedAt - wa.last > 12 * 3600
+  const unread = preview ? 0 : setup.data?.unread ?? 0 // chats no pass has read: promises in them aren't here yet
   const quiet = (all.data ?? []).filter((x) => !x.live)
   // the Still on? deck: quiet ones asked about one at a time; Skip just moves on (it stays quiet, so assumed done)
   const [seen, setSeen] = useState<string[]>([])
@@ -52,6 +54,12 @@ export default function Today() {
           <Banner tone="warning" title="WhatsApp isn’t syncing"
                   body={`Last message arrived ${formatRelative(wa!.last)}. New promises won’t show up until your Mac syncs again.`}
                   action={{ label: 'Open sources', onPress: () => router.navigate('/sources') }} />
+        </View>
+      ) : null}
+      {unread && mode === 'live' ? (
+        <View style={{ paddingHorizontal: t.space.lg, marginBottom: t.space.md + 2 }}>
+          <Banner title={`${plural(unread, 'chat hasn’t', 'chats haven’t')} been read yet`} body="Promises in them won’t show up here until soloyolo reads them."
+                  action={{ label: 'Read them', onPress: () => router.push('/welcome') }} />
         </View>
       ) : null}
       {s.error ? <InlineError title="We couldn’t load today’s list." body="soloyolo on your Mac didn’t answer. Check it’s running, then try again." onRetry={refresh} /> : null}

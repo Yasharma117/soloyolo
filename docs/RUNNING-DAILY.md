@@ -24,6 +24,11 @@ and open **http://127.0.0.1:8765/welcome** in a browser on the Mac. From there:
   `scripts/install-mac.sh` hands syncing to launchd. Only one connectord may run: if launchd's is up, the app says so.
 - **Read an export:** a LinkedIn, Instagram, X or WhatsApp export saved to `~/Downloads` under the name the network
   gave it shows up on the screen; pick it to read it. The app can only name a file the server found there.
+- **Find your promises:** when chats have messages no pass has read, the screen (and Today) says how many, and
+  offers **Read with Claude** or **Read on Mac**. Either runs one `watch --once --top 15` pass and shows which chat
+  it's on. Claude sends those chats' text to Claude through your Claude Code login, and the screen says so before
+  you pick; on Mac is the offline heuristic. It takes the same lock as the launchd jobs, so two passes never
+  overlap. Only counts come back to the app: the pass's own output names people and promises, and is dropped.
 - Nothing asks for a password. connectord's output is read for the code and the link result only; the message lines
   it logs are dropped.
 

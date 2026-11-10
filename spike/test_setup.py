@@ -12,6 +12,7 @@ import zipfile
 from functools import partial
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from types import SimpleNamespace
 
 from spike import setup
 from spike.server import Handler
@@ -115,6 +116,31 @@ class SetupTest(unittest.TestCase):
         st = Store(self.db)
         self.assertGreater(st.conn.execute("SELECT COUNT(*) FROM message WHERE network = 'linkedin'").fetchone()[0], 0)
         st.close()
+
+    def test_read_turns_messages_into_promises(self):
+        st = Store(self.db)
+        t = time.time()
+        rows = [SimpleNamespace(guid=f"g{i}", handle="+919811111111", from_me=i % 2, ts=t - 3600 + i, text=text)
+                for i, text in enumerate(["are you free this week", "yes", "can you send the deck", "I'll send the deck by Friday", "thanks"])]
+        st.add_messages("whatsapp", rows, {"+919811111111": "Ivy Secretname"})
+        st.add_messages("whatsapp", [SimpleNamespace(guid="short", handle="+919822222222", from_me=0, ts=t, text="hi")], {})  # one line: never read
+        st.close()
+        self.assertEqual((self.get()["unread"], self.get()["read"]["state"]), (1, "idle"))
+        self.assertEqual(self.post("read", {"extractor": "gpt"})[0], 400)
+        lock = self.db.parent / ".extract.lock"
+        lock.mkdir()  # the launchd job is mid-pass
+        code, why = self.post("read", {"extractor": "heuristic"})
+        self.assertEqual(code, 400)
+        self.assertIn("already reading", why)
+        lock.rmdir()
+        self.assertEqual(self.post("read", {"extractor": "heuristic"})[0], 200)
+        s = self.until(lambda s: s["read"]["state"] in ("done", "error"), seconds=20)
+        self.assertEqual((s["read"]["state"], s["read"]["done"], s["read"]["total"], s["read"]["failed"], s["unread"]),
+                         ("done", 1, 1, 0, 0))
+        self.assertGreaterEqual(s["read"]["new"], 1)
+        self.assertNotIn("Secretname", json.dumps(s))  # the pass prints names and promises; only counts come back
+        self.assertNotIn("deck", json.dumps(s))
+        self.assertFalse(lock.exists())
 
 
 if __name__ == "__main__":

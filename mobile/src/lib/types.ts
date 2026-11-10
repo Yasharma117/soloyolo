@@ -94,4 +94,11 @@ export type SetupStatus = {
   ready: boolean
   whatsapp: { state: 'idle' | 'starting' | 'code' | 'linked' | 'error'; code: string | null; message: string | null; linked: boolean; syncing: boolean }
   exports: ExportFile[]
+  /** Chats with messages no pass has read yet. */
+  unread: number
+  /** Claude Code is installed on the Mac, so "Read with Claude" can work. */
+  claude: boolean
+  read: ReadPass
 }
+/** One pass over the chats that changed, which is what finds promises. Counts only: no names, no text. */
+export type ReadPass = { state: 'idle' | 'reading' | 'done' | 'error'; extractor: 'claude-code' | 'heuristic' | null; total: number; done: number; failed: number; new: number; message: string | null }

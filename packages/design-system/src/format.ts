@@ -11,6 +11,11 @@ export function formatCount(n: number): string {
   return n.toLocaleString(locale)
 }
 
+/** "1 chat", "1,204 chats"; pass `many` when adding an s isn't right: plural(n, 'chat has', 'chats have'). */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${formatCount(n)} ${n === 1 ? one : many}`
+}
+
 /** 1.2K, 15.4M. */
 export function formatCompact(n: number): string {
   if (n < 1000) return String(n)

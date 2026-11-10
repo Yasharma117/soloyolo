@@ -1,8 +1,8 @@
 // First run: the three things that make soloyolo work, in order. WhatsApp links from here (your number, then the
 // code WhatsApp gives, typed on your phone) and exports found in Downloads are read from here (spike/setup.py);
-// Telegram is still paired on the Mac. With a soloyolo too old for /api/setup, each step shows what to run instead.
+// Reading the chats for promises starts here too, and says when it sends text to Claude. Telegram is still paired on the Mac. With a soloyolo too old for /api/setup, each step shows what to run instead.
 // ?state=new previews it with nothing set up.
-import { Banner, Button, InlineError, Loader, NavList, NetworkIcon, OnboardingStep, PairingCode, Screen, SectionCard, StepHeader, TextField, formatCount, formatRelative, useTheme, useToast, type StepState } from '@soloyolo/design-system'
+import { Banner, Button, InlineError, Loader, NavList, Row, Stack, Text, NetworkIcon, OnboardingStep, PairingCode, Screen, SectionCard, StepHeader, TextField, formatCount, formatRelative, plural, useTheme, useToast, type StepState } from '@soloyolo/design-system'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { View } from 'react-native'
@@ -31,13 +31,15 @@ export default function Welcome() {
   const state = (i: number): StepState => (done[i] ? 'done' : i === at ? 'now' : 'later')
   const check = { label: 'Check again', onPress: refresh }
   // while WhatsApp is being asked for a code, or waiting for you to type it, look again every two seconds
-  const waiting = wa?.state === 'starting' || wa?.state === 'code'
+  const read = preview === 'new' ? undefined : setup?.read
+  const unread = preview === 'new' ? 0 : setup?.unread ?? 0
+  const waiting = wa?.state === 'starting' || wa?.state === 'code' || read?.state === 'reading'
   useEffect(() => {
     if (!waiting) return
     const id = setInterval(refresh, 2000)
     return () => clearInterval(id)
   }, [waiting])
-  const act = async (what: 'whatsapp' | 'sync' | 'import', body = {}) => {
+  const act = async (what: 'whatsapp' | 'sync' | 'import' | 'read', body = {}) => {
     setAsking(true)
     try {
       await setupAct(what, body)
@@ -73,6 +75,34 @@ export default function Welcome() {
                        hint="With the country code. WhatsApp shows soloyolo as a linked device, like WhatsApp Web." />
           ) : null}
         </OnboardingStep>
+        {read && (unread || read.state !== 'idle') ? (
+          <SectionCard title="Find your promises">
+            <Stack pad="lg" gap="md">
+              {read.state === 'reading' ? (
+                <Loader label={read.total ? `Reading chat ${Math.min(read.done + 1, read.total)} of ${read.total}...` : 'Looking for chats with new messages...'} />
+              ) : (
+                <>
+                  {read.state === 'done' ? (
+                    <Text variant="bodyStrong">{read.done ? `Read ${plural(read.done, 'chat')}. ${read.new ? `${plural(read.new, 'new promise')} found.` : 'Nothing new in them.'}` : 'Nothing new to read.'}</Text>
+                  ) : null}
+                  {read.state === 'error' ? <View style={{ marginHorizontal: -t.space.lg }}><InlineError title="Your chats weren’t read." body={read.message ?? 'Try again.'} /></View> : null}
+                  {unread ? (
+                    <>
+                      <Text variant="body" tone="secondary">
+                        {`${plural(unread, 'chat has', 'chats have')} messages soloyolo hasn’t read${read.state === 'done' ? ' yet. It reads 15 at a time' : ''}. Claude reads best, and that sends the text of those chats to Claude through your Claude login. Reading on this Mac sends nothing and misses more.`}
+                      </Text>
+                      {setup?.claude ? null : <Text variant="small" tone="tertiary">Claude Code isn’t installed on this Mac. Install it and log in to read with Claude.</Text>}
+                      <Row gap="sm" wrap>
+                        <Button label="Read with Claude" variant="primary" disabled={!setup?.claude || asking} onPress={() => act('read', { extractor: 'claude-code' })} />
+                        <Button label="Read on Mac" disabled={asking} onPress={() => act('read', { extractor: 'heuristic' })} />
+                      </Row>
+                    </>
+                  ) : null}
+                </>
+              )}
+            </Stack>
+          </SectionCard>
+        ) : null}
         <OnboardingStep n={2} icon="paper-plane-outline" title="Pair Telegram" state={state(1)} action={check}
                         body="Each morning at 07:30 you get the one to three things that matter today, with Done and Not needed under each."
                         how="python -m spike telegram pair" doneNote="Morning message at 07:30" />

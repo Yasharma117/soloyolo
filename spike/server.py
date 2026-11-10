@@ -231,7 +231,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(b"json only", "text/plain", 415)
         route = urlsplit(self.path).path
         if route not in ("/api/mark", "/api/mute", "/api/merge", "/api/merge/undo",
-                         "/api/setup/whatsapp", "/api/setup/sync", "/api/setup/import"):
+                         "/api/setup/whatsapp", "/api/setup/sync", "/api/setup/import", "/api/setup/read"):
             return self._send(b"not found", "text/plain", 404)
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -293,7 +293,7 @@ class Handler(BaseHTTPRequestHandler):
             store.close()
 
     def _setup(self, what: str, length: int) -> None:
-        """Link WhatsApp with a pairing code, start syncing, or read an export from Downloads."""
+        """Link WhatsApp with a pairing code, start syncing, read an export from Downloads, or read the chats for promises."""
         try:
             req = json.loads(self.rfile.read(length))
             if not isinstance(req, dict):
@@ -305,6 +305,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(st.link(re.sub(r"[\s+()-]", "", req["phone"])))
             if what == "sync":
                 return self._json(st.sync())
+            if what == "read":
+                if not isinstance(req.get("extractor"), str):
+                    raise ValueError
+                return self._json(st.read(req["extractor"]))
             if not isinstance(req.get("file"), str):
                 raise ValueError
             return self._json(st.start_import(req["file"]))

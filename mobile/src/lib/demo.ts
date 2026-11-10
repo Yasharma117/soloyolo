@@ -87,8 +87,10 @@ const THREADS: Record<number, [number, boolean, string][]> = {
 // Setting up in the demo: nothing is linked or read, it only walks through the states on a timer so the
 // screens can be seen. The real thing is spike/setup.py.
 const DEMO_EXPORT = 'Complete_LinkedInDataExport_11-02-2026.zip'
-const setupState: { wa: SetupStatus['whatsapp']; at: number; job: (ImportJob & { at: number }) | null } = {
+const DEMO_UNREAD = 9
+const setupState: { wa: SetupStatus['whatsapp']; at: number; job: (ImportJob & { at: number }) | null; read: SetupStatus['read'] & { at: number } } = {
   wa: { state: 'idle', code: null, message: null, linked: false, syncing: false }, at: 0, job: null,
+  read: { state: 'idle', extractor: null, total: 0, done: 0, failed: 0, new: 0, message: null, at: 0 },
 }
 function setupNow(): SetupStatus {
   const s = setupState, t = now()
@@ -97,7 +99,12 @@ function setupNow(): SetupStatus {
   if (s.job && s.job.state === 'reading' && t - s.job.at > 2) Object.assign(s.job, { state: 'saving', found: '64 people', notes: ['messages.csv: 780 rows'] })
   if (s.job && s.job.state === 'saving' && t - s.job.at > 4.5)
     Object.assign(s.job, { state: 'done', summary: '312 new messages from 64 threads, 0 new group lines, 210 connections (640 new attributes)' })
-  return { ready: true, whatsapp: s.wa, exports: [{ file: DEMO_EXPORT, network: 'linkedin', size: 4_200_000, modified: t - 3600, job: s.job }] }
+  if (s.read.state === 'reading') {
+    const done = Math.min(DEMO_UNREAD, Math.floor((t - s.read.at) / 0.7))
+    Object.assign(s.read, done < DEMO_UNREAD ? { total: DEMO_UNREAD, done } : { state: 'done', total: DEMO_UNREAD, done, new: 4 })
+  }
+  return { ready: true, whatsapp: s.wa, exports: [{ file: DEMO_EXPORT, network: 'linkedin', size: 4_200_000, modified: t - 3600, job: s.job }],
+           unread: s.read.state === 'done' ? 0 : DEMO_UNREAD, claude: true, read: s.read }
 }
 
 const named = (id: number) => PEOPLE.find((p) => p.id === id)?.name
@@ -173,12 +180,14 @@ export const demo = {
     })
   },
 
-  setup(what: 'whatsapp' | 'sync' | 'import', body: { phone?: string; file?: string }): void {
+  setup(what: 'whatsapp' | 'sync' | 'import' | 'read', body: { phone?: string; file?: string; extractor?: string }): void {
     if (what === 'whatsapp') {
       if (!/^\d{8,15}$/.test((body.phone ?? '').replace(/[\s+()-]/g, ''))) throw new Error('Enter your number with the country code, digits only, like 919800000000.')
       Object.assign(setupState, { wa: { state: 'starting', code: null, message: null, linked: false, syncing: false }, at: now() })
     } else if (what === 'import') {
       setupState.job = { file: DEMO_EXPORT, network: 'linkedin', state: 'reading', found: null, summary: null, notes: [], error: null, at: now() }
+    } else if (what === 'read') {
+      setupState.read = { state: 'reading', extractor: body.extractor === 'heuristic' ? 'heuristic' : 'claude-code', total: 0, done: 0, failed: 0, new: 0, message: null, at: now() }
     }
   },
 
