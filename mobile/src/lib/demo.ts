@@ -1,6 +1,6 @@
 // Made-up people, shaped like the real store, for when no soloyolo is reachable
 // (Expo Go on a phone away from the Mac, or the web preview). Marks change it in memory.
-import type { Edge, Insight, Item, Mark, MergePair, Message, Person, PersonSummary, Status, TodaySummary, Week } from './types'
+import type { Edge, ImportJob, Insight, Item, Mark, MergePair, Message, Person, PersonSummary, SetupStatus, Status, TodaySummary, Week } from './types'
 import { isOpen } from './types'
 
 const now = () => Date.now() / 1000
@@ -84,6 +84,22 @@ const THREADS: Record<number, [number, boolean, string][]> = {
       [3 * D, false, 'Of course! I’ll dig out Anand’s email and send it over this week'], [3 * D - 900, true, 'Thank you so much 🙏']],
 }
 
+// Setting up in the demo: nothing is linked or read, it only walks through the states on a timer so the
+// screens can be seen. The real thing is spike/setup.py.
+const DEMO_EXPORT = 'Complete_LinkedInDataExport_11-02-2026.zip'
+const setupState: { wa: SetupStatus['whatsapp']; at: number; job: (ImportJob & { at: number }) | null } = {
+  wa: { state: 'idle', code: null, message: null, linked: false, syncing: false }, at: 0, job: null,
+}
+function setupNow(): SetupStatus {
+  const s = setupState, t = now()
+  if (s.wa.state === 'starting' && t - s.at > 1.5) s.wa = { ...s.wa, state: 'code', code: 'K7QM-2XPD' }
+  if (s.wa.state === 'code' && t - s.at > 9) s.wa = { state: 'linked', code: null, message: null, linked: true, syncing: true }
+  if (s.job && s.job.state === 'reading' && t - s.job.at > 2) Object.assign(s.job, { state: 'saving', found: '64 people', notes: ['messages.csv: 780 rows'] })
+  if (s.job && s.job.state === 'saving' && t - s.job.at > 4.5)
+    Object.assign(s.job, { state: 'done', summary: '312 new messages from 64 threads, 0 new group lines, 210 connections (640 new attributes)' })
+  return { ready: true, whatsapp: s.wa, exports: [{ file: DEMO_EXPORT, network: 'linkedin', size: 4_200_000, modified: t - 3600, job: s.job }] }
+}
+
 const named = (id: number) => PEOPLE.find((p) => p.id === id)?.name
 const visible = () => items.filter((c) => !PEOPLE.find((p) => p.id === c.person_id)!.muted)
 
@@ -109,6 +125,7 @@ export const demo = {
                  .map((e) => ({ ...e, src_name: named(e.src)!, dst_name: named(e.dst)!, ts: now() - 3 * D })),
                commitments: items.filter((c) => c.person_id === p.id) } satisfies Person as T
     }
+    if (path === '/api/setup') return setupNow() as T
     if (path === '/api/merges') {
       const who = (id: number) => {
         const p = PEOPLE.find((x) => x.id === id)!
@@ -154,6 +171,15 @@ export const demo = {
       live: state === 'open' ? true : it.live,
       reasons: state === 'open' && !it.reasons?.includes('you kept it on') ? ['you kept it on', ...(it.reasons ?? [])] : it.reasons,
     })
+  },
+
+  setup(what: 'whatsapp' | 'sync' | 'import', body: { phone?: string; file?: string }): void {
+    if (what === 'whatsapp') {
+      if (!/^\d{8,15}$/.test((body.phone ?? '').replace(/[\s+()-]/g, ''))) throw new Error('Enter your number with the country code, digits only, like 919800000000.')
+      Object.assign(setupState, { wa: { state: 'starting', code: null, message: null, linked: false, syncing: false }, at: now() })
+    } else if (what === 'import') {
+      setupState.job = { file: DEMO_EXPORT, network: 'linkedin', state: 'reading', found: null, summary: null, notes: [], error: null, at: now() }
+    }
   },
 
   /** Same: the smaller chat folds into the bigger one. Different: the pair is never asked again. */

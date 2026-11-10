@@ -13,6 +13,20 @@ Telegram bot.** It's the only option that pushes to an Android phone, has real b
 ban risk and needs no open port. The cost: the 1–3 item lines (never chat text) pass through Telegram's
 servers. Built: `spike/telegram.py` (`python -m spike telegram pair|send|poll|listen`).
 
+## Setting up from the app (built: `spike/setup.py`)
+
+`scripts/setup-mac.sh` once, then `scripts/build-app.sh`, then `python -m spike --db ~/.soloyolo/soloyolo.db serve`
+and open **http://127.0.0.1:8765/welcome** in a browser on the Mac. From there:
+
+- **Link WhatsApp:** type your number, and the screen shows the 8-character code to enter on your phone (WhatsApp →
+  Linked devices → Link a device → Link with phone number instead). The server runs `connectord link` for this and
+  keeps it running afterwards, since the same process syncs. It stops when `serve` stops; once WhatsApp is linked,
+  `scripts/install-mac.sh` hands syncing to launchd. Only one connectord may run: if launchd's is up, the app says so.
+- **Read an export:** a LinkedIn, Instagram, X or WhatsApp export saved to `~/Downloads` under the name the network
+  gave it shows up on the screen; pick it to read it. The app can only name a file the server found there.
+- Nothing asks for a password. connectord's output is read for the code and the link result only; the message lines
+  it logs are dropped.
+
 ## Process model (built: `scripts/`)
 
 | Agent | Runs | When | If it dies |

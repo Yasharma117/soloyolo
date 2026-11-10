@@ -84,4 +84,14 @@ export function ago(ts: number): string {
 export const HOT = /^(due|overdue)|again|chased/i
 
 /** A network's name as people write it. */
-export const NETWORK_NAMES: Record<string, string> = { linkedin: 'LinkedIn', instagram: 'Instagram', x: 'X' }
+export const NETWORK_NAMES: Record<string, string> = { linkedin: 'LinkedIn', instagram: 'Instagram', x: 'X', whatsapp: 'WhatsApp' }
+
+/** A file soloyolo found in Downloads, and how reading it is going (spike/setup.py). */
+export type ImportJob = { file: string; network: string; state: 'reading' | 'saving' | 'done' | 'error'; found: string | null; summary: string | null; notes: string[]; error: string | null }
+export type ExportFile = { file: string; network: string; size: number; modified: number; job: ImportJob | null }
+export type SetupStatus = {
+  /** connectord is built on the Mac. */
+  ready: boolean
+  whatsapp: { state: 'idle' | 'starting' | 'code' | 'linked' | 'error'; code: string | null; message: string | null; linked: boolean; syncing: boolean }
+  exports: ExportFile[]
+}

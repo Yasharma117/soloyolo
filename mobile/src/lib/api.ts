@@ -2,6 +2,7 @@
 // reach it, and otherwise to the made-up demo, and says which.
 //
 // The iOS Simulator shares the Mac's network, so 127.0.0.1:8765 reaches the server directly.
+// In a browser on the Mac, open http://127.0.0.1:8765 (scripts/build-app.sh builds the app the server serves).
 // A phone can't (the server only listens on the Mac itself); set EXPO_PUBLIC_SOLOYOLO_URL once
 // there's a private route to the Mac (Tailscale), until then a phone shows the demo.
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
@@ -9,7 +10,9 @@ import { demo } from './demo'
 import type { ReasonKey } from './reasons'
 import type { Item, Mark } from './types'
 
-const BASE = (process.env.EXPO_PUBLIC_SOLOYOLO_URL ?? 'http://127.0.0.1:8765').replace(/\/$/, '')
+// In a browser the app is served by soloyolo itself (spike/server.py), so the server is wherever the page came from.
+const here = typeof window !== 'undefined' && window.location?.origin?.startsWith('http') ? window.location.origin : null
+const BASE = (process.env.EXPO_PUBLIC_SOLOYOLO_URL ?? here ?? 'http://127.0.0.1:8765').replace(/\/$/, '')
 
 export type Mode = 'checking' | 'live' | 'demo'
 
@@ -83,6 +86,16 @@ export async function undoMerge(logId: number): Promise<void> {
   await ready
   if (mode === 'live') await post('/api/merge/undo', { log_id: logId })
   else await demo.undoMerge(logId)
+  version++
+  emit()
+}
+
+/** Setting up from the app: ask WhatsApp for a pairing code, start syncing, or read an export from Downloads.
+ *  Each returns at once; the progress is in /api/setup, which the screen reloads while something is running. */
+export async function setupAct(what: 'whatsapp' | 'sync' | 'import', body: { phone?: string; file?: string } = {}): Promise<void> {
+  await ready
+  if (mode === 'live') await post(`/api/setup/${what}`, body)
+  else demo.setup(what, body)
   version++
   emit()
 }

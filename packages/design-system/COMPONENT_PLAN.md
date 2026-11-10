@@ -22,8 +22,8 @@ What exists, and what to build next, in the order screens will need it.
 ### Still open from Tier 2
 | What | Why |
 |---|---|
-| **Real import progress** | `/import` shows sample numbers: `spike serve` doesn't report an import's progress yet. ImportProgress takes the real counts when it does |
-| **Set up from the phone** | `/welcome` shows where you are and what to run on your Mac; linking and pairing still happen there |
+| **Import progress by stage** | `/import?file=` follows the real job (`spike/setup.py`): reading, then saving, with what it found. The importers don't report a percentage, so the bar moves a stage at a time |
+| **Telegram from the app** | `/welcome` links WhatsApp (pairing code) and reads exports from Downloads; pairing Telegram is still `python -m spike telegram pair` |
 | **Extracting connections** | EdgeRow and `/api/person` read the `edge` table; nothing fills it from chats yet |
 
 ### Tier 3: polish

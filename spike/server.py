@@ -2,9 +2,10 @@
 
 It reads everything and writes three things: your own marks on items (done, not needed, still on,
 snooze), which chats are muted (a bot or an assistant, not a person), and your yes or no when two
-chats look like one person.
+chats look like one person. It can also set soloyolo up (setup.py): link WhatsApp and read an export.
 
-`/` is the app (app.html: Today, People, All, Sources); `/viewer` is the older desktop viewer.
+`/` is the app: the one in mobile/ once scripts/build-app.sh has built it, else app.html (always at `/classic`).
+`/viewer` is the older desktop viewer.
 """
 from __future__ import annotations
 
@@ -16,11 +17,14 @@ from urllib.parse import urlsplit
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import identity, linkedin_export, linkedin_live, nudge, priority
+from . import identity, linkedin_export, linkedin_live, nudge, priority, setup
 from .store import Store
 
 INDEX = Path(__file__).with_name("viewer.html")
 APP = Path(__file__).with_name("app.html")
+# The real app (mobile/, built for the web by scripts/build-app.sh), served from here so it talks to this server
+# as the same origin. Until it's built, `/` is the older app.html, which stays at /classic either way.
+APP_BUILD = Path(__file__).resolve().parents[1] / "mobile/dist-web/app.html"
 # Why an item closed without the chat saying so (the app asks after "Not needed"). Run 6 found most
 # promises close off the chat; these are its buckets, so the answers can be counted the same way.
 REASONS = {"off_chat": "done off the chat", "not_needed": "no longer needed",
@@ -161,10 +165,16 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get("Host", "") not in self.allowed_hosts:
             return self._send(b"forbidden host", "text/plain", 403)
         path = urlsplit(self.path).path
-        if path in ("/", "/index.html"):
-            return self._send(APP_HEAD + APP.read_bytes() + b"</body></html>", "text/html; charset=utf-8")
+        if not path.startswith("/api/") and path != "/viewer":
+            # every other path is a screen of the app (/welcome, /person/3), so a reload lands back on it
+            page = APP if path == "/classic" or not APP_BUILD.exists() else APP_BUILD
+            if page is APP and path not in ("/", "/index.html", "/classic"):
+                return self._send(b"not found", "text/plain", 404)
+            return self._send(APP_HEAD + page.read_bytes() + b"</body></html>", "text/html; charset=utf-8")
         if path == "/viewer":
             return self._send(INDEX.read_bytes(), "text/html; charset=utf-8")
+        if path == "/api/setup":
+            return self._json(setup.get(self.db).status())
         store = Store(self.db)
         try:
             nets = _networks(store)
@@ -220,7 +230,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
             return self._send(b"json only", "text/plain", 415)
         route = urlsplit(self.path).path
-        if route not in ("/api/mark", "/api/mute", "/api/merge", "/api/merge/undo"):
+        if route not in ("/api/mark", "/api/mute", "/api/merge", "/api/merge/undo",
+                         "/api/setup/whatsapp", "/api/setup/sync", "/api/setup/import"):
             return self._send(b"not found", "text/plain", 404)
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -230,6 +241,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(b"bad length", "text/plain", 400)
         if route == "/api/mute":
             return self._mute(length)
+        if route.startswith("/api/setup/"):
+            return self._setup(route.rsplit("/", 1)[1], length)
         if route.startswith("/api/merge"):
             return self._merge(length, undo=route.endswith("/undo"))
         try:
@@ -278,6 +291,27 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True})
         finally:
             store.close()
+
+    def _setup(self, what: str, length: int) -> None:
+        """Link WhatsApp with a pairing code, start syncing, or read an export from Downloads."""
+        try:
+            req = json.loads(self.rfile.read(length))
+            if not isinstance(req, dict):
+                raise ValueError
+            st = setup.get(self.db)
+            if what == "whatsapp":
+                if not isinstance(req.get("phone"), str):
+                    raise ValueError
+                return self._json(st.link(re.sub(r"[\s+()-]", "", req["phone"])))
+            if what == "sync":
+                return self._json(st.sync())
+            if not isinstance(req.get("file"), str):
+                raise ValueError
+            return self._json(st.start_import(req["file"]))
+        except LookupError:
+            return self._send(b"no such export", "text/plain", 404)
+        except (ValueError, KeyError, TypeError) as err:
+            return self._send((str(err) or "bad request").encode(), "text/plain", 400)
 
     def _merge(self, length: int, undo: bool) -> None:
         """Your answer to "same person?", or taking a yes back. Only a pair soloyolo asked about can be merged."""

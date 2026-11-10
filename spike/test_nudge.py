@@ -231,7 +231,7 @@ class NudgeTest(unittest.TestCase):
             self.assertEqual([i["action"] for i in body["today"]], ["Send Ivy the slides"])
             page = urllib.request.urlopen(f"http://127.0.0.1:{port}/viewer").read().decode()
             self.assertIn('select("today")', page)
-            app = urllib.request.urlopen(f"http://127.0.0.1:{port}/").read().decode()
+            app = urllib.request.urlopen(f"http://127.0.0.1:{port}/classic").read().decode()
             self.assertTrue(app.startswith("<!doctype html>") and "async function today()" in app)
             body = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{port}/api/all").read())
             self.assertEqual([(i["action"], i["live"]) for i in body], [("Send Ivy the slides", True)])
