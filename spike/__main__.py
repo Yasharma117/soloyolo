@@ -11,6 +11,7 @@ from pathlib import Path
 
 from . import (chatdb, closure, fixture, instagram_export, json_import, linkedin_export, linkedin_live, nudge, priority,
                reconcile, sms, whatsapp_export, x_export)
+from .council import Council
 from .extract import ClaudeCodeExtractor, ClaudeExtractor, HeuristicExtractor, OpenModelExtractor
 from .store import Store
 
@@ -25,7 +26,8 @@ def ingest(store: Store, source: Path, days: int, names: dict[str, str] | None =
 
 
 EXTRACTORS = {"heuristic": HeuristicExtractor, "claude-code": ClaudeCodeExtractor, "api": ClaudeExtractor,
-              "open-model": OpenModelExtractor}  # open-model: any OpenAI-compatible server (see its docstring)
+              "open-model": OpenModelExtractor,  # any OpenAI-compatible server (see its docstring)
+              "council": Council}  # several open models, one job each (spike/council.py); eval only for now
 
 
 WINDOW_DAYS = 60

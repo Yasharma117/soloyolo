@@ -62,7 +62,7 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
 
     ex = EXTRACTORS[a.extractor](model=a.model) if a.model else EXTRACTORS[a.extractor]()
-    now = time.time()
+    now = started = time.time()
 
     def run(case):
         try:
@@ -82,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"extractor: {ex.name}   cases: {len(rows)}   expected items: {tp + fn}")
     print(f"precision {precision:.2f}   recall {recall:.2f}   F1 {f1:.2f}   "
           f"status right {ok}/{tp}   kind right {kind_ok}/{tp}   errors {len(errors)}")
+    print(f"time {time.time() - started:.0f}s" + (f"   {json.dumps(ex.stats)}" if hasattr(ex, "stats") else ""))
     for r in rows:
         if r["fp"] or r["fn"] or "error" in r:
             bits = [f"missed {', '.join(r['missed'])}"] if r["missed"] else []

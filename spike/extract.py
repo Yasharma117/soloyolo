@@ -328,6 +328,9 @@ class OpenModelExtractor:
         SOLOYOLO_LLM_MODEL   the model id, e.g. google/gemma-4-31b-it:free
         SOLOYOLO_LLM_URL     the API base (default https://openrouter.ai/api/v1)
         SOLOYOLO_LLM_KEY     the key (or OPENROUTER_API_KEY)
+        SOLOYOLO_LLM_EFFORT  how much the model thinks first: none, low, medium, high (default: the model's own).
+                             A model id can carry its own: "qwen3.5:4b@none". Small thinking models are many
+                             times slower with it on.
 
     Servers disagree on structured output, so the schema goes in the prompt and the reply is parsed and
     validated here; a reply that isn't valid is asked for once more. Who sees the text depends on the server:
@@ -343,6 +346,8 @@ class OpenModelExtractor:
         self.url = (url or os.environ.get("SOLOYOLO_LLM_URL") or "https://openrouter.ai/api/v1").rstrip("/")
         self.key = key or os.environ.get("SOLOYOLO_LLM_KEY") or os.environ.get("OPENROUTER_API_KEY") or ""
         self.name, self.timeout, self.pause = self.model, timeout, 8.0
+        self.model, _, effort = self.model.partition("@")
+        self.effort = effort or os.environ.get("SOLOYOLO_LLM_EFFORT")
 
     def extract(self, thread: Sequence, prior: Sequence[dict] | None = None) -> Extraction:
         result = self.ask(SYSTEM, f"Today is {_today()}. List the promises and asks in the thread.", _stdin(thread, prior), Extraction)
@@ -353,6 +358,8 @@ class OpenModelExtractor:
                   f"JSON schema:\n{json.dumps(schema.model_json_schema())}")
         body = {"model": self.model, "temperature": 0, "max_tokens": 4000,
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": f"{prompt}\n\n{stdin}"}]}
+        if self.effort:
+            body["reasoning_effort"] = self.effort
         why = ""
         for _ in range(2):
             text = self._post(body)
