@@ -318,6 +318,72 @@ func (d *Daemon) resume(ctx context.Context) {
 	}
 }
 
+// --- command-line mode: the same accounts and pump, without a UI on the other end ----------
+
+// Link links a new account for network and keeps it syncing. phone, if set, asks for a pairing
+// code instead of a QR code on WhatsApp (the only way that works when the screen showing it is
+// elsewhere), and is the number Telegram sends its login code to. show gets each step to
+// display and returns the user's answer to it: the code or password Telegram asks for, or ""
+// for a step that only waits (a QR code, a WhatsApp pairing code). An account that is already
+// linked is returned as is.
+func (d *Daemon) Link(ctx context.Context, w io.Writer, network, phone string, show func(adapter.LoginStep) string) (store.Account, error) {
+	d.out = json.NewEncoder(w)
+	accts, err := d.store.Accounts(ctx)
+	if err != nil {
+		return store.Account{}, err
+	}
+	var acct store.Account
+	for _, a := range accts {
+		if a.Network != network {
+			continue
+		}
+		if a.RemoteUser != "" {
+			return a, d.connectAccount(ctx, a.ID)
+		}
+		acct = a // a link that never finished: reuse it
+	}
+	if acct.ID == "" {
+		if acct, err = d.addAccount(ctx, network); err != nil {
+			return store.Account{}, err
+		}
+	}
+	a, err := d.adapterFor(acct.ID)
+	if err != nil {
+		return store.Account{}, err
+	}
+	step, err := a.Login(ctx, adapter.LoginInput{Value: phone})
+	for err == nil && step.Kind != "done" {
+		step, err = a.Login(ctx, adapter.LoginInput{Value: show(step)})
+	}
+	if err != nil {
+		return store.Account{}, err
+	}
+	acct.RemoteUser = step.Payload
+	if err := d.store.PutAccount(ctx, acct); err != nil {
+		return store.Account{}, err
+	}
+	show(step)
+	return acct, d.connect(ctx, acct.ID, a)
+}
+
+func (d *Daemon) connectAccount(ctx context.Context, id string) error {
+	a, err := d.adapterFor(id)
+	if err != nil {
+		return err
+	}
+	return d.connect(ctx, id, a)
+}
+
+// Sync reconnects every linked account and writes their events into the store until ctx ends.
+func (d *Daemon) Sync(ctx context.Context, w io.Writer) {
+	if d.out == nil {
+		d.out = json.NewEncoder(w)
+	}
+	d.resume(ctx)
+	<-ctx.Done()
+	d.closeAll()
+}
+
 func (d *Daemon) closeAll() {
 	d.mu.Lock()
 	defer d.mu.Unlock()

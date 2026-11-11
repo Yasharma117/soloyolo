@@ -1,0 +1,72 @@
+# Status: overnight run, 11 November 2026
+
+Kept current as work lands, so this is true even if the session stopped part-way. Newest first under each heading.
+Nothing here is in a pull request: everything is committed and pushed to `claude/gifted-fermi-3xfkyc`.
+
+## To do
+
+| # | Workstream | Who | State |
+|---|---|---|---|
+| 1 | Model pair: small Gemma 4 reads, mid-size Gemma 4 (thinking off) checks | main session | scored (F1 0.95); next: run it on the live store |
+| 2 | Score the remaining models (mid-size Qwen 3.5) | main session | done: not a fit |
+| 3 | Browser extension, Kondo-style: one extension for LinkedIn, Instagram and X messages | subagent | done: tested on fixtures, never run signed in |
+| 4 | Telegram personal chats in connectord | subagent | done: tested on a fake server, never run on a real account |
+| 5 | Cloud plan: where the model pair runs, and the multi-user server | subagent | done: `docs/CLOUD.md` |
+| 6 | App screens for the new sources (pairing the extension, per-network state) | main session | done |
+
+## Done
+
+- **Browser extension for LinkedIn, Instagram and X** (`extension/`, `spike/live.py`). Reads through your own
+  signed-in Chrome session, slowly, never writes. Instagram and X are off by default with the risk beside the
+  switch. Set up has a Browser extension card: Show token, then each network's state (synced, stopped and why,
+  or off). Parsing is tested on fixtures built from open-source clients; it has never run signed in. Open
+  questions: whether Instagram's web inbox endpoint still answers a browser session at all, and X reaches only
+  older unencrypted DMs. `docs/INSTAGRAM-X.md` has the sources.
+- **Telegram personal chats in connectord** (`connectord/internal/telegram/`, `docs/TELEGRAM.md`). Signs in as you
+  with a phone number, the code Telegram sends and your password if you have one; reads 1:1 chats from the last 90
+  days, then live. Never sends, never marks read. Needs your own api_id and api_hash from my.telegram.org. Tests
+  run against a fake server; it has never signed in to a real account. Linked from the app's Set up screen (a Telegram chats card: number, code, then password), tested with a stand-in.
+- **Cloud plan written: `docs/CLOUD.md`.** The exact pair is not on any hosted API: hosts serve Gemma 4 only at
+  26B A4B and 31B. Recommended: DeepInfra for those two (no retention, about $45 to $70 a month at the plan's
+  volume, which assumes 60 chats an hour all day), one small VM with a folder per tester, Oracle free or $12 a
+  month at DigitalOcean Bangalore. Fallback: the exact pair on Modal's serverless GPU. Its step 0 is scoring the
+  two hosted sizes.
+- **The pair works.** Small Gemma 4 reading and mid-size Gemma 4 (thinking off) checking finds every item on the
+  eval and lists two false ones: F1 0.95, Claude's score in its worse runs. Caveat: tuned on the same set.
+  `spike/eval/RESULTS.md`, run 9. Mid-size Qwen 3.5 was scored too and is not a fit for either job.
+- At 06:40 the subagents stopped again on the Fable model limit. The session moved to Opus 5.5 and they were
+  restarted from what each had left in the working tree.
+- The session hit its usage limit at about 01:30 and resumed at 06:20. The three subagents stopped mid-work and
+  were resumed from where they were; local model scoring kept running in between.
+- The pair as first scored: lists nothing false, finds 70% of real items. The checker was removing kept promises.
+  Its instructions are fixed and the pair is being re-scored. Full table: `spike/eval/RESULTS.md`, run 8.
+- The council can now re-read a chat with its earlier items, which the live store needs (tests in `spike/test_open_model.py`).
+
+- Council of models (`spike/council.py`) and the thinking setting, with every score so far in `spike/eval/RESULTS.md`.
+
+## Try the pair yourself
+
+With Ollama running (`brew install ollama`, then `ollama pull gemma4:e4b gemma4:12b`):
+
+```bash
+export SOLOYOLO_LLM_URL=http://localhost:11434/v1 SOLOYOLO_COUNCIL=reader=gemma4:e4b,checker=gemma4:12b@none
+.venv/bin/python -m spike.eval --extractor council --jobs 1                         # the 30 made-up chats, ~10 min
+.venv/bin/python -m spike --db ~/.soloyolo/soloyolo.db watch --once --extractor council --top 15   # your store
+```
+
+For real chats start Ollama with `OLLAMA_CONTEXT_LENGTH=16384`: by default it reads only the first 4,096 tokens
+of a prompt, which cuts off a long chat. The app's "Find your promises" card and the launchd jobs don't offer the
+council yet.
+
+## Needs you
+
+- **The `/usage` changes.** Three proposals are waiting for your yes (subagent model, unused skills off, a cheaper
+  design skill). Nothing in your settings has been changed.
+- **Scoring the hosted Gemma sizes.** OpenRouter's free Gemma 4 26B and 31B endpoints answered "rate-limited
+  upstream" every time they were tried (10 November evening, 11 November morning). Either try again later, or put
+  a few dollars on DeepInfra and the score takes ten minutes for under a cent.
+- **Telegram:** to try it, create an api_id and api_hash at my.telegram.org (steps in `docs/TELEGRAM.md`).
+- **Extension:** load `extension/` unpacked in Chrome and do one supervised run per network, and decide whether you
+  accept the Instagram and X account risk at all (all three sites' terms forbid unofficial clients).
+- **Decisions in `docs/CLOUD.md`** ("Decisions that are the owner's"), above all whether to hold testers'
+  WhatsApp keys on a server at all.

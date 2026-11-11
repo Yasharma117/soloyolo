@@ -1,0 +1,14 @@
+{
+  "_source": "Built by hand from mautrix-twitter (read 2026-11-11). Not a captured response.",
+  "user_events": {
+    "cursor": "GRwmgICx1aCDpN0uFoCAseaVgaTdLiUAAAB",
+    "last_seen_event_id": "1990000000000000009",
+    "entries": [
+      { "message": { "id": "1990000000000000009", "time": "1793300000000", "conversation_id": "1500000000000000001-1600000000000000002",
+        "message_data": { "id": "1990000000000000009", "time": "1793300000000", "sender_id": "1600000000000000002", "text": "thanks" } } },
+      { "reaction_create": { "id": "1990000000000000010", "time": "1793300001000", "conversation_id": "1800000000000000777" } }
+    ],
+    "users": {},
+    "conversations": {}
+  }
+}

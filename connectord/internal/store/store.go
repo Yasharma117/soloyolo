@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"strings"
 
 	_ "modernc.org/sqlite" // pure Go, no cgo: registers driver "sqlite"
 
@@ -84,10 +85,24 @@ func (s *Store) PersonFor(ctx context.Context, network, address, name string) (i
 	return id, tx.Commit()
 }
 
-// AddEvent persists a message event. It reports whether the row was new: the same message
-// can arrive from the live socket and from history sync, and (network, remote_id) dedupes it.
+// AddEvent persists an event. It reports whether a row was new: the same message can arrive
+// from the live socket and from history sync, and (network, remote_id) dedupes it.
+//
+//   - a 1:1 message or call: a message row for the person on the other side
+//   - a group message: an evidence row (closes items, never creates them)
+//   - a contact: a better name for a person or a group, never over one you set
 func (s *Store) AddEvent(ctx context.Context, e adapter.Event) (bool, error) {
-	if e.Kind != adapter.EventMessage || e.Text == "" || e.ChatID == "" {
+	switch {
+	case e.Kind == adapter.EventContact:
+		return false, s.rename(ctx, e)
+	case e.Group != "" && e.Kind == adapter.EventMessage && e.Text != "":
+		return s.addGroupLine(ctx, e)
+	case e.Kind == adapter.EventCall:
+		e.Text = adapter.CallText
+	case e.Kind != adapter.EventMessage || e.Text == "" || e.ChatID == "":
+		return false, nil
+	}
+	if e.ChatID == "" {
 		return false, nil
 	}
 	// 1:1 chats only for now: the person is the chat's other party.
@@ -103,6 +118,67 @@ func (s *Store) AddEvent(ctx context.Context, e adapter.Event) (bool, error) {
 	}
 	n, _ := res.RowsAffected()
 	return n == 1, nil
+}
+
+// GroupSource is the evidence source for a group: its subject when known, else its id.
+// The spike shows the part after the colon as the chat's name.
+func GroupSource(e adapter.Event) string {
+	if e.GroupName != "" {
+		return e.Network + "-group:" + e.GroupName
+	}
+	return e.Network + "-group:" + e.Group
+}
+
+func (s *Store) addGroupLine(ctx context.Context, e adapter.Event) (bool, error) {
+	sender := "me"
+	if !e.FromMe {
+		sender = e.Name
+		if sender == "" {
+			sender = e.Sender
+		}
+	}
+	res, err := s.db.ExecContext(ctx,
+		`INSERT OR IGNORE INTO evidence(source, remote_id, ts, sender, text) VALUES (?, ?, ?, ?, ?)`,
+		GroupSource(e), e.RemoteID, float64(e.Time.UnixMilli())/1000, sender, e.Text)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
+func (s *Store) rename(ctx context.Context, e adapter.Event) error {
+	if e.Group != "" && e.GroupName != "" {
+		// Lines stored before the subject was known move under its name.
+		_, err := s.db.ExecContext(ctx, `UPDATE OR IGNORE evidence SET source = ? WHERE source = ?`,
+			GroupSource(e), e.Network+"-group:"+e.Group)
+		return err
+	}
+	if e.ChatID == "" || (e.Name == "" && e.Email == "") {
+		return nil
+	}
+	// Names often arrive before the first message (history sync sends them first), so a name for
+	// someone not seen yet creates them. A person with no messages never shows in the lists.
+	// A push name only fills in the placeholder (the raw address); PersonFor does exactly that.
+	id, err := s.PersonFor(ctx, e.Network, e.ChatID, e.Name)
+	if err != nil {
+		return err
+	}
+	if e.Email != "" {
+		// The email becomes a second handle on the same person, so another network that knows
+		// them by email (mail, calendar) lands on this card. An email already taken by someone
+		// else is left alone: merging people is the user's call.
+		if _, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO handle(network, address, person_id) VALUES ('email', ?, ?)`,
+			strings.ToLower(strings.TrimSpace(e.Email)), id); err != nil {
+			return err
+		}
+	}
+	if !e.Saved || e.Name == "" {
+		return nil
+	}
+	// A saved address-book name replaces whatever is there: it's what you call them.
+	_, err = s.db.ExecContext(ctx, `UPDATE person SET display_name = ? WHERE id = ?`, e.Name, id)
+	return err
 }
 
 func nameIfTheirs(e adapter.Event) string {
@@ -135,6 +211,19 @@ func (s *Store) Accounts(ctx context.Context) ([]Account, error) {
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+// Stats is for status output: what the store holds right now.
+type Stats struct {
+	People     int `json:"people"`
+	Messages   int `json:"messages"`
+	GroupLines int `json:"group_lines"`
+}
+
+func (s *Store) Stats(ctx context.Context) (st Stats, err error) {
+	err = s.db.QueryRowContext(ctx, `SELECT (SELECT COUNT(DISTINCT person_id) FROM message), (SELECT COUNT(*) FROM message),
+		(SELECT COUNT(*) FROM evidence WHERE source LIKE '%-group:%')`).Scan(&st.People, &st.Messages, &st.GroupLines)
+	return
 }
 
 // MessageCount is for tests and status output.

@@ -1,0 +1,42 @@
+{
+  "participants": [
+    {
+      "name": "Kabir Sharma"
+    },
+    {
+      "name": "Anaya Iyer"
+    }
+  ],
+  "messages": [
+    {
+      "sender_name": "Kabir Sharma",
+      "timestamp_ms": 1793018000000,
+      "content": "Reacted \u00e2\u009d\u00a4\u00ef\u00b8\u008f to your message ",
+      "is_geoblocked_for_viewer": false,
+      "is_unsent_image_by_messenger_kid_parent": false
+    },
+    {
+      "sender_name": "Anaya Iyer",
+      "timestamp_ms": 1793014400000,
+      "content": "\u00e0\u00a4\u00a0\u00e0\u00a5\u0080\u00e0\u00a4\u0095 \u00e0\u00a4\u00b9\u00e0\u00a5\u0088, \u00e0\u00a4\u00b6\u00e0\u00a5\u0081\u00e0\u00a4\u0095\u00e0\u00a5\u008d\u00e0\u00a4\u00b0\u00e0\u00a4\u00bf\u00e0\u00a4\u00af\u00e0\u00a4\u00be \u00f0\u009f\u0099\u008f",
+      "is_geoblocked_for_viewer": false
+    },
+    {
+      "sender_name": "Kabir Sharma",
+      "timestamp_ms": 1793010800000,
+      "content": "\u00e0\u00a4\u0095\u00e0\u00a4\u00b2 \u00e0\u00a4\u00aa\u00e0\u00a5\u0088\u00e0\u00a4\u00b8\u00e0\u00a5\u0087 \u00e0\u00a4\u00ad\u00e0\u00a5\u0087\u00e0\u00a4\u009c \u00e0\u00a4\u00a6\u00e0\u00a5\u0082\u00e0\u00a4\u0081\u00e0\u00a4\u0097\u00e0\u00a4\u00be \u00f0\u009f\u0099\u008f",
+      "reactions": [
+        {
+          "reaction": "\u00e2\u009d\u00a4\u00ef\u00b8\u008f",
+          "actor": "Anaya Iyer",
+          "timestamp": 1793014400
+        }
+      ],
+      "is_geoblocked_for_viewer": false
+    }
+  ],
+  "title": "Kabir Sharma",
+  "is_still_participant": true,
+  "thread_path": "inbox/kabirsharma_1784512345678901",
+  "magic_words": []
+}

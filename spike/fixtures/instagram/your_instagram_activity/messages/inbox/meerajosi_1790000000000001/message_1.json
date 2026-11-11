@@ -1,0 +1,96 @@
+{
+  "participants": [
+    {
+      "name": "Meera Jo\u00c5\u00a1i \u00e2\u009c\u00a8"
+    },
+    {
+      "name": "Anaya Iyer"
+    }
+  ],
+  "messages": [
+    {
+      "sender_name": "Meera Jo\u00c5\u00a1i \u00e2\u009c\u00a8",
+      "timestamp_ms": 1793032400000,
+      "content": "Liked a message"
+    },
+    {
+      "sender_name": "Anaya Iyer",
+      "timestamp_ms": 1793028800000,
+      "content": "Video chat ended",
+      "call_duration": 0
+    },
+    {
+      "sender_name": "Meera Jo\u00c5\u00a1i \u00e2\u009c\u00a8",
+      "timestamp_ms": 1793025260000,
+      "content": "Audio call ended",
+      "call_duration": 312
+    },
+    {
+      "sender_name": "Anaya Iyer",
+      "timestamp_ms": 1793021600000,
+      "content": "You sent an attachment.",
+      "share": {
+        "link": "https://www.instagram.com/reel/SYNTH123abc/",
+        "share_text": "A long caption \u00f0\u009f\u008c\u00b4",
+        "original_content_owner": "travel.synthetic"
+      }
+    },
+    {
+      "sender_name": "Meera Jo\u00c5\u00a1i \u00e2\u009c\u00a8",
+      "timestamp_ms": 1793018000000,
+      "audio_files": [
+        {
+          "uri": "your_instagram_activity/messages/inbox/meerajosi_1790000000000001/audio/audioclip1.mp4",
+          "creation_timestamp": 1793018000
+        }
+      ]
+    },
+    {
+      "sender_name": "Meera Jo\u00c5\u00a1i \u00e2\u009c\u00a8",
+      "timestamp_ms": 1793014400000,
+      "content": "here you go",
+      "photos": [
+        {
+          "uri": "your_instagram_activity/messages/inbox/meerajosi_1790000000000001/photos/1.jpg",
+          "creation_timestamp": 1
+        },
+        {
+          "uri": "your_instagram_activity/messages/inbox/meerajosi_1790000000000001/photos/2.jpg",
+          "creation_timestamp": 1
+        }
+      ]
+    },
+    {
+      "sender_name": "Meera Jo\u00c5\u00a1i \u00e2\u009c\u00a8",
+      "timestamp_ms": 1793010800000,
+      "videos": [
+        {
+          "uri": "your_instagram_activity/messages/inbox/meerajosi_1790000000000001/videos/1.mp4",
+          "creation_timestamp": 1
+        }
+      ]
+    },
+    {
+      "sender_name": "Meera Jo\u00c5\u00a1i \u00e2\u009c\u00a8",
+      "timestamp_ms": 1793007200000,
+      "content": "Meera Jo\u00c5\u00a1i \u00e2\u009c\u00a8 unsent a message",
+      "is_unsent": true
+    },
+    {
+      "sender_name": "Meera Jo\u00c5\u00a1i \u00e2\u009c\u00a8",
+      "timestamp_ms": 1793003600000,
+      "sticker": {
+        "uri": "your_instagram_activity/messages/inbox/meerajosi_1790000000000001/stickers/1.webp"
+      }
+    },
+    {
+      "sender_name": "Anaya Iyer",
+      "timestamp_ms": 1793000000000,
+      "content": "I'll call you tonight \u00f0\u009f\u0093\u009e"
+    }
+  ],
+  "title": "Meera Jo\u00c5\u00a1i \u00e2\u009c\u00a8",
+  "is_still_participant": true,
+  "thread_path": "inbox/meerajosi_1790000000000001",
+  "magic_words": []
+}

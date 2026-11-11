@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template: scripts/install-mac.sh fills in the placeholders and writes it to ~/Library/LaunchAgents. -->
+<plist version="1.0">
+<dict>
+	<key>Label</key><string>com.soloyolo.digest</string>
+	<!-- Every morning at the time below, in the Mac's time zone: one fresh extraction pass, then the
+	     message. Asleep at that time: it runs on wake. Shut down: it doesn't run that day. -->
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>@JOB@</string>
+		<string>digest</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key><integer>@DIGEST_HOUR@</integer>
+		<key>Minute</key><integer>@DIGEST_MINUTE@</integer>
+	</dict>
+	<key>StandardOutPath</key><string>@DATA@/logs/digest.log</string>
+	<key>StandardErrorPath</key><string>@DATA@/logs/digest.log</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key><string>@PATH@</string>
+		<key>LANG</key><string>en_US.UTF-8</string>
+		<key>PYTHONUNBUFFERED</key><string>1</string>
+		<key>SOLOYOLO_REPO</key><string>@REPO@</string>
+		<key>SOLOYOLO_DATA</key><string>@DATA@</string>
+		<key>SOLOYOLO_PYTHON</key><string>@PYTHON@</string>
+		<key>SOLOYOLO_EXTRACTOR</key><string>@EXTRACTOR@</string>
+		<key>SOLOYOLO_TOP</key><string>@TOP@</string>
+		<key>SOLOYOLO_NOTIFY</key><string>@NOTIFY@</string>
+	</dict>
+	<key>WorkingDirectory</key><string>@REPO@</string>
+	<key>Umask</key><integer>63</integer><!-- 077: the digest names people; yours only -->
+</dict>
+</plist>

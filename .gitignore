@@ -17,3 +17,7 @@ rea-out/
 
 # Go build output
 connectord/bin/
+.claude/worktrees/
+# built by scripts/setup-mac.sh
+connectord/connectord
+mobile/dist-web/

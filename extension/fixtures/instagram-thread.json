@@ -1,0 +1,24 @@
+{
+  "_source": "Built by hand from instagrapi's direct_thread/extract_direct_message (read 2026-11-11). Items newest first. Not a captured response.",
+  "thread": {
+    "thread_id": "340282366841710300949128100000000001",
+    "thread_v2_id": "1784512345678901",
+    "thread_title": "Kabir Sharma",
+    "is_group": false,
+    "users": [{ "pk": 17840000000000002, "pk_id": "17840000000000002", "username": "kabirsharma", "full_name": "Kabir Sharma" }],
+    "items": [
+      { "item_id": "i9", "user_id": 17840000000000002, "timestamp": "1793100004000000", "item_type": "text", "text": "see you then" },
+      { "item_id": "i8", "user_id": 17840000000000001, "timestamp": "1793100003000000", "item_type": "video_call_event", "video_call_event": { "action": "video_call_ended" } },
+      { "item_id": "i7", "user_id": 17840000000000002, "timestamp": "1793100002500000", "item_type": "action_log", "action_log": { "description": "Kabir named the group" } },
+      { "item_id": "i6", "user_id": 17840000000000002, "timestamp": "1793100002000000", "item_type": "voice_media", "voice_media": { "media": { "id": "1" } } },
+      { "item_id": "i5", "user_id": 17840000000000002, "timestamp": "1793100001500000", "item_type": "clip", "clip": { "clip": { "code": "Cabc123" } } },
+      { "item_id": "i4", "user_id": 17840000000000002, "timestamp": "1793100001000000", "item_type": "link", "link": { "text": "look https://example.com/menu", "link_context": { "link_url": "https://example.com/menu" } } },
+      { "item_id": "i3", "user_id": 17840000000000002, "timestamp": "1793100000000000", "item_type": "media", "media": { "media_type": 1 } },
+      { "item_id": "i2", "user_id": 17840000000000001, "timestamp": "1793014400000000", "item_type": "like", "like": "❤️" },
+      { "item_id": "i1", "user_id": 17840000000000001, "timestamp": "1793000000000000", "item_type": "text", "text": "an old one" }
+    ],
+    "has_older": true,
+    "oldest_cursor": "i1"
+  },
+  "status": "ok"
+}

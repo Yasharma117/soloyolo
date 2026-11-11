@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template: scripts/install-mac.sh fills in the placeholders and writes it to ~/Library/LaunchAgents. -->
+<plist version="1.0">
+<dict>
+	<key>Label</key><string>com.soloyolo.watch</string>
+	<!-- One extraction pass every @WATCH_SECONDS@ seconds over the chats that changed. launchd never runs two
+	     at once, and after sleep it runs once on wake, not once per missed interval. -->
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>@JOB@</string>
+		<string>watch</string>
+	</array>
+	<key>StartInterval</key><integer>@WATCH_SECONDS@</integer>
+	<key>StandardOutPath</key><string>@DATA@/logs/watch.log</string>
+	<key>StandardErrorPath</key><string>@DATA@/logs/watch.log</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key><string>@PATH@</string>
+		<key>LANG</key><string>en_US.UTF-8</string>
+		<key>PYTHONUNBUFFERED</key><string>1</string>
+		<key>SOLOYOLO_REPO</key><string>@REPO@</string>
+		<key>SOLOYOLO_DATA</key><string>@DATA@</string>
+		<key>SOLOYOLO_PYTHON</key><string>@PYTHON@</string>
+		<key>SOLOYOLO_EXTRACTOR</key><string>@EXTRACTOR@</string>
+		<key>SOLOYOLO_TOP</key><string>@TOP@</string>
+	</dict>
+	<key>WorkingDirectory</key><string>@REPO@</string>
+	<key>Umask</key><integer>63</integer><!-- 077: logs are yours only -->
+</dict>
+</plist>

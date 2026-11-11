@@ -1,0 +1,26 @@
+{
+  "participants": [
+    {
+      "name": "Dev Patel"
+    },
+    {
+      "name": "Anaya Iyer"
+    }
+  ],
+  "messages": [
+    {
+      "sender_name": "Anaya Iyer",
+      "timestamp_ms": 1793003600000,
+      "content": "Sure, send me the deck"
+    },
+    {
+      "sender_name": "Dev Patel",
+      "timestamp_ms": 1793000000000,
+      "content": "Hi! Can I send you our pitch?"
+    }
+  ],
+  "title": "Dev Patel",
+  "is_still_participant": true,
+  "thread_path": "message_requests/devpatel_1820000000000004",
+  "magic_words": []
+}
