@@ -88,8 +88,9 @@ const THREADS: Record<number, [number, boolean, string][]> = {
 // screens can be seen. The real thing is spike/setup.py.
 const DEMO_EXPORT = 'Complete_LinkedInDataExport_11-02-2026.zip'
 const DEMO_UNREAD = 9
-const setupState: { wa: SetupStatus['whatsapp']; at: number; job: (ImportJob & { at: number }) | null; read: SetupStatus['read'] & { at: number } } = {
+const setupState: { wa: SetupStatus['whatsapp']; tg: SetupStatus['telegram'] & { at: number }; at: number; job: (ImportJob & { at: number }) | null; read: SetupStatus['read'] & { at: number } } = {
   wa: { state: 'idle', code: null, message: null, linked: false, syncing: false }, at: 0, job: null,
+  tg: { state: 'idle', hint: null, message: null, ready: true, linked: false, at: 0 },
   read: { state: 'idle', extractor: null, total: 0, done: 0, failed: 0, new: 0, message: null, at: 0 },
 }
 function setupNow(): SetupStatus {
@@ -103,7 +104,10 @@ function setupNow(): SetupStatus {
     const done = Math.min(DEMO_UNREAD, Math.floor((t - s.read.at) / 0.7))
     Object.assign(s.read, done < DEMO_UNREAD ? { total: DEMO_UNREAD, done } : { state: 'done', total: DEMO_UNREAD, done, new: 4 })
   }
-  return { ready: true, whatsapp: s.wa, exports: [{ file: DEMO_EXPORT, network: 'linkedin', size: 4_200_000, modified: t - 3600, job: s.job }],
+  if (s.tg.state === 'starting' && t - s.tg.at > 1.5) Object.assign(s.tg, { state: 'code', hint: 'sent to your Telegram app' })
+  if (s.tg.state === 'checking' && t - s.tg.at > 1.5) Object.assign(s.tg, { state: 'linked', hint: null, linked: true })
+  const { at: _tgAt, ...telegram } = s.tg
+  return { ready: true, whatsapp: s.wa, telegram, exports: [{ file: DEMO_EXPORT, network: 'linkedin', size: 4_200_000, modified: t - 3600, job: s.job }],
            unread: s.read.state === 'done' ? 0 : DEMO_UNREAD, claude: true, read: s.read }
 }
 
@@ -180,12 +184,17 @@ export const demo = {
     })
   },
 
-  setup(what: 'whatsapp' | 'sync' | 'import' | 'read', body: { phone?: string; file?: string; extractor?: string }): void {
+  setup(what: 'whatsapp' | 'sync' | 'import' | 'read' | 'telegram' | 'telegram-code', body: { phone?: string; file?: string; extractor?: string; code?: string }): void {
     if (what === 'whatsapp') {
       if (!/^\d{8,15}$/.test((body.phone ?? '').replace(/[\s+()-]/g, ''))) throw new Error('Enter your number with the country code, digits only, like 919800000000.')
       Object.assign(setupState, { wa: { state: 'starting', code: null, message: null, linked: false, syncing: false }, at: now() })
     } else if (what === 'import') {
       setupState.job = { file: DEMO_EXPORT, network: 'linkedin', state: 'reading', found: null, summary: null, notes: [], error: null, at: now() }
+    } else if (what === 'telegram') {
+      if (!/^\d{8,15}$/.test((body.phone ?? '').replace(/[\s+()-]/g, ''))) throw new Error('Enter your number with the country code, digits only, like 919800000000.')
+      Object.assign(setupState.tg, { state: 'starting', hint: null, message: null, at: now() })
+    } else if (what === 'telegram-code') {
+      Object.assign(setupState.tg, { state: 'checking', at: now() })
     } else if (what === 'read') {
       setupState.read = { state: 'reading', extractor: body.extractor === 'heuristic' ? 'heuristic' : 'claude-code', total: 0, done: 0, failed: 0, new: 0, message: null, at: now() }
     }

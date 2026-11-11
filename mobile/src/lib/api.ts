@@ -92,7 +92,7 @@ export async function undoMerge(logId: number): Promise<void> {
 
 /** Setting up from the app: ask WhatsApp for a pairing code, start syncing, or read an export from Downloads.
  *  Each returns at once; the progress is in /api/setup, which the screen reloads while something is running. */
-export async function setupAct(what: 'whatsapp' | 'sync' | 'import' | 'read', body: { phone?: string; file?: string; extractor?: string } = {}): Promise<void> {
+export async function setupAct(what: 'whatsapp' | 'sync' | 'import' | 'read' | 'telegram' | 'telegram-code', body: { phone?: string; file?: string; extractor?: string; code?: string } = {}): Promise<void> {
   await ready
   if (mode === 'live') await post(`/api/setup/${what}`, body)
   else demo.setup(what, body)

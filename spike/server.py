@@ -231,7 +231,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(b"json only", "text/plain", 415)
         route = urlsplit(self.path).path
         if route not in ("/api/mark", "/api/mute", "/api/merge", "/api/merge/undo",
-                         "/api/setup/whatsapp", "/api/setup/sync", "/api/setup/import", "/api/setup/read"):
+                         "/api/setup/whatsapp", "/api/setup/sync", "/api/setup/import", "/api/setup/read", "/api/setup/telegram", "/api/setup/telegram-code"):
             return self._send(b"not found", "text/plain", 404)
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -305,6 +305,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(st.link(re.sub(r"[\s+()-]", "", req["phone"])))
             if what == "sync":
                 return self._json(st.sync())
+            if what == "telegram":
+                if not isinstance(req.get("phone"), str):
+                    raise ValueError
+                return self._json(st.tg_link(re.sub(r"[\s+()-]", "", req["phone"])))
+            if what == "telegram-code":
+                if not isinstance(req.get("code"), str):
+                    raise ValueError
+                return self._json(st.tg_answer(req["code"]))
             if what == "read":
                 if not isinstance(req.get("extractor"), str):
                     raise ValueError

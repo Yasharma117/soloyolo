@@ -1,6 +1,6 @@
 // First run: the three things that make soloyolo work, in order. WhatsApp links from here (your number, then the
 // code WhatsApp gives, typed on your phone) and exports found in Downloads are read from here (spike/setup.py);
-// Reading the chats for promises starts here too, and says when it sends text to Claude. Telegram is still paired on the Mac. With a soloyolo too old for /api/setup, each step shows what to run instead.
+// Your own Telegram chats link here (code, then password if set). Reading the chats for promises starts here too, and says when it sends text to Claude. Telegram is still paired on the Mac. With a soloyolo too old for /api/setup, each step shows what to run instead.
 // ?state=new previews it with nothing set up.
 import { Banner, Button, InlineError, Loader, NavList, Row, Stack, Text, NetworkIcon, OnboardingStep, PairingCode, Screen, SectionCard, StepHeader, TextField, formatCount, formatRelative, plural, useTheme, useToast, type StepState } from '@soloyolo/design-system'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -20,6 +20,8 @@ export default function Welcome() {
   const setup = useData<SetupStatus>('/api/setup').data
   const [phone, setPhone] = useState('')
   const [asking, setAsking] = useState(false)
+  const [tgPhone, setTgPhone] = useState('')
+  const [tgCode, setTgCode] = useState('')
   const s = preview === 'new' ? { networks: [], telegram: false } : live
   const has = Object.fromEntries((s?.networks ?? []).map((n) => [n.network, n]))
   const wa = setup?.whatsapp
@@ -33,13 +35,15 @@ export default function Welcome() {
   // while WhatsApp is being asked for a code, or waiting for you to type it, look again every two seconds
   const read = preview === 'new' ? undefined : setup?.read
   const unread = preview === 'new' ? 0 : setup?.unread ?? 0
-  const waiting = wa?.state === 'starting' || wa?.state === 'code' || read?.state === 'reading'
+  const tg = setup?.telegram
+  const tgAsks = tg?.state === 'code' || tg?.state === 'password' || tg?.state === 'checking'
+  const waiting = wa?.state === 'starting' || wa?.state === 'code' || read?.state === 'reading' || tg?.state === 'starting' || tg?.state === 'checking'
   useEffect(() => {
     if (!waiting) return
     const id = setInterval(refresh, 2000)
     return () => clearInterval(id)
   }, [waiting])
-  const act = async (what: 'whatsapp' | 'sync' | 'import' | 'read', body = {}) => {
+  const act = async (what: 'whatsapp' | 'sync' | 'import' | 'read' | 'telegram' | 'telegram-code', body = {}) => {
     setAsking(true)
     try {
       await setupAct(what, body)
@@ -103,13 +107,40 @@ export default function Welcome() {
             </Stack>
           </SectionCard>
         ) : null}
-        <OnboardingStep n={2} icon="paper-plane-outline" title="Pair Telegram" state={state(1)} action={check}
+        <OnboardingStep n={2} icon="paper-plane-outline" title="Morning message on Telegram" state={state(1)} action={check}
                         body="Each morning at 07:30 you get the one to three things that matter today, with Done and Not needed under each."
                         how="python -m spike telegram pair" doneNote="Morning message at 07:30" />
         <OnboardingStep n={3} icon="cloud-upload-outline" title="Import your other chats" state={state(2)} action={files.length ? undefined : check}
                         body={files.length ? 'These exports are in Downloads on your Mac. Pick one to read it.'
                           : 'LinkedIn, Instagram and X come from their data exports. Request one, save it to Downloads on your Mac, and it shows up here.'}
                         how={setup ? undefined : 'python -m spike import-linkedin <folder>'} doneNote={exports.map((n) => NETWORK_NAMES[n]).join(', ')} />
+        {tg && preview !== 'new' ? (
+          <SectionCard title="Telegram chats">
+            <Stack pad="lg" gap="md">
+              {tg.linked || tg.state === 'linked' ? <Text variant="bodyStrong">Linked. Your Telegram chats are coming in.</Text>
+                : !tg.ready ? (
+                  <Text variant="body" tone="secondary">Reading your Telegram chats needs your own api_id and api_hash from my.telegram.org. docs/TELEGRAM.md has the steps.</Text>
+                ) : tg.state === 'starting' ? <Loader label="Asking Telegram for a code..." />
+                : tgAsks ? (
+                  <>
+                    <TextField label={tg.state === 'password' ? 'Two-step password' : 'Code from Telegram'} value={tgCode} onChangeText={setTgCode}
+                               keyboardType={tg.state === 'password' ? 'default' : 'number-pad'} secureTextEntry={tg.state === 'password'} autoComplete="off"
+                               error={tg.message ?? undefined}
+                               hint={tg.state === 'password' ? (tg.hint ? `Your hint: ${tg.hint}` : 'The one you set in Telegram.') : 'Telegram sent it to your Telegram app.'} />
+                    <Button label="Link" variant="primary" loading={tg.state === 'checking'} disabled={!tgCode.trim()}
+                            onPress={async () => { await act('telegram-code', { code: tgCode }); setTgCode('') }} />
+                  </>
+                ) : (
+                  <>
+                    {tg.state === 'error' && tg.message ? <View style={{ marginHorizontal: -t.space.lg }}><InlineError title="Telegram didn’t link." body={tg.message} /></View> : null}
+                    <Text variant="body" tone="secondary">soloyolo reads your one-to-one Telegram chats too. It never sends or marks anything read.</Text>
+                    <TextField label="Your Telegram number" value={tgPhone} onChangeText={setTgPhone} placeholder="919800000000" keyboardType="phone-pad" hint="With the country code." />
+                    <Button label="Get code" variant="primary" loading={asking} disabled={tgPhone.replace(/\D/g, '').length < 8} onPress={() => act('telegram', { phone: tgPhone })} />
+                  </>
+                )}
+            </Stack>
+          </SectionCard>
+        ) : null}
         {files.length ? (
           <SectionCard title="Exports in Downloads">
             <NavList rows={files.map((f) => ({

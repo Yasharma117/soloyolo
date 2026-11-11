@@ -6,6 +6,9 @@ The server (`python -m spike serve`) owns one Setup per store. It does two thing
            connectord running afterwards, because the same process is what keeps syncing.
   import   reads a LinkedIn, Instagram, X or WhatsApp export it found in ~/Downloads, in a background thread,
            and says which stage it's at.
+  telegram runs `connectord link --network telegram --phone …`, then passes on the code Telegram sends you (and
+           your two-step password, if you set one) as you type them in the app. Needs your own api_id and api_hash
+           from my.telegram.org (docs/TELEGRAM.md); nothing is stored here but what connectord keeps.
   read     runs one pass over the chats with new messages (`spike watch --once`), which is what turns messages
            into promises. With Claude it sends those chats' text to Claude, so the app asks for it by name.
 
@@ -54,6 +57,8 @@ class Setup:
         self.proc: subprocess.Popen | None = None
         self.wa = {"state": "idle", "code": None, "message": None}
         self.jobs: dict[str, dict] = {}
+        self.tg = {"state": "idle", "hint": None, "message": None}
+        self.tg_proc: subprocess.Popen | None = None
         self.reading = dict(IDLE_READ)
         self.reader: subprocess.Popen | None = None
 
@@ -133,9 +138,75 @@ class Setup:
             self.wa = {"state": "idle", "code": None, "message": last_error}  # sync stopped: status() says so
 
     def stop(self) -> None:
-        for proc in (self.proc, self.reader):
+        for proc in (self.proc, self.reader, self.tg_proc):
             if proc and proc.poll() is None:
                 proc.terminate()
+
+    # --- Telegram -------------------------------------------------------------------------------
+    def tg_ready(self) -> bool:
+        """api_id and api_hash are set: in the environment, or telegram-api.json beside the store."""
+        return bool(os.environ.get("TELEGRAM_API_ID") and os.environ.get("TELEGRAM_API_HASH")) or (self.data / "telegram-api.json").is_file()
+
+    def tg_linked(self) -> bool:
+        try:
+            conn = sqlite3.connect(f"file:{self.db}?mode=ro", uri=True)
+            try:
+                return conn.execute("SELECT 1 FROM account WHERE network = 'telegram' AND remote_user != ''").fetchone() is not None
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            return False
+
+    def tg_link(self, phone: str) -> dict:
+        """Ask Telegram for a login code. It arrives in your Telegram app; type it with tg_answer()."""
+        if not PHONE.fullmatch(phone):
+            raise ValueError("Enter your number with the country code, digits only, like 919800000000.")
+        with self.lock:
+            if not self.connectord.exists():
+                self.tg = {"state": "error", "hint": None, "message": NOT_BUILT}
+                return self.status()
+            if not self.tg_ready():
+                raise ValueError("Telegram needs your own api_id and api_hash first. docs/TELEGRAM.md says where to get them.")
+            if self.tg_proc and self.tg_proc.poll() is None:
+                if self.tg["state"] == "linked":
+                    return self.status()
+                self.tg_proc.terminate()
+                self.tg_proc.wait(timeout=10)
+            self.tg = {"state": "starting", "hint": None, "message": None}
+            self.tg_proc = subprocess.Popen([str(self.connectord), "--data", str(self.data), "link", "--network", "telegram", "--phone", phone],
+                                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace")
+            threading.Thread(target=self._follow_tg, args=(self.tg_proc,), daemon=True).start()
+        return self.status()
+
+    def tg_answer(self, answer: str) -> dict:
+        """The code or password connectord is waiting for. Written to its stdin, never logged or kept."""
+        with self.lock:
+            if self.tg["state"] not in ("code", "password") or not self.tg_proc or self.tg_proc.poll() is not None:
+                raise ValueError("Telegram isn't waiting for a code. Start again.")
+            if not answer.strip() or "\n" in answer:
+                raise ValueError("Type the code Telegram sent you.")
+            self.tg = {**self.tg, "state": "checking"}
+            self.tg_proc.stdin.write(answer.strip() + "\n")  # type: ignore[union-attr]
+            self.tg_proc.stdin.flush()  # type: ignore[union-attr]
+        return self.status()
+
+    def _follow_tg(self, proc: subprocess.Popen) -> None:
+        """Only the prompts and the result are kept; history lines and anything else are dropped."""
+        last_error = None
+        for line in proc.stdout:  # type: ignore[union-attr]
+            if m := re.match(r"Telegram (code|password) needed:\s*(.*)", line.strip()):
+                again = self.tg["state"] == "checking" and self.tg.get("asked") == m.group(1)
+                self.tg = {"state": m.group(1), "hint": m.group(2)[:120] or None, "asked": m.group(1),
+                           "message": f"That {m.group(1)} didn't work. Try again." if again else None}
+            elif line.startswith("Linked as "):
+                self.tg = {"state": "linked", "hint": None, "message": None}
+            elif m := re.match(r"(?:connectord: )?(link: .*)", line.strip()):
+                last_error = m.group(1)[:300]
+        proc.wait()
+        if self.tg_proc is proc and self.tg["state"] != "linked":
+            self.tg = {"state": "error", "hint": None, "message": last_error or "Telegram stopped before the link finished. Try again."}
+        elif self.tg_proc is proc:
+            self.tg = {"state": "idle", "hint": None, "message": last_error}
 
     # --- reading ----------------------------------------------------------------------------
     def unread(self) -> int:
@@ -266,6 +337,8 @@ class Setup:
         linked = self.linked()
         return {"ready": self.connectord.exists(),
                 "whatsapp": {**self.wa, "linked": linked, "syncing": linked and self.running()},
+                "telegram": {"state": self.tg["state"], "hint": self.tg["hint"], "message": self.tg["message"],
+                             "ready": self.tg_ready(), "linked": self.tg_linked()},
                 "exports": self.exports(), "unread": self.unread(), "claude": shutil.which("claude") is not None,
                 "read": dict(self.reading)}
 

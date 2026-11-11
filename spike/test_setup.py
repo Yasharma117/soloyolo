@@ -23,11 +23,19 @@ EXPORT = Path(__file__).parent / "fixtures/linkedin/Complete_LinkedInDataExport_
 # every live message; the second line stands for one, and must never reach the app.
 FAKE = """#!/usr/bin/env python3
 import sys, time
-if "link" in sys.argv:
+if "link" in sys.argv and "telegram" not in sys.argv:
     print("\\nPairing code: ABCD-EFGH\\n", flush=True)
     print('{"method":"event","params":{"text":"a private message"}}', flush=True)
     time.sleep(0.3)
     print("Linked as 919800000000@s.whatsapp.net. Syncing history; Ctrl-C to stop.", flush=True)
+elif "telegram" in sys.argv:
+    print("Telegram code needed: sent to your Telegram app", flush=True)
+    while sys.stdin.readline().strip() != "12345":
+        print("Telegram code needed: sent to your Telegram app", flush=True)
+    print("Telegram password needed: hint pet", flush=True)
+    sys.stdin.readline()
+    print('{"method":"event","params":{"text":"a private message"}}', flush=True)
+    print("Linked as 777. Syncing history; Ctrl-C to stop.", flush=True)
 time.sleep(30)
 """
 
@@ -141,6 +149,27 @@ class SetupTest(unittest.TestCase):
         self.assertNotIn("Secretname", json.dumps(s))  # the pass prints names and promises; only counts come back
         self.assertNotIn("deck", json.dumps(s))
         self.assertFalse(lock.exists())
+
+    def test_telegram_asks_for_the_code_then_the_password(self):
+        code, why = self.post("telegram", {"phone": "919800000000"})
+        self.assertEqual(code, 400)
+        self.assertIn("api_id", why)  # no credentials yet
+        (self.db.parent / "telegram-api.json").write_text('{"api_id": 1, "api_hash": "x"}')
+        self.assertFalse(self.get()["telegram"]["linked"])
+        self.assertEqual(self.post("telegram-code", {"code": "1"})[0], 400)  # nothing is waiting for one
+        self.assertEqual(self.post("telegram", {"phone": "919800000000"})[0], 200)
+        self.until(lambda s: s["telegram"]["state"] == "code")
+        self.post("telegram-code", {"code": "99999"})
+        s = self.until(lambda s: s["telegram"]["state"] == "code" and s["telegram"]["message"])
+        self.assertIn("didn't work", s["telegram"]["message"])
+        self.post("telegram-code", {"code": "12345"})
+        s = self.until(lambda s: s["telegram"]["state"] == "password")
+        self.assertEqual(s["telegram"]["hint"], "hint pet")
+        self.post("telegram-code", {"code": "my secret"})
+        s = self.until(lambda s: s["telegram"]["state"] == "linked")
+        dump = json.dumps(s)
+        for leak in ("private message", "my secret", "12345"):
+            self.assertNotIn(leak, dump)
 
 
 if __name__ == "__main__":

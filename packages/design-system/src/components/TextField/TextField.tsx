@@ -4,7 +4,7 @@ import { useTheme } from '../../theme'
 import { Text } from '../Text/Text'
 
 export type TextFieldProps = Pick<TextInputProps, 'value' | 'onChangeText' | 'placeholder' | 'autoFocus' | 'keyboardType' | 'returnKeyType'
-  | 'onSubmitEditing' | 'autoCapitalize' | 'maxLength' | 'multiline'> & {
+  | 'onSubmitEditing' | 'autoCapitalize' | 'maxLength' | 'multiline' | 'secureTextEntry' | 'autoComplete'> & {
   /** Sentence case, a noun: "Note", "Name". Also what a screen reader says. */
   label: string
   /** One line under the field: "Only you see notes." Replaced by the error when there is one. */

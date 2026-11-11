@@ -93,6 +93,8 @@ export type SetupStatus = {
   /** connectord is built on the Mac. */
   ready: boolean
   whatsapp: { state: 'idle' | 'starting' | 'code' | 'linked' | 'error'; code: string | null; message: string | null; linked: boolean; syncing: boolean }
+  /** Your own Telegram chats, read by connectord (not the morning-message bot). */
+  telegram: { state: 'idle' | 'starting' | 'code' | 'password' | 'checking' | 'linked' | 'error'; hint: string | null; message: string | null; ready: boolean; linked: boolean }
   exports: ExportFile[]
   /** Chats with messages no pass has read yet. */
   unread: number
