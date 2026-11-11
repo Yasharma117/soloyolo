@@ -54,7 +54,7 @@ pairing code to type into WhatsApp → Linked devices → Link with phone number
 Telegram: call `accounts.login` with `"value": "919800000000"` (your number), then again with the code Telegram
 sent, then, if asked (`password` step), with your two-step password. Each step needs a value; none blocks. It needs
 your own api_id and api_hash from my.telegram.org in `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` or
-`~/.soloyolo/telegram.json`. From a terminal: `connectord link --network telegram --phone 919800000000`, which asks
+`~/.soloyolo/telegram-api.json`. From a terminal: `connectord link --network telegram --phone 919800000000`, which asks
 for the code (and password) on stdin. Details, limits and the ban risk: `docs/TELEGRAM.md`.
 
 ## What works, what doesn't

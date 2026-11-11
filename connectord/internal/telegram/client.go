@@ -25,10 +25,10 @@ const configHelp = `telegram: no api_id / api_hash. Telegram wants every app to 
    {"api_id": 12345, "api_hash": "..."} to %s (chmod 600).
 Never share them or commit them: they are tied to your account and can't be regenerated.`
 
-// apiConfig reads your api_id and api_hash from the environment, or from telegram.json in the
+// apiConfig reads your api_id and api_hash from the environment, or from telegram-api.json in the
 // data directory (two levels above the account's own directory). None is built in.
 func apiConfig(dataDir string) (int, string, error) {
-	path := filepath.Join(filepath.Dir(filepath.Dir(dataDir)), "telegram.json")
+	path := filepath.Join(filepath.Dir(filepath.Dir(dataDir)), "telegram-api.json")
 	id, hash := strings.TrimSpace(os.Getenv("TELEGRAM_API_ID")), strings.TrimSpace(os.Getenv("TELEGRAM_API_HASH"))
 	if id == "" || hash == "" {
 		var f struct {

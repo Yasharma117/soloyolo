@@ -12,7 +12,7 @@
 //
 // The session key lives in dataDir/<account>.session.json (mode 0600, dir 0700). Leaking it
 // means someone else can read your Telegram. api_id and api_hash are yours, from
-// my.telegram.org: TELEGRAM_API_ID / TELEGRAM_API_HASH, or telegram.json in the data directory.
+// my.telegram.org: TELEGRAM_API_ID / TELEGRAM_API_HASH, or telegram-api.json beside the store (telegram.json there is the morning-message bot's).
 package telegram
 
 import (

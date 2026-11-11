@@ -540,7 +540,7 @@ func TestAPIConfig(t *testing.T) {
 	if _, _, err := apiConfig(dir); err == nil || !contains(err.Error(), "my.telegram.org") {
 		t.Fatalf("no config should explain where to get one: %v", err)
 	}
-	os.WriteFile(filepath.Join(root, "telegram.json"), []byte(`{"api_id": 42, "api_hash": "abc"}`), 0o600)
+	os.WriteFile(filepath.Join(root, "telegram-api.json"), []byte(`{"api_id": 42, "api_hash": "abc"}`), 0o600)
 	if id, hash, err := apiConfig(dir); err != nil || id != 42 || hash != "abc" {
 		t.Fatalf("file: %d %q %v", id, hash, err)
 	}

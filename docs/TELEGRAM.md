@@ -21,7 +21,7 @@ summaries of Telegram's own pages and from library maintainers' notes. Each clai
   "Telegram"), then your two-step password if you have one. A wrong code or password asks again; nothing is re-sent.
   A flood wait during login is reported as an error, never slept through.
 - **Your own api_id and api_hash.** Read from `TELEGRAM_API_ID` and `TELEGRAM_API_HASH`, or from
-  `~/.soloyolo/telegram.json` (`{"api_id": 12345, "api_hash": "..."}`). Nothing is hard-coded.
+  `~/.soloyolo/telegram-api.json` (`{"api_id": 12345, "api_hash": "..."}`). Nothing is hard-coded.
 - **Session keys.** `~/.soloyolo/accounts/<id>/<id>.session.json`, file mode 0600 in a 0700 directory. Anyone who
   copies that file is signed in as you. Like the WhatsApp keys, it belongs in the macOS Keychain later.
 - **What it reads.** 1:1 chats with people, and basic groups as evidence. It skips channels, supergroups, bots,
@@ -93,7 +93,7 @@ Sources:
      ./bin/connectord link --network telegram --phone 919800000000
    ```
 
-   Or put `{"api_id": 12345, "api_hash": "..."}` in `~/.soloyolo/telegram.json` (chmod 600) and leave out the variables.
+   Or put `{"api_id": 12345, "api_hash": "..."}` in `~/.soloyolo/telegram-api.json` (chmod 600) and leave out the variables.
 5. You'll see `Telegram code needed: the login code Telegram sent you (in your Telegram app, from the chat called
    Telegram)`. Type the code and press Enter.
 6. If you have two-step verification you'll see `Telegram password needed: ...`. Type the password; it isn't echoed.
