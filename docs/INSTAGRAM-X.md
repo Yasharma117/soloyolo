@@ -88,6 +88,48 @@ name. A group becomes `x-group:<conversationId>` evidence. The importer expands 
 and turns `mediaUrls` into `[photo]` / `[video]` / `[voice note]`. A GIF alone is dropped. Joins, renames
 and reactions are dropped.
 
+## Live, through the extension
+
+The exports are snapshots. `extension/` can also read Instagram and X DMs through the sessions already open in
+Chrome, as it does for LinkedIn, and post them to `/api/live/sync` (`spike/live.py`). Both are off until you turn
+them on in its options page. Instagram conversations become the same `instagram_export.Result` the importer builds
+and go through `instagram_export.save`; X conversations go through `x_export.save`. Setup, pacing, permissions and
+risk: `extension/README.md`. None of it has run against a signed-in account; the parsing is tested on fixtures
+built by hand from the sources below (`extension/fixtures/`).
+
+What the research found (read 2026-11-11), and how sure it is:
+
+- **X, endpoints (medium).** mautrix-twitter still lists `x.com/i/api/1.1/dm/inbox_initial_state.json`,
+  `dm/user_updates.json` (changes since a cursor), `dm/inbox_timeline/trusted.json` (older inbox pages) and
+  `dm/conversation/<id>.json` (a conversation's messages), with the web app's public bearer token, `x-csrf-token`
+  from the `ct0` cookie and `x-twitter-auth-type: OAuth2Session` [14, 15]. Its `Message`, `MessageData`
+  (`id`, `time` in ms, `sender_id`, `text`, `entities`, `attachment`) and `Conversation` (`type` ONE_TO_ONE or
+  GROUP_DM, `sort_timestamp`, `participants[].user_id`, `trusted`, `status`, `min_entry_id`) types are what
+  `extension/x.js` reads [16]. The wrapper keys (`inbox_initial_state`, `user_events`, `inbox_timeline`,
+  `conversation_timeline`) and the `users` map are not in the files read and come from older clients (low).
+- **X, coverage (medium).** mautrix-twitter reads encrypted XChat conversations over a separate protocol and
+  describes the REST endpoints as being for "unencrypted/untrusted conversations" [17]. So the extension sees only
+  the older, unencrypted DMs; as XChat spreads [12, 13], that share shrinks. Message requests (`trusted: false`)
+  are skipped.
+- **X, ids (high).** The live DM id is the archive's `messageId`, so `x_export.save` stores a DM seen both ways
+  once. A 1:1 conversation id is the two user ids joined by a dash, as in the archive.
+- **Instagram, endpoints (low).** instagrapi reads `direct_v2/inbox/` (threads newest first, paged with
+  `oldest_cursor`) and `direct_v2/threads/<id>/` (items newest first), with thread fields `thread_id`,
+  `thread_v2_id`, `users`, `last_activity_at` (microseconds) and item fields `item_id`, `user_id`, `timestamp`
+  (microseconds), `item_type` and per-type payloads [18, 19]. That is the mobile app's private API. The extension
+  sends the same paths to `www.instagram.com/api/v1/` with the web app's id; whether the web still answers them
+  is unverified. mautrix-meta, the maintained bridge, reads Instagram over Lightspeed GraphQL and a socket
+  instead [20], which is far more work and not attempted here.
+- **Instagram, ids (low).** `pk` and `user_id` are JSON numbers; ids past 2^53 lose digits when parsed, so the
+  extension names users by the string `pk_id` and matches senders by the same rounding. Whether `thread_v2_id` is
+  the number in the export's folder name is unknown; if not, a person synced both ways appears twice until merged.
+  Encrypted Instagram chats end on 2026-05-08 [11], so there is no second protocol to miss.
+- **Account risk (medium).** All three forbid unofficial clients in their terms. Private-API clients for
+  Instagram report `checkpoint_required` challenges on plain inbox reads [21], and X's automation rules allow
+  suspension for unofficial access (from general knowledge, not re-read for this). LinkedIn restricts accounts
+  too, and Kondo reads it the same way. Hence off by default, a person's pace, reads only, and a stop on
+  the first unexpected answer rather than a retry.
+
 ## Could not verify
 
 - Whether Instagram's thread slug is the username. That's why the username attribute is written only on
@@ -116,3 +158,11 @@ and reactions are dropped.
 11. vpncentral.com, "Meta will remove encrypted Instagram DMs after May 8, 2026".
 12. MacRumors, 2025-11-17, "X Launches 'Chat' Encrypted DM Service"; TechCrunch, 2025-09-04.
 13. Privacy Guides, 2026-09-15, "X's Encrypted Messenger, X Chat, Disappears From the App Store…".
+14. mautrix/twitter, `pkg/twittermeow/data/endpoints/endpoints.go` (read 2026-11-11): DM endpoint paths.
+15. mautrix/twitter, `pkg/twittermeow/headers.go` (read 2026-11-11): bearer token, csrf and auth-type headers.
+16. mautrix/twitter, `pkg/twittermeow/data/types/messaging.go` (read 2026-11-11): Message, MessageData, Conversation.
+17. mautrix/twitter, `pkg/twittermeow/messaging.go` (read 2026-11-11): REST for unencrypted conversations, XChat for the rest.
+18. subzeroid/instagrapi, `instagrapi/mixins/direct.py` (read 2026-11-11): inbox and thread paths, params, cursors.
+19. subzeroid/instagrapi, `instagrapi/extractors.py` (read 2026-11-11): thread and item fields, microsecond times.
+20. mautrix/meta, `pkg/messagix/` (read 2026-11-11): lightspeed, graphql, socket and e2ee packages; no direct_v2.
+21. ramtinak/InstagramApiSharp, discussion #488 (read 2026-11-11): `GetDirectInboxAsync` returns `checkpoint_required`.

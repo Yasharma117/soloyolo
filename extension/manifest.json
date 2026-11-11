@@ -1,11 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "soloyolo for LinkedIn",
-  "version": "0.1.0",
-  "description": "Keeps soloyolo on your Mac in sync with your LinkedIn messages. Reads only; messages go to your own Mac and nowhere else.",
+  "name": "soloyolo sync",
+  "version": "0.2.0",
+  "description": "Keeps soloyolo on your Mac in sync with your LinkedIn, Instagram and X messages. Reads only; messages go to your own Mac and nowhere else.",
   "permissions": ["cookies", "storage", "alarms", "declarativeNetRequestWithHostAccess"],
-  "host_permissions": ["https://www.linkedin.com/*", "http://127.0.0.1/*", "http://localhost/*"],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "https://www.instagram.com/*",
+    "https://x.com/*",
+    "http://127.0.0.1/*"
+  ],
   "background": { "service_worker": "background.js", "type": "module" },
   "options_ui": { "page": "options.html", "open_in_tab": true },
-  "action": { "default_title": "soloyolo: LinkedIn sync" }
+  "action": { "default_title": "soloyolo sync" }
 }

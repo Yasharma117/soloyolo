@@ -1,0 +1,34 @@
+{
+  "_source": "Built by hand from instagrapi's direct_threads/extract_direct_thread (read 2026-11-11). Not a captured response.",
+  "viewer": { "pk": 17840000000000001, "pk_id": "17840000000000001", "username": "anaya.iyer", "full_name": "Anaya Iyer" },
+  "inbox": {
+    "threads": [
+      {
+        "thread_id": "340282366841710300949128100000000001",
+        "thread_v2_id": "1784512345678901",
+        "thread_title": "Kabir Sharma",
+        "is_group": false,
+        "last_activity_at": 1793100004000000,
+        "users": [{ "pk": 17840000000000002, "pk_id": "17840000000000002", "username": "kabirsharma", "full_name": "Kabir Sharma" }],
+        "items": [{ "item_id": "31000000000000000000000000000005", "user_id": 17840000000000002, "timestamp": "1793100004000000", "item_type": "text", "text": "see you then" }],
+        "has_older": true,
+        "oldest_cursor": "31000000000000000000000000000005"
+      },
+      {
+        "thread_id": "340282366841710300949128100000000002",
+        "thread_v2_id": "1800000000000009",
+        "thread_title": "Goa trip",
+        "is_group": true,
+        "last_activity_at": 1793000000000000,
+        "users": [
+          { "pk": 17840000000000002, "pk_id": "17840000000000002", "username": "kabirsharma", "full_name": "Kabir Sharma" },
+          { "pk": 17840000000000003, "pk_id": "17840000000000003", "username": "devpatel", "full_name": "" }
+        ],
+        "items": []
+      }
+    ],
+    "has_older": true,
+    "oldest_cursor": "1793000000000000"
+  },
+  "status": "ok"
+}

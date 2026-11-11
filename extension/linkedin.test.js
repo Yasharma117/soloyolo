@@ -1,4 +1,4 @@
-// node --test  (offline: LinkedIn's answer shapes, after mautrix-linkedin's types, into what spike/linkedin_live.py reads)
+// node --test  (offline: LinkedIn's answer shapes, after mautrix-linkedin's types, into the shape spike/live.py reads)
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { conversation } from './linkedin.js'
@@ -24,12 +24,12 @@ test('a 1:1 conversation in soloyolo shape', () => {
   assert.deepEqual(conversation(c, msgs), {
     id: c.entityUrn, title: '', group: false,
     participants: [
-      { url: 'https://www.linkedin.com/in/alex', name: 'Alex Rivera', member: 'urn:li:msg_messagingParticipant:urn:li:fsd_profile:alex' },
-      { url: 'https://www.linkedin.com/in/priya', name: 'Priya N', member: 'urn:li:msg_messagingParticipant:urn:li:fsd_profile:priya' },
+      { id: 'https://www.linkedin.com/in/alex', name: 'Alex Rivera', member: 'urn:li:msg_messagingParticipant:urn:li:fsd_profile:alex' },
+      { id: 'https://www.linkedin.com/in/priya', name: 'Priya N', member: 'urn:li:msg_messagingParticipant:urn:li:fsd_profile:priya' },
     ],
     messages: [
-      { id: 'urn:li:msg_message:1', ts: 1, sender: 'https://www.linkedin.com/in/alex', text: 'I will send the deck', subject: '', attachment: false },
-      { id: 'urn:li:msg_message:2', ts: 2, sender: 'https://www.linkedin.com/in/priya', text: '', subject: '', attachment: true },
+      { id: 'urn:li:msg_message:1', ts: 1, sender: 'https://www.linkedin.com/in/alex', text: 'I will send the deck', subject: '', media: [] },
+      { id: 'urn:li:msg_message:2', ts: 2, sender: 'https://www.linkedin.com/in/priya', text: '', subject: '', media: ['attachment'] },
     ],
   })
 })

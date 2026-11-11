@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import identity, linkedin_export, linkedin_live, nudge, priority, setup
+from . import identity, live, nudge, priority, setup
 from .store import Store
 
 INDEX = Path(__file__).with_name("viewer.html")
@@ -29,6 +29,8 @@ APP_BUILD = Path(__file__).resolve().parents[1] / "mobile/dist-web/app.html"
 # promises close off the chat; these are its buckets, so the answers can be counted the same way.
 REASONS = {"off_chat": "done off the chat", "not_needed": "no longer needed",
            "let_go": "let it go", "misread": "not a real promise"}
+# What the Chrome extension posts (live.py). /api/linkedin/sync is where its first version posted.
+LIVE_ROUTES = {"/api/live/sync": "sync", "/api/linkedin/sync": "linkedin", "/api/live/status": "status"}
 # app.html is written as a page body (so the same file publishes as a demo); the server adds the document.
 APP_HEAD = (b'<!doctype html><html lang="en"><head><meta charset="utf-8">'
             b'<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"></head><body>')
@@ -175,6 +177,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(INDEX.read_bytes(), "text/html; charset=utf-8")
         if path == "/api/setup":
             return self._json(setup.get(self.db).status())
+        if path == "/api/live/status":  # how the extension's sync is going, per network
+            return self._json(live.status(self.db))
         store = Store(self.db)
         try:
             nets = _networks(store)
@@ -222,14 +226,16 @@ class Handler(BaseHTTPRequestHandler):
         host = self.headers.get("Host", "")
         if host not in self.allowed_hosts:
             return self._send(b"forbidden host", "text/plain", 403)
-        if urlsplit(self.path).path == "/api/linkedin/sync":
-            return self._linkedin_sync()
+        if urlsplit(self.path).path in LIVE_ROUTES:
+            return self._live(LIVE_ROUTES[urlsplit(self.path).path])
         origin = self.headers.get("Origin")
         if origin is not None and origin != f"http://{host}":
             return self._send(b"forbidden origin", "text/plain", 403)
         if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
             return self._send(b"json only", "text/plain", 415)
         route = urlsplit(self.path).path
+        if route == "/api/live/token":  # the app shows it, to paste into the extension; made on first ask
+            return self._json({"token": live.token(self.db, create=True)})
         if route not in ("/api/mark", "/api/mute", "/api/merge", "/api/merge/undo",
                          "/api/setup/whatsapp", "/api/setup/sync", "/api/setup/import", "/api/setup/read", "/api/setup/telegram", "/api/setup/telegram-code"):
             return self._send(b"not found", "text/plain", 404)
@@ -357,10 +363,13 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             store.close()
 
-    def _linkedin_sync(self) -> None:
+    def _live(self, what: str) -> None:
         # From the Chrome extension, so the Origin is chrome-extension://. The pairing token stands in for the
         # same-origin check: a web page can't send an Authorization header here without a preflight we never answer.
-        if not linkedin_live.authorized(self.db, self.headers.get("Authorization")):
+        origin = self.headers.get("Origin")
+        if origin is not None and not origin.startswith("chrome-extension://"):
+            return self._send(b"forbidden origin", "text/plain", 403)
+        if not live.authorized(self.db, self.headers.get("Authorization")):
             return self._send(b"not paired: run python -m spike linkedin-token", "text/plain", 401)
         if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
             return self._send(b"json only", "text/plain", 415)
@@ -368,21 +377,27 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             length = -1
-        if not 0 < length <= linkedin_live.MAX_BODY:
+        if not 0 < length <= live.MAX_BODY:
             return self._send(b"bad length", "text/plain", 400)
         try:
             body = json.loads(self.rfile.read(length))
-            if body == {"ping": True}:  # the extension checks it's paired before spending LinkedIn requests
+            if body == {"ping": True}:  # the extension checks it's paired before spending a network's requests
                 return self._json({"ok": True})
-            res = linkedin_live.parse(body)
+            if what == "status":  # the extension's own view: a network switched on or off, or why it stopped
+                live.report(self.db, body)
+                return self._json({"ok": True})
+            network, res = live.parse(body, "linkedin" if what == "linkedin" else None)
         except ValueError as err:
             return self._send(str(err).encode(), "text/plain", 400)
         store = Store(self.db)
         try:
-            summary = linkedin_export.save(store, res)
+            summary = live.save(store, network, res)
         finally:
             store.close()
-        self._json({"ok": True, "summary": summary, "notes": res.notes})
+        you = body["me"].get("name") or body["me"].get("username")
+        live.record(self.db, network, ok=time.time(), summary=summary, error=None, enabled=True,
+                    **({"you": you} if isinstance(you, str) else {}))
+        self._json({"ok": True, "network": network, "summary": summary, "notes": res.notes})
 
     def _json(self, data) -> None:
         self._send(json.dumps(data).encode(), "application/json")

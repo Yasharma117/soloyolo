@@ -107,8 +107,10 @@ or trailing slashes. Connections and messages for the same person therefore shar
 ## Live sync (the Chrome extension)
 
 The export is a snapshot. To stay current, `extension/` reads LinkedIn's own web API through the session in Chrome
-(as Kondo does) and posts to `/api/linkedin/sync` (`spike/linkedin_live.py`). Setup, pacing, risk and what's
-unverified: `extension/README.md`. Both paths go through `save()`. Its `_unseen` check matches a message across
+(as Kondo does) and posts to `/api/live/sync` (`spike/live.py`; `/api/linkedin/sync`, where its first version
+posted, still works). The same extension can read Instagram and X, each behind its own switch
+(`docs/INSTAGRAM-X.md`). Setup, pacing, permissions, risk and what's unverified: `extension/README.md`. Both
+paths go through `linkedin_export.save()`. Its `_unseen` check matches a message across
 the two by person, direction, text and a 2-second window, because the export rounds times to the second and gives
 messages no stable id. Group lines aren't matched across the two yet, so a group line can be stored twice as
 evidence. That's harmless: evidence only closes items.

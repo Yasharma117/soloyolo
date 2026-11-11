@@ -1,0 +1,25 @@
+{
+  "_source": "Built by hand from mautrix-twitter's data/types/messaging.go and endpoints.go (read 2026-11-11). Not a captured response.",
+  "inbox_initial_state": {
+    "cursor": "GRwmgICx1aCDpN0uFoCAseaVgaTdLiUAAAA",
+    "last_seen_event_id": "1990000000000000001",
+    "inbox_timelines": { "trusted": { "status": "AT_END", "min_entry_id": "1910000000000000006" } },
+    "entries": [
+      { "message": { "id": "1990000000000000001", "time": "1793200000000", "conversation_id": "1500000000000000001-1600000000000000002",
+        "message_data": { "id": "1990000000000000001", "time": "1793200000000", "sender_id": "1500000000000000001", "recipient_id": "1600000000000000002", "text": "Q&amp;A deck is at https://t.co/abc", "entities": { "urls": [{ "url": "https://t.co/abc", "expanded_url": "https://example.com/deck" }] } } } }
+    ],
+    "users": {
+      "1500000000000000001": { "id_str": "1500000000000000001", "name": "Anaya Iyer", "screen_name": "anaya_iyer" },
+      "1600000000000000002": { "id_str": "1600000000000000002", "name": "Riya Kapoor", "screen_name": "riya_k" },
+      "1700000000000000003": { "id_str": "1700000000000000003", "name": "Sam Lee", "screen_name": "samlee" }
+    },
+    "conversations": {
+      "1500000000000000001-1600000000000000002": { "conversation_id": "1500000000000000001-1600000000000000002", "type": "ONE_TO_ONE", "sort_timestamp": "1793200000000", "trusted": true, "status": "HAS_MORE", "min_entry_id": "1990000000000000001",
+        "participants": [{ "user_id": "1500000000000000001" }, { "user_id": "1600000000000000002" }] },
+      "1800000000000000777": { "conversation_id": "1800000000000000777", "type": "GROUP_DM", "name": "Offsite", "sort_timestamp": "1793150000000", "trusted": true,
+        "participants": [{ "user_id": "1500000000000000001" }, { "user_id": "1600000000000000002" }, { "user_id": "1700000000000000003" }] },
+      "1500000000000000001-1999999999999999999": { "conversation_id": "1500000000000000001-1999999999999999999", "type": "ONE_TO_ONE", "sort_timestamp": "1793190000000", "trusted": false,
+        "participants": [{ "user_id": "1500000000000000001" }, { "user_id": "1999999999999999999" }] }
+    }
+  }
+}

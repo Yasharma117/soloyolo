@@ -1,0 +1,27 @@
+{
+  "_source": "Built by hand from mautrix-twitter (read 2026-11-11). Entries newest first. Not a captured response.",
+  "conversation_timeline": {
+    "status": "AT_END",
+    "min_entry_id": "1910000000000000006",
+    "max_entry_id": "1990000000000000001",
+    "entries": [
+      { "message": { "id": "1990000000000000001", "time": "1793200000000", "conversation_id": "1500000000000000001-1600000000000000002",
+        "message_data": { "id": "1990000000000000001", "time": "1793200000000", "sender_id": "1500000000000000001", "text": "Q&amp;A deck is at https://t.co/abc", "entities": { "urls": [{ "url": "https://t.co/abc", "expanded_url": "https://example.com/deck" }] } } } },
+      { "join_conversation": { "id": "1950000000000000000", "time": "1793150000000", "conversation_id": "1500000000000000001-1600000000000000002" } },
+      { "message": { "id": "1940000000000000002", "time": "1793140000000", "conversation_id": "1500000000000000001-1600000000000000002",
+        "message_data": { "id": "1940000000000000002", "time": "1793140000000", "sender_id": "1600000000000000002", "text": "https://t.co/vid", "attachment": { "video": { "url": "https://t.co/vid", "audio_only": true } } } } },
+      { "message": { "id": "1930000000000000003", "time": "1793130000000", "conversation_id": "1500000000000000001-1600000000000000002",
+        "message_data": { "id": "1930000000000000003", "time": "1793130000000", "sender_id": "1600000000000000002", "text": "this one https://t.co/tw", "entities": { "urls": [{ "url": "https://t.co/tw", "expanded_url": "https://x.com/riya_k/status/1" }] }, "attachment": { "tweet": { "url": "https://t.co/tw", "expanded_url": "https://x.com/riya_k/status/1" } } } } },
+      { "message": { "id": "1910000000000000006", "time": "1793120000000", "conversation_id": "1500000000000000001-1600000000000000002",
+        "message_data": { "id": "1910000000000000006", "time": "1793120000000", "sender_id": "1600000000000000002", "text": "https://t.co/pic", "attachment": { "photo": { "url": "https://t.co/pic" } } } } }
+    ],
+    "users": {
+      "1500000000000000001": { "id_str": "1500000000000000001", "name": "Anaya Iyer", "screen_name": "anaya_iyer" },
+      "1600000000000000002": { "id_str": "1600000000000000002", "name": "Riya Kapoor", "screen_name": "riya_k" }
+    },
+    "conversations": {
+      "1500000000000000001-1600000000000000002": { "conversation_id": "1500000000000000001-1600000000000000002", "type": "ONE_TO_ONE", "sort_timestamp": "1793200000000", "trusted": true,
+        "participants": [{ "user_id": "1500000000000000001" }, { "user_id": "1600000000000000002" }] }
+    }
+  }
+}
