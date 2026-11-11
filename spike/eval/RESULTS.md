@@ -1,5 +1,25 @@
 # Extraction eval: results
 
+## Run 9 (2026-11-11): the pair, with the checker fixed
+
+The checker's instructions now say a finished item stays, one of each duplicate stays, and unsure means keep
+(run 8 explains why). Same 30 cases, same Mac.
+
+| Setup | Precision | Recall | F1 | Seconds per chat |
+|---|---|---|---|---|
+| **reader `gemma4:e4b`, checker `gemma4:12b@none`** | **0.91** | **1.00** | **0.95** | 21 |
+| reader `gemma4:e4b`, checker `qwen3.5:9b@none` | 0.92 | 0.60 | 0.73 | 21 (2 checker replies malformed) |
+| `qwen3.5:9b@none` alone | 0.71 | 0.60 | 0.65 | 4 |
+| `claude-code` (run 2's table, for comparison) | 0.95 to 1.00 | 0.95 to 1.00 | 0.95 to 1.00 | |
+
+- **The Gemma pair now finds every item and lists two that aren't.** Both extras are a second item beside a
+  promise it already listed ("send notes" twice; "revert with flat status" beside the promise to check with the
+  broker). It removed 4 of the reader's 6 extras and no real item. That is Claude's score in its worse runs.
+- **Qwen 3.5 doesn't suit either job.** At 9B with thinking off it misses 40% alone, and as checker it removed
+  real items and twice answered with the schema itself instead of verdicts.
+- **Treat 0.95 as optimistic.** The checker's instructions were changed after looking at its mistakes on this same
+  set, so this set flatters it. It needs a set it hasn't been tuned on, ideally real chats scored by the user.
+
 ## Run 8 (2026-11-10 to 11): small open models on a Mac, alone and as a council
 
 Same 30 cases, 20 items, prompt unchanged. Models run locally through Ollama on an M5 Mac with 16 GB, one call at a
