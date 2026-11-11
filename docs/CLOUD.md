@@ -13,6 +13,48 @@ them: about **$45 to $70 a month** at the stated volume, nothing kept by the pro
 If only the exact pair will do, the fallback is **Modal**, a serverless GPU that runs both models from
 their open weights: about **$25 to $100 a month** after its free credit, with a cold start on every pass.
 
+## Cost for the pilot, revisited (11 November, afternoon)
+
+The $45 to $70 above is an artefact of two assumptions, not of the models. It assumed 60 chats read an hour, all
+day, every day, and every read sending the whole thread. That is the shape of today's code, which was built for a
+Claude subscription where a read costs nothing extra. Priced per token, the shape is what costs, so it changes.
+
+**What drives the bill.** Each read sends about 1,200 tokens of instructions and schema (measured) plus the thread.
+Today a re-read sends the last 60 days of the chat, up to 1,000 messages: for a busy chat that is 10,000 tokens or
+more, to find the one or two new messages. And a chat that is busy all day changes in most 30-minute passes, so it is
+re-read four or more times a day.
+
+**Two changes** (estimated a day of work, not built):
+
+1. **Read a chat once it has gone quiet**, for example an hour after its last message, instead of every pass it
+   changed in. A conversation is read once per burst, not once per half hour.
+2. **Send only what's new**: the earlier items (already supported), the messages since the last read, and the 30 or
+   so before them for context. About 1,000 tokens of chat instead of 8,000.
+
+**Monthly model cost for ten testers**, from current list prices [2][5]. The volumes are guesses: a tester with 25
+one-to-one chats that move on a typical day.
+
+| Setup | Reads a month | DeepInfra, 26B reads, 31B checks | DeepInfra, 26B both | Cloudflare, 26B both |
+|---|---|---|---|---|
+| As this plan first assumed | 43,200 | $70 | $46 | $51 |
+| Today's code, realistic tester | 30,000 | $81 | $49 | $58 |
+| **With both changes** | 9,000 | **$5.70** | **$5** | **$2** |
+| Both changes, reader thinking off | 9,000 | $3.40 | $2.70 | about $0 (inside the free 10,000 neurons a day) |
+
+Assumptions in the last two rows: 2,200 tokens in per read (instructions plus about 1,000 of chat), 1,000 out
+with thinking or 250 without, and the checker called on 3 reads in 10 (only when the reader found something).
+
+**So for the pilot:** about $2 to $6 a month for the models, plus $0 (Oracle free) or $12 (DigitalOcean) for the
+server, plus a domain at about $1 a month. Roughly **$3 to $20 a month in all**, or under $2 per tester.
+
+**What's not known yet.** None of the hosted sizes has been scored: the free endpoints were rate-limited every time.
+"Thinking off" for the hosted reader is untested. The read volume is a guess until one real tester's week is
+counted, which the server should log from day one (reads, tokens and cost per tester, counts only).
+
+**At a real service's scale** the same shape costs about $0.25 to $0.60 per user a month in model fees, before any
+volume discount. That is cheap enough to carry on a free tier or bury in a small subscription, but only with
+reads debounced and kept to what's new.
+
 ## 1. Where the models run
 
 Gemma 4 comes in five sizes: E2B, E4B, 12B (released 3 June 2026), 26B A4B and 31B, all Apache 2.0 [1].
@@ -155,6 +197,9 @@ days, and ask them to log the device out on their phone. Write that as one scrip
 joins.
 
 ## 5. Phases
+
+Step 0 now includes the two changes above: without them every other number in this plan is too high.
+
 
 | Step | What it unblocks | Main risk |
 |---|---|---|
