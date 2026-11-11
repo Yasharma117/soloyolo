@@ -34,6 +34,26 @@ Nothing here is in a pull request: everything is committed and pushed to `claude
 
 - Council of models (`spike/council.py`) and the thinking setting, with every score so far in `spike/eval/RESULTS.md`.
 
+## Try the pair yourself
+
+With Ollama running (`brew install ollama`, then `ollama pull gemma4:e4b gemma4:12b`):
+
+```bash
+export SOLOYOLO_LLM_URL=http://localhost:11434/v1 SOLOYOLO_COUNCIL=reader=gemma4:e4b,checker=gemma4:12b@none
+.venv/bin/python -m spike.eval --extractor council --jobs 1                         # the 30 made-up chats, ~10 min
+.venv/bin/python -m spike --db ~/.soloyolo/soloyolo.db watch --once --extractor council --top 15   # your store
+```
+
+For real chats start Ollama with `OLLAMA_CONTEXT_LENGTH=16384`: by default it reads only the first 4,096 tokens
+of a prompt, which cuts off a long chat. The app's "Find your promises" card and the launchd jobs don't offer the
+council yet.
+
 ## Needs you
 
-(Filled in as things come up that only you can do: logins, keys, decisions.)
+- **The `/usage` changes.** Three proposals are waiting for your yes (subagent model, unused skills off, a cheaper
+  design skill). Nothing in your settings has been changed.
+- **Scoring the hosted Gemma sizes.** OpenRouter's free Gemma 4 26B and 31B endpoints answered "rate-limited
+  upstream" every time they were tried (10 November evening, 11 November morning). Either try again later, or put
+  a few dollars on DeepInfra and the score takes ten minutes for under a cent.
+- **Decisions in `docs/CLOUD.md`** ("Decisions that are the owner's"), above all whether to hold testers'
+  WhatsApp keys on a server at all.
