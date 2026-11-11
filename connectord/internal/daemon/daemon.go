@@ -321,9 +321,12 @@ func (d *Daemon) resume(ctx context.Context) {
 // --- command-line mode: the same accounts and pump, without a UI on the other end ----------
 
 // Link links a new account for network and keeps it syncing. phone, if set, asks for a pairing
-// code instead of a QR code (the only way that works when the screen showing it is elsewhere).
-// show gets each step to display. An account that is already linked is returned as is.
-func (d *Daemon) Link(ctx context.Context, w io.Writer, network, phone string, show func(adapter.LoginStep)) (store.Account, error) {
+// code instead of a QR code on WhatsApp (the only way that works when the screen showing it is
+// elsewhere), and is the number Telegram sends its login code to. show gets each step to
+// display and returns the user's answer to it: the code or password Telegram asks for, or ""
+// for a step that only waits (a QR code, a WhatsApp pairing code). An account that is already
+// linked is returned as is.
+func (d *Daemon) Link(ctx context.Context, w io.Writer, network, phone string, show func(adapter.LoginStep) string) (store.Account, error) {
 	d.out = json.NewEncoder(w)
 	accts, err := d.store.Accounts(ctx)
 	if err != nil {
@@ -350,8 +353,7 @@ func (d *Daemon) Link(ctx context.Context, w io.Writer, network, phone string, s
 	}
 	step, err := a.Login(ctx, adapter.LoginInput{Value: phone})
 	for err == nil && step.Kind != "done" {
-		show(step)
-		step, err = a.Login(ctx, adapter.LoginInput{})
+		step, err = a.Login(ctx, adapter.LoginInput{Value: show(step)})
 	}
 	if err != nil {
 		return store.Account{}, err

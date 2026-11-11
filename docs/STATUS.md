@@ -10,12 +10,16 @@ Nothing here is in a pull request: everything is committed and pushed to `claude
 | 1 | Model pair: small Gemma 4 reads, mid-size Gemma 4 (thinking off) checks | main session | scored (F1 0.95); next: run it on the live store |
 | 2 | Score the remaining models (mid-size Qwen 3.5) | main session | done: not a fit |
 | 3 | Browser extension, Kondo-style: one extension for LinkedIn, Instagram and X messages | subagent | started |
-| 4 | Telegram personal chats in connectord | subagent | started |
+| 4 | Telegram personal chats in connectord | subagent | done: tested on a fake server, never run on a real account |
 | 5 | Cloud plan: where the model pair runs, and the multi-user server | subagent | done: `docs/CLOUD.md` |
 | 6 | App screens for the new sources (pairing the extension, per-network state) | main session | after 3 |
 
 ## Done
 
+- **Telegram personal chats in connectord** (`connectord/internal/telegram/`, `docs/TELEGRAM.md`). Signs in as you
+  with a phone number, the code Telegram sends and your password if you have one; reads 1:1 chats from the last 90
+  days, then live. Never sends, never marks read. Needs your own api_id and api_hash from my.telegram.org. Tests
+  run against a fake server; it has never signed in to a real account. Not yet in the app's Set up screen.
 - **Cloud plan written: `docs/CLOUD.md`.** The exact pair is not on any hosted API: hosts serve Gemma 4 only at
   26B A4B and 31B. Recommended: DeepInfra for those two (no retention, about $45 to $70 a month at the plan's
   volume, which assumes 60 chats an hour all day), one small VM with a folder per tester, Oracle free or $12 a
@@ -55,5 +59,6 @@ council yet.
 - **Scoring the hosted Gemma sizes.** OpenRouter's free Gemma 4 26B and 31B endpoints answered "rate-limited
   upstream" every time they were tried (10 November evening, 11 November morning). Either try again later, or put
   a few dollars on DeepInfra and the score takes ten minutes for under a cent.
+- **Telegram:** to try it, create an api_id and api_hash at my.telegram.org (steps in `docs/TELEGRAM.md`).
 - **Decisions in `docs/CLOUD.md`** ("Decisions that are the owner's"), above all whether to hold testers'
   WhatsApp keys on a server at all.
