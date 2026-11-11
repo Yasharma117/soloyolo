@@ -104,3 +104,7 @@ export type SetupStatus = {
 }
 /** One pass over the chats that changed, which is what finds promises. Counts only: no names, no text. */
 export type ReadPass = { state: 'idle' | 'reading' | 'done' | 'error'; extractor: 'claude-code' | 'heuristic' | null; total: number; done: number; failed: number; new: number; message: string | null }
+
+/** The browser extension's sync, per network (spike/live.py). Times are epoch seconds, null until set. */
+export type LiveNetwork = { enabled: boolean | null; ok: number | null; summary: string | null; you: string | null; error: string | null; failed: number | null }
+export type LiveStatus = { paired: boolean; networks: Partial<Record<'linkedin' | 'instagram' | 'x', LiveNetwork>> }

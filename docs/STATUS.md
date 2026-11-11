@@ -9,13 +9,19 @@ Nothing here is in a pull request: everything is committed and pushed to `claude
 |---|---|---|---|
 | 1 | Model pair: small Gemma 4 reads, mid-size Gemma 4 (thinking off) checks | main session | scored (F1 0.95); next: run it on the live store |
 | 2 | Score the remaining models (mid-size Qwen 3.5) | main session | done: not a fit |
-| 3 | Browser extension, Kondo-style: one extension for LinkedIn, Instagram and X messages | subagent | started |
+| 3 | Browser extension, Kondo-style: one extension for LinkedIn, Instagram and X messages | subagent | done: tested on fixtures, never run signed in |
 | 4 | Telegram personal chats in connectord | subagent | done: tested on a fake server, never run on a real account |
 | 5 | Cloud plan: where the model pair runs, and the multi-user server | subagent | done: `docs/CLOUD.md` |
-| 6 | App screens for the new sources (pairing the extension, per-network state) | main session | Telegram done; extension after 3 |
+| 6 | App screens for the new sources (pairing the extension, per-network state) | main session | done |
 
 ## Done
 
+- **Browser extension for LinkedIn, Instagram and X** (`extension/`, `spike/live.py`). Reads through your own
+  signed-in Chrome session, slowly, never writes. Instagram and X are off by default with the risk beside the
+  switch. Set up has a Browser extension card: Show token, then each network's state (synced, stopped and why,
+  or off). Parsing is tested on fixtures built from open-source clients; it has never run signed in. Open
+  questions: whether Instagram's web inbox endpoint still answers a browser session at all, and X reaches only
+  older unencrypted DMs. `docs/INSTAGRAM-X.md` has the sources.
 - **Telegram personal chats in connectord** (`connectord/internal/telegram/`, `docs/TELEGRAM.md`). Signs in as you
   with a phone number, the code Telegram sends and your password if you have one; reads 1:1 chats from the last 90
   days, then live. Never sends, never marks read. Needs your own api_id and api_hash from my.telegram.org. Tests
@@ -60,5 +66,7 @@ council yet.
   upstream" every time they were tried (10 November evening, 11 November morning). Either try again later, or put
   a few dollars on DeepInfra and the score takes ten minutes for under a cent.
 - **Telegram:** to try it, create an api_id and api_hash at my.telegram.org (steps in `docs/TELEGRAM.md`).
+- **Extension:** load `extension/` unpacked in Chrome and do one supervised run per network, and decide whether you
+  accept the Instagram and X account risk at all (all three sites' terms forbid unofficial clients).
 - **Decisions in `docs/CLOUD.md`** ("Decisions that are the owner's"), above all whether to hold testers'
   WhatsApp keys on a server at all.

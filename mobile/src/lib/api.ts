@@ -92,6 +92,15 @@ export async function undoMerge(logId: number): Promise<void> {
 
 /** Setting up from the app: ask WhatsApp for a pairing code, start syncing, or read an export from Downloads.
  *  Each returns at once; the progress is in /api/setup, which the screen reloads while something is running. */
+/** The token to paste into the browser extension's options page. Made on the first ask. */
+export async function liveToken(): Promise<string> {
+  await ready
+  const token = mode === 'live' ? (await post<{ token: string }>('/api/live/token', {})).token : demo.liveToken()
+  version++
+  emit()
+  return token
+}
+
 export async function setupAct(what: 'whatsapp' | 'sync' | 'import' | 'read' | 'telegram' | 'telegram-code', body: { phone?: string; file?: string; extractor?: string; code?: string } = {}): Promise<void> {
   await ready
   if (mode === 'live') await post(`/api/setup/${what}`, body)

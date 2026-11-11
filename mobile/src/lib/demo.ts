@@ -1,6 +1,6 @@
 // Made-up people, shaped like the real store, for when no soloyolo is reachable
 // (Expo Go on a phone away from the Mac, or the web preview). Marks change it in memory.
-import type { Edge, ImportJob, Insight, Item, Mark, MergePair, Message, Person, PersonSummary, SetupStatus, Status, TodaySummary, Week } from './types'
+import type { Edge, ImportJob, Insight, Item, LiveStatus, Mark, MergePair, Message, Person, PersonSummary, SetupStatus, Status, TodaySummary, Week } from './types'
 import { isOpen } from './types'
 
 const now = () => Date.now() / 1000
@@ -88,6 +88,7 @@ const THREADS: Record<number, [number, boolean, string][]> = {
 // screens can be seen. The real thing is spike/setup.py.
 const DEMO_EXPORT = 'Complete_LinkedInDataExport_11-02-2026.zip'
 const DEMO_UNREAD = 9
+const liveState = { paired: false }
 const setupState: { wa: SetupStatus['whatsapp']; tg: SetupStatus['telegram'] & { at: number }; at: number; job: (ImportJob & { at: number }) | null; read: SetupStatus['read'] & { at: number } } = {
   wa: { state: 'idle', code: null, message: null, linked: false, syncing: false }, at: 0, job: null,
   tg: { state: 'idle', hint: null, message: null, ready: true, linked: false, at: 0 },
@@ -137,6 +138,12 @@ export const demo = {
                commitments: items.filter((c) => c.person_id === p.id) } satisfies Person as T
     }
     if (path === '/api/setup') return setupNow() as T
+    if (path === '/api/live/status')
+      return { paired: liveState.paired, networks: liveState.paired ? {
+        linkedin: { enabled: true, ok: now() - 1200, summary: '12 new messages from 4 threads', you: 'You', error: null, failed: null },
+        instagram: { enabled: false, ok: null, summary: null, you: null, error: null, failed: null },
+        x: { enabled: false, ok: null, summary: null, you: null, error: null, failed: null },
+      } : {} } satisfies LiveStatus as T
     if (path === '/api/merges') {
       const who = (id: number) => {
         const p = PEOPLE.find((x) => x.id === id)!
@@ -182,6 +189,11 @@ export const demo = {
       live: state === 'open' ? true : it.live,
       reasons: state === 'open' && !it.reasons?.includes('you kept it on') ? ['you kept it on', ...(it.reasons ?? [])] : it.reasons,
     })
+  },
+
+  liveToken(): string {
+    liveState.paired = true // in the demo, showing the token stands in for pasting it into the extension
+    return 'demo-3f9a1c7e2b'
   },
 
   setup(what: 'whatsapp' | 'sync' | 'import' | 'read' | 'telegram' | 'telegram-code', body: { phone?: string; file?: string; extractor?: string; code?: string }): void {

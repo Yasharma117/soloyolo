@@ -6,8 +6,8 @@ import { Banner, Button, InlineError, Loader, NavList, Row, Stack, Text, Network
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { View } from 'react-native'
-import { refresh, setupAct, useData } from '../lib/api'
-import { NETWORK_NAMES, type SetupStatus, type Status } from '../lib/types'
+import { liveToken, refresh, setupAct, useData } from '../lib/api'
+import { NETWORK_NAMES, type LiveStatus, type SetupStatus, type Status } from '../lib/types'
 
 const ON_PHONE = ['On your phone, open WhatsApp, then Linked devices.', 'Tap Link a device, then Link with phone number instead.', 'Type this code. It works for a few minutes.']
 
@@ -22,6 +22,10 @@ export default function Welcome() {
   const [asking, setAsking] = useState(false)
   const [tgPhone, setTgPhone] = useState('')
   const [tgCode, setTgCode] = useState('')
+  const extension = useData<LiveStatus>('/api/live/status').data
+  const [token, setToken] = useState<string | null>(null)
+  // a token alone isn't pairing: until the extension has reported once, keep showing how to pair it
+  const heard = Object.values(extension?.networks ?? {}).some((x) => x && (x.enabled !== null || x.ok || x.error))
   const s = preview === 'new' ? { networks: [], telegram: false } : live
   const has = Object.fromEntries((s?.networks ?? []).map((n) => [n.network, n]))
   const wa = setup?.whatsapp
@@ -139,6 +143,41 @@ export default function Welcome() {
                   </>
                 )}
             </Stack>
+          </SectionCard>
+        ) : null}
+        {extension && preview !== 'new' ? (
+          <SectionCard title="Browser extension">
+            {heard ? (
+              <NavList rows={(['linkedin', 'instagram', 'x'] as const).map((n) => {
+                const x = extension.networks[n]
+                return {
+                  key: n, lead: <NetworkIcon network={n} size="lg" />, label: NETWORK_NAMES[n],
+                  description: !x?.enabled ? 'Off. Switch it on in the extension’s options.'
+                    : x.error ? `Stopped: ${x.error}` : x.ok ? `Synced ${formatRelative(x.ok)}${x.summary ? `. ${x.summary}` : ''}` : 'Waiting for its first sync',
+                  value: !x?.enabled ? 'Off' : x.error ? 'Stopped' : x.ok ? 'On' : undefined,
+                }
+              })} />
+            ) : (
+              <Stack pad="lg" gap="md">
+                <Text variant="body" tone="secondary">
+                  The soloyolo extension for Chrome keeps LinkedIn, and if you switch them on Instagram and X, in sync using the session already open in your browser. It only reads.
+                </Text>
+                {token ? (
+                  <>
+                    <View style={{ backgroundColor: t.color.surfaceRaised, borderRadius: t.radius.md, paddingHorizontal: t.space.md, paddingVertical: t.space.sm + 2, gap: 2 }}>
+                      <Text variant="label" tone="tertiary" upper>Pairing token</Text>
+                      <Text variant="small" selectable style={{ fontWeight: '600' }}>{token}</Text>
+                    </View>
+                    <Text variant="small" tone="tertiary">In Chrome, load the extension folder from chrome://extensions, paste this token in its options, then Save and Sync now. This card updates after the first sync.</Text>
+                    <Button label="Check again" onPress={refresh} />
+                  </>
+                ) : (
+                  <Button label="Show token" variant="primary" disabled={asking} onPress={async () => {
+                    try { setToken(await liveToken()) } catch { toast.show('Couldn’t reach soloyolo on your Mac. Check it’s running, then try again.') }
+                  }} />
+                )}
+              </Stack>
+            )}
           </SectionCard>
         ) : null}
         {files.length ? (
