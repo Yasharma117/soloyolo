@@ -28,8 +28,8 @@ triage (is anything owed?), reader (list everything), checker (remove what isn't
   done", and it took that to cover promises that were kept, which the list should still carry as done. With the
   mid-size Gemma as checker, 6 of the 12 items it removed were real. The prompt now says a finished item stays, one
   of each duplicate stays, and unsure means keep. The re-score is the next run.
-- **Triage is not safe at any size tried.** Each triage model skipped the 10 to 15 chats with nothing in them, and
-  also 3 to 5 chats that held a real item.
+- **Triage is not safe at any size tried.** 11 of the 30 chats hold nothing. Each triage model skipped 15 or 16,
+  so at least 4 or 5 chats with a real item were never read.
 - **Thinking is what the small model's recall is made of.** Off, `gemma4:e4b` is seven times faster and misses a
   fifth of the items. `qwen3.5:4b` with thinking on took over 90 seconds a chat and often returned nothing, so it
   was only scored with it off. `gemma4:12b` with thinking on ran past three minutes a chat on this Mac.
