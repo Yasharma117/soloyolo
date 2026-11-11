@@ -11,11 +11,16 @@ Nothing here is in a pull request: everything is committed and pushed to `claude
 | 2 | Score the remaining models (mid-size Qwen 3.5) | main session | done: not a fit |
 | 3 | Browser extension, Kondo-style: one extension for LinkedIn, Instagram and X messages | subagent | started |
 | 4 | Telegram personal chats in connectord | subagent | started |
-| 5 | Cloud plan: where the model pair runs, and the multi-user server | subagent | started |
+| 5 | Cloud plan: where the model pair runs, and the multi-user server | subagent | done: `docs/CLOUD.md` |
 | 6 | App screens for the new sources (pairing the extension, per-network state) | main session | after 3 |
 
 ## Done
 
+- **Cloud plan written: `docs/CLOUD.md`.** The exact pair is not on any hosted API: hosts serve Gemma 4 only at
+  26B A4B and 31B. Recommended: DeepInfra for those two (no retention, about $45 to $70 a month at the plan's
+  volume, which assumes 60 chats an hour all day), one small VM with a folder per tester, Oracle free or $12 a
+  month at DigitalOcean Bangalore. Fallback: the exact pair on Modal's serverless GPU. Its step 0 is scoring the
+  two hosted sizes.
 - **The pair works.** Small Gemma 4 reading and mid-size Gemma 4 (thinking off) checking finds every item on the
   eval and lists two false ones: F1 0.95, Claude's score in its worse runs. Caveat: tuned on the same set.
   `spike/eval/RESULTS.md`, run 9. Mid-size Qwen 3.5 was scored too and is not a fit for either job.
