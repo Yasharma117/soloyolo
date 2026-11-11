@@ -11,7 +11,12 @@ trying things out, a hosted endpoint for real use. Any role but the reader can b
 
     python -m spike.eval --extractor council --model reader=qwen3.5:4b,checker=gemma4:e4b,triage=llama3.2:3b
 
-It reads fresh each time (no earlier items yet), so it is for the eval, not the live store.
+On a re-read it gets the thread's earlier items, as the Claude extractors do. Then there is no triage (the thread
+is known to hold something, and its items may have been done since), and the checker judges only what's new: an
+earlier item was checked when it was found.
+
+A local Ollama reads only the first 4,096 tokens of a prompt unless told otherwise (OLLAMA_CONTEXT_LENGTH), which
+is enough for the eval's short threads and not for a long chat. Hosted servers don't have that limit.
 """
 from __future__ import annotations
 
@@ -41,10 +46,16 @@ A real item is one of:
 - ask: someone asked the other for something concrete, and the other has neither agreed nor said no.
 
 Not real: a joke or banter, a hope or a maybe ("might come", "will see"), a pleasantry or open-ended offer, a
-plan that was later cancelled or withdrawn, a request that was turned down, something the person does for
-themselves that nobody is waiting on (reading an article, deciding whether to go), a report of something already
-done with nothing left to do, and a second candidate for the same thing as another candidate (keep the one citing
-the message where it was promised or accepted; mark the other not real).
+plan that was later cancelled or withdrawn, a request that was turned down, and something the person does for
+themselves that nobody is waiting on (reading an article, deciding whether to go).
+
+Still real: a promise or request that was later delivered or answered. It happened, and the list records it as done.
+Do not remove an item because it is finished.
+
+When two candidates are the same thing (a request and the reply that accepted it, or the same promise said twice),
+keep exactly one: the one citing the message where it was promised or accepted. Never mark both not real.
+
+When unsure, say real: a wrong keep costs the person one swipe, a wrong remove loses a promise.
 
 Judge only from the thread. Give a verdict for every candidate, by its number."""
 
@@ -84,19 +95,21 @@ class Council:
             self.stats[role]["calls"] += 1
             self.stats[role]["seconds"] += time.time() - t
 
-    def extract(self, thread: Sequence) -> Extraction:
-        text = _stdin(thread, None)
-        if "triage" in self.models and not self._ask("triage", TRIAGE, "Is anything owed in this thread?", text, Any).owed:
+    def extract(self, thread: Sequence, prior: Sequence[dict] | None = None) -> Extraction:
+        text = _stdin(thread, prior)
+        if "triage" in self.models and not prior and not self._ask("triage", TRIAGE, "Is anything owed in this thread?", text, Any).owed:
             self.stats["skipped"] += 1
             return Extraction(commitments=[], topics=[])
         found = _checked(self._ask("reader", SYSTEM, f"Today is {_today()}. List the promises and asks in the thread.",
-                                   text, Extraction), thread)
-        if "checker" in self.models and found.commitments:
+                                   text, Extraction), thread, prior)
+        new = [c for c in found.commitments if not c.previous]
+        if "checker" in self.models and new:
             lines = [f"{n}. {'I owe' if c.owner == 'me' else 'they owe'} ({c.kind}): {c.action}, from message [{c.source_message_id}]"
-                     for n, c in enumerate(found.commitments, start=1)]
+                     for n, c in enumerate(new, start=1)]
             out = self._ask("checker", CHECK, "Check each candidate against the thread.",
                             f"<thread>\n{render(thread)}\n</thread>\n<candidates>\n" + "\n".join(lines) + "\n</candidates>", Verdicts)
             fake = {v.n for v in out.verdicts if not v.real}  # a candidate with no verdict stays: the checker only removes
             self.stats["removed"] += len(fake)
-            found.commitments = [c for n, c in enumerate(found.commitments, start=1) if n not in fake]
+            gone = {id(c) for n, c in enumerate(new, start=1) if n in fake}
+            found.commitments = [c for c in found.commitments if id(c) not in gone]
         return found

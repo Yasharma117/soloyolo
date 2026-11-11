@@ -1,5 +1,43 @@
 # Extraction eval: results
 
+## Run 8 (2026-11-10 to 11): small open models on a Mac, alone and as a council
+
+Same 30 cases, 20 items, prompt unchanged. Models run locally through Ollama on an M5 Mac with 16 GB, one call at a
+time. `@none` means the model's thinking is switched off. A council (`spike/council.py`) gives each model one job:
+triage (is anything owed?), reader (list everything), checker (remove what isn't real).
+
+| Setup | Precision | Recall | F1 | Seconds per chat |
+|---|---|---|---|---|
+| `gemma4:e4b` (thinking on) | 0.80 | 1.00 | 0.89 | 15 |
+| `gemma4:12b@none` | 1.00 | 0.80 | 0.89 | 9 |
+| `gemma4:e4b@none` | 0.84 | 0.80 | 0.82 | 2 |
+| `qwen3.5:4b@none` | 0.86 | 0.60 | 0.71 | 3 |
+| `llama3.2:3b` | 0.16 | 0.15 | 0.15 | 34 (12 of 30 replies malformed) |
+| reader `gemma4:e4b`, checker `gemma4:12b@none` (first checker prompt) | 1.00 | 0.70 | 0.82 | 30 |
+| reader `gemma4:e4b`, checker `gemma4:e4b@none` | 0.85 | 0.85 | 0.85 | 18 |
+| reader `gemma4:e4b`, checker `gemma4:e4b` | 0.89 | 0.80 | 0.84 | 25 |
+| reader `gemma4:e4b`, checker `qwen3.5:4b@none` | 0.94 | 0.75 | 0.83 | 27 |
+| triage `gemma4:12b@none`, reader `gemma4:e4b` | 0.78 | 0.70 | 0.74 | 16 |
+| triage `gemma4:e4b@none`, reader and checker `gemma4:e4b` | 0.88 | 0.70 | 0.78 | 17 |
+| triage `llama3.2:3b`, reader and checker `gemma4:e4b` | 0.86 | 0.60 | 0.71 | 21 |
+
+- **Two Gemma results complement each other.** The small one with thinking on finds everything and lists one false
+  item in five, mostly a second copy of a promise it already listed. The mid-size one with thinking off lists
+  nothing false and misses one in five.
+- **Every checker removed real items.** The first checker prompt told it to remove "a report of something already
+  done", and it took that to cover promises that were kept, which the list should still carry as done. With the
+  mid-size Gemma as checker, 6 of the 12 items it removed were real. The prompt now says a finished item stays, one
+  of each duplicate stays, and unsure means keep. The re-score is the next run.
+- **Triage is not safe at any size tried.** Each triage model skipped the 10 to 15 chats with nothing in them, and
+  also 3 to 5 chats that held a real item.
+- **Thinking is what the small model's recall is made of.** Off, `gemma4:e4b` is seven times faster and misses a
+  fifth of the items. `qwen3.5:4b` with thinking on took over 90 seconds a chat and often returned nothing, so it
+  was only scored with it off. `gemma4:12b` with thinking on ran past three minutes a chat on this Mac.
+- **Sizes on disk:** `gemma4:e4b` 9.5 GB, `gemma4:12b` 7.7 GB, `qwen3.5:4b` 4.0 GB, `llama3.2:3b` 2.0 GB.
+- **Limits of this run.** One run per setup on 20 items, so each item is 5 points of recall; differences of one or
+  two items are noise. The checker prompt is now being tuned against this same set, which flatters it. No Hinglish
+  beyond the one case in the set. Ollama's default context is 4,096 tokens, enough for these short threads only.
+
 ## Run 7 (2026-11-10): an open model, so nobody needs a Claude plan
 
 The same 30 cases and 20 items as run 2's table below, read by an open model through OpenRouter's free tier

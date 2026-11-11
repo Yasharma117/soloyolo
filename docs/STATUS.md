@@ -16,6 +16,12 @@ Nothing here is in a pull request: everything is committed and pushed to `claude
 
 ## Done
 
+- The session hit its usage limit at about 01:30 and resumed at 06:20. The three subagents stopped mid-work and
+  were resumed from where they were; local model scoring kept running in between.
+- The pair as first scored: lists nothing false, finds 70% of real items. The checker was removing kept promises.
+  Its instructions are fixed and the pair is being re-scored. Full table: `spike/eval/RESULTS.md`, run 8.
+- The council can now re-read a chat with its earlier items, which the live store needs (tests in `spike/test_open_model.py`).
+
 - Council of models (`spike/council.py`) and the thinking setting, with every score so far in `spike/eval/RESULTS.md`.
 
 ## Needs you
